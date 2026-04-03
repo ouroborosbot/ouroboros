@@ -4,8 +4,10 @@ import * as path from "path"
 import { DaemonProcessManager } from "./process-manager"
 import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../../nerves/runtime"
+import { registerGlobalLogSink } from "../../nerves/index"
 import { FileMessageRouter } from "./message-router"
 import { HealthMonitor } from "./health-monitor"
+import { DaemonHealthWriter, createHealthNervesSink, getDefaultHealthPath } from "./daemon-health"
 import { TaskDrivenScheduler } from "./task-scheduler"
 import { configureDaemonRuntimeLogger } from "./runtime-logging"
 import { DaemonSenseManager } from "./sense-manager"
@@ -98,6 +100,22 @@ const daemon = new OuroDaemon({
   mode,
 })
 
+/* v8 ignore start — daemon health writer wiring, tested via daemon-health.test.ts @preserve */
+const healthWriter = new DaemonHealthWriter(getDefaultHealthPath())
+const healthSink = createHealthNervesSink(healthWriter, () => ({
+  status: "ok",
+  mode,
+  pid: process.pid,
+  startedAt: new Date().toISOString(),
+  uptimeSeconds: Math.floor(process.uptime()),
+  safeMode: null,
+  degraded: [],
+  agents: {},
+  habits: {},
+}))
+registerGlobalLogSink(healthSink)
+/* v8 ignore stop */
+
 const habitSchedulers: HabitScheduler[] = []
 
 /* v8 ignore start -- habit wiring: lambdas delegate to processManager/fs; tested via HabitScheduler unit tests @preserve */
@@ -165,6 +183,12 @@ process.on("SIGTERM", () => {
   void daemon.stop().then(() => process.exit(0))
 })
 
+// Suppress EPIPE on stdout/stderr — normal when detached daemon's parent exits
+/* v8 ignore start -- EPIPE suppression: only fires when parent process exits @preserve */
+process.stdout?.on?.("error", () => {})
+process.stderr?.on?.("error", () => {})
+/* v8 ignore stop */
+
 /* v8 ignore start -- global exception handlers: genuinely untestable in vitest; exercised by real daemon crashes @preserve */
 let _uncaughtCount = 0
 const CIRCUIT_BREAKER_WINDOW_MS = 60_000
@@ -211,3 +235,4 @@ process.on("unhandledRejection", (reason) => {
   })
 })
 /* v8 ignore stop */
+// daemon stdio fix

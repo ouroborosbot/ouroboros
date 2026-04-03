@@ -127,12 +127,15 @@ export function installLaunchAgent(deps: LaunchdDeps, options: DaemonPlistOption
 
   writeLaunchAgentPlist(deps, options)
 
-  deps.exec(`launchctl bootstrap ${domain} "${fullPath}"`)
+  // Bootstrap the plist so launchd manages crash recovery via KeepAlive.
+  // This is safe because ouro up calls this AFTER the daemon is already running,
+  // so launchd sees the existing process and just registers for KeepAlive.
+  try { deps.exec(`launchctl bootstrap ${domain} "${fullPath}"`) } catch { /* already loaded */ }
 
   emitNervesEvent({
     component: "daemon",
     event: "daemon.launchd_installed",
-    message: "launch agent installed",
+    message: "launch agent installed with KeepAlive",
     meta: { plistPath: fullPath },
   })
 }

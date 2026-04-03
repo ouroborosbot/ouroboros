@@ -2,6 +2,137 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.192",
+      "changes": [
+        "refactor: canonical obligations — ActiveWorkFrame as single source of truth for prompt sections",
+        "feat(mcp): dynamic server add/remove \u2014 agents can manage MCP servers without daemon restart"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.177",
+      "changes": [
+        "feat(mcp): dynamic server add/remove without restart"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.176",
+      "changes": [
+        "feat(mcp): dynamic MCP server add/remove \u2014 agents can add/remove MCP servers in agent.json without daemon restart"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.175",
+      "changes": [
+        "fix(daemon): launchd KeepAlive for crash recovery \u2014 auto-restarts on crash",
+        "fix(daemon): orphan killer excludes MCP server processes",
+        "fix(daemon): health file writer wired into daemon-entry",
+        "fix(engine): auth-failure errors include actionable guidance"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.174",
+      "changes": [
+        "feat(outlook): keyboard shortcuts \u2014 1-7 for tabs, Esc to collapse",
+        "feat(outlook): obligation origin cards \u2014 clickable visual chain from who asked through which channel"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.173",
+      "changes": [
+        "feat(outlook): sessions grouped by person \u2014 same friend across multiple channels shown together with person header"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.172",
+      "changes": [
+        "feat(outlook): inner dialog landmark navigation \u2014 jump to surfaces, rests, delegations",
+        "feat(outlook): active coding sessions shown on Overview dashboard",
+        "feat(outlook): habit confidence indicators \u2014 on schedule, overdue, never fired"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.171",
+      "changes": [
+        "feat(outlook): session state at a glance \u2014 last inbound/outbound shown on each session row",
+        "feat(outlook): habit confidence \u2014 on schedule / overdue / never fired indicators"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.170",
+      "changes": [
+        "feat(outlook): needs-me triage \u2014 action now vs stale sections, dismiss buttons, return-ready highlighting",
+        "fix(outlook): return-ready obligation detection \u2014 highlights results ready but not returned"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.169",
+      "changes": [
+        "fix(outlook): desk prefs wiring \u2014 carrying block, constellations, starred friends now load in production",
+        "feat(outlook): obligation dismiss \u2014 agents can clear stale obligations from needs-me queue",
+        "fix: default minimax model updated to MiniMax-M2.7"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.168",
+      "changes": [
+        "fix(outlook): content area matches sidebar background \u2014 consistent dark surface"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.167",
+      "changes": [
+        "fix(outlook): sidebar border for visual separation between nav and content"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.166",
+      "changes": [
+        "fix(outlook): add dark class to html root \u2014 fixes white/blank page in production"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.165",
+      "changes": [
+        "fix(daemon): dont launchctl bootstrap during ouro up \u2014 write plist only, prevents competing daemon process"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.164",
+      "changes": [
+        "fix(daemon): keep /dev/null fds open until parent exits \u2014 fixes ouro up daemon crash"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.163",
+      "changes": [
+        "fix(daemon): redirect detached spawn stdio to /dev/null \u2014 fixes ouro up daemon crash"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.162",
+      "changes": [
+        "fix(daemon): handle EPIPE in detached daemon \u2014 suppress pipe errors when parent exits after ouro up"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.161",
+      "changes": [
+        "feat(outlook): serve React SPA at root (/), daemon serves static assets",
+        "fix(daemon): graceful EADDRINUSE handling for Outlook port"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.160",
+      "changes": [
+        "feat(outlook): total inspectability expansion \u2014 14 API endpoints, session x-ray, obligation chain tracing, coding deep inspection, attention/pending queue, bridge inventory, habit triage, memory/journal, friend economics, SSE live updates",
+        "feat(outlook): React SPA with Catalyst UI \u2014 sidebar layout, 7-tab agent inspector, chat bubble transcripts with mechanism-tool awareness, hash URL routing",
+        "feat(outlook): agent desk customization \u2014 carrying block, pinned constellations, tab ordering, starred friends, status line, closure memory, needs-me urgency queue",
+        "feat(outlook): nerves observation layer \u2014 shared typed readers, eliminates bespoke type mirrors",
+        "fix(auth): ouro auth for openai-codex always refreshes token, provider verification uses correct endpoint",
+        "fix(daemon): use OUTLOOK_DEFAULT_PORT (6876) for Outlook server"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.159",
       "changes": [
         "Human-facing and agent-facing provider configs: agent.json now has humanFacing and agentFacing blocks, each with provider and model. CLI/Teams/BlueBubbles use humanFacing, inner dialog uses agentFacing.",
@@ -14,12 +145,12 @@
     {
       "version": "0.1.0-alpha.158",
       "changes": [
-        "Task scanner v2: explicit identity via kind: task field. Scanner only parses files that declare themselves as task cards — doing docs, planning docs, and artifacts silently skipped. Eliminates 184 false parse errors on real bundles.",
+        "Task scanner v2: explicit identity via kind: task field. Scanner only parses files that declare themselves as task cards \u2014 doing docs, planning docs, and artifacts silently skipped. Eliminates 184 false parse errors on real bundles.",
         "Typed issue model: every scanner issue has a code, description, proposed fix, confidence (safe/needs_review), and category (live/migration). Replaces flat parseErrors/invalidFilenames arrays.",
         "Board health line: compact board shows health: clean or health: 1 live, 10 migration. Live vs migration split prevents cleanup noise from looking like breakage.",
         "Fix command: ouro task fix (dry-run), ouro task fix --safe (apply deterministic fixes), ouro task fix <id> (inspect/apply individual issues). Currently auto-fixes schema-missing-kind.",
         "Cancelled status: new terminal state reachable from any active status. Auto-archives with work directory, hidden from active board view.",
-        "Derived child_tasks: computed at scan time from parent_task links. child_tasks removed from authored schema — no more hand-maintained stale arrays.",
+        "Derived child_tasks: computed at scan time from parent_task links. child_tasks removed from authored schema \u2014 no more hand-maintained stale arrays.",
         "Work directory awareness: same-stem directories detected and listed on TaskFile (hasWorkDir, workDirFiles). Scanner never descends into them.",
         "Collection root clutter detection: non-task support docs at collection root summarized as one aggregated migration issue per collection.",
         "Root-only scanning: flat directory reads replace recursive walks. Faster and correct."

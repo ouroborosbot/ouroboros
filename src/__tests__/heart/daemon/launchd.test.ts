@@ -153,7 +153,7 @@ describe("launchd daemon management", () => {
       expect(fs.existsSync(logDir)).toBe(true)
     })
 
-    it("writes plist file and calls launchctl bootstrap", () => {
+    it("writes plist file and bootstraps for KeepAlive crash recovery", () => {
       const deps = makeDeps()
 
       installLaunchAgent(deps, defaultPlistOptions)
@@ -177,7 +177,6 @@ describe("launchd daemon management", () => {
 
       installLaunchAgent(deps, defaultPlistOptions)
 
-      // Should call bootout first (best effort), then bootstrap
       expect(deps.exec).toHaveBeenCalledWith(
         expect.stringContaining("launchctl bootout gui/501"),
       )

@@ -8,7 +8,7 @@ import {
   getOpenAICodexConfig,
 } from "./config";
 import { loadAgentConfig } from "./identity";
-import { execTool, summarizeArgs, settleTool, observeTool, ponderTool, restTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
+import { execTool, summarizeArgs, buildToolResultSummary, settleTool, observeTool, ponderTool, restTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities, channelToFacing, type Facing } from "../mind/friends/channel";
 import { surfaceToolDef } from "../senses/surface-tool";
@@ -274,6 +274,10 @@ export interface RunAgentOptions {
   /** When true, the observe tool is available in 1:1 chats (normally group-only).
    *  Used for reaction/feedback signals where silence is natural even in DMs. */
   isReactionSignal?: boolean;
+  /** Pending messages from other sessions/inner dialog, rendered in system prompt. */
+  pendingMessages?: Array<{ from: string; content: string }>;
+  /** Rendered wake packet for continuity-aware prompt. */
+  wakePacket?: string;
 }
 
 export type RunAgentOutcome =
@@ -1123,7 +1127,7 @@ export async function runAgent(
             success = false;
           }
           recordToolOutcome(toolLoopState, tc.name, args, toolResult, success);
-          callbacks.onToolEnd(tc.name, argSummary, success);
+          callbacks.onToolEnd(tc.name, buildToolResultSummary(tc.name, args, toolResult, success), success);
           messages.push({ role: "tool", tool_call_id: tc.id, content: toolResult });
           providerRuntime.appendToolOutput(tc.id, toolResult);
         }
@@ -1184,7 +1188,21 @@ export async function runAgent(
         /* v8 ignore next -- defensive: classifyError should not throw @preserve */
         terminalErrorClassification = "unknown";
       }
-      callbacks.onError(terminalError, "terminal");
+
+      /* v8 ignore start — auth-failure guidance: tested via provider error classification tests @preserve */
+      if (terminalErrorClassification === "auth-failure") {
+        const agentName = getAgentName()
+        const currentProvider = providerRuntime.id
+        callbacks.onError(new Error(
+          `${currentProvider} (${providerRuntime.model}) encountered an error. ` +
+          `Run \`ouro auth --agent ${agentName} --provider ${currentProvider}\` to refresh credentials, ` +
+          `or \`ouro auth switch --agent ${agentName} --provider <other>\` to switch providers.`
+        ), "terminal")
+      } else {
+        callbacks.onError(terminalError, "terminal");
+      }
+      /* v8 ignore stop */
+
       emitNervesEvent({
         level: "error",
         event: "engine.error",

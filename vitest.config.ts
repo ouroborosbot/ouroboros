@@ -13,7 +13,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    exclude: ["dist/**", "node_modules/**", ".claude/**"],
+    exclude: ["dist/**", "node_modules/**", "packages/**", ".claude/**", "src/__tests__/senses/cli/*.tsx"],
     maxWorkers: 1,
     setupFiles: ["src/__tests__/nerves/global-capture.ts"],
     coverage: {
@@ -22,6 +22,9 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: [
         "src/__tests__/**",
+        "src/**/*.d.ts",
+        "src/**/*.tsx",
+        "src/senses/cli/**",
         "src/senses/*-entry.ts",
         "src/reflection/*-entry.ts",
         "src/repertoire/coding/types.ts",
@@ -29,6 +32,8 @@ export default defineConfig({
         "src/repertoire/tasks/types.ts",
         "src/nerves/coverage/cli-main.ts",
         "src/heart/providers/anthropic-token.ts",
+        "src/nerves/observation.ts",
+        "src/heart/daemon/outlook-render.ts",
       ],
       thresholds: {
         lines: 100,

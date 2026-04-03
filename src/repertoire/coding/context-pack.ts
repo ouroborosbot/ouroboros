@@ -6,8 +6,11 @@ import { spawnSync } from "child_process"
 import { formatLiveWorldStateCheckpoint, type ActiveWorkFrame } from "../../heart/active-work"
 import { getAgentName, getAgentRoot } from "../../heart/identity"
 import { emitNervesEvent } from "../../nerves/runtime"
+import { emitEpisode } from "../../mind/episodes"
 import { listSkills } from "../skills"
-import type { CodingSession, CodingSessionRequest } from "./types"
+import type { CodingSession, CodingSessionRequest, CodingIdentityPacket } from "./types"
+
+export type { CodingIdentityPacket } from "./types"
 
 const CONTEXT_FILENAMES = ["AGENTS.md", "CLAUDE.md"]
 
@@ -17,12 +20,15 @@ export interface CodingContextPack {
   stateFile: string
   scopeContent: string
   stateContent: string
+  identityPacket: CodingIdentityPacket
 }
 
 export interface CodingContextPackInput {
   request: CodingSessionRequest
   existingSessions?: CodingSession[]
   activeWorkFrame?: ActiveWorkFrame
+  /** Compact rendered wake packet for continuity-aware coding context. */
+  wakePacket?: string
 }
 
 interface CommandResult {
@@ -143,6 +149,62 @@ function captureRepoSnapshot(
   }
 }
 
+function buildIdentityPacket(
+  snapshot: RepoSnapshot,
+  request: CodingSessionRequest,
+): CodingIdentityPacket {
+  if (!snapshot.available) {
+    return {
+      repoPath: null,
+      worktreePath: null,
+      branch: null,
+      commit: null,
+      dirty: false,
+      dirtyFiles: [],
+      taskRef: request.taskRef ?? null,
+      verificationCommands: request.verificationCommands ?? [],
+      verificationStatus: "not-verified",
+    }
+  }
+
+  const dirtyFiles = snapshot.statusLines.filter((line) => line.length > 0)
+
+  return {
+    repoPath: snapshot.repoRoot,
+    worktreePath: snapshot.repoRoot,
+    branch: snapshot.branch,
+    commit: snapshot.head,
+    dirty: dirtyFiles.length > 0,
+    dirtyFiles,
+    taskRef: request.taskRef ?? null,
+    verificationCommands: request.verificationCommands ?? [],
+    verificationStatus: "not-verified",
+  }
+}
+
+function formatIdentitySection(packet: CodingIdentityPacket): string {
+  const lines = [
+    "## Coding Identity",
+    `repoPath: ${packet.repoPath ?? "unknown"}`,
+    `worktreePath: ${packet.worktreePath ?? "unknown"}`,
+    `branch: ${packet.branch ?? "unknown"}`,
+    `commit: ${packet.commit ?? "unknown"}`,
+    `dirty: ${packet.dirty}`,
+  ]
+  if (packet.dirtyFiles.length > 0) {
+    lines.push("dirtyFiles:")
+    for (const file of packet.dirtyFiles) {
+      lines.push(file)
+    }
+  }
+  lines.push(`taskRef: ${packet.taskRef ?? "none"}`)
+  if (packet.verificationCommands.length > 0) {
+    lines.push(`verificationCommands: ${packet.verificationCommands.join(", ")}`)
+  }
+  lines.push(`verificationStatus: ${packet.verificationStatus}`)
+  return lines.join("\n")
+}
+
 function formatContextFiles(files: ContextFile[]): string {
   if (files.length === 0) return "(none found)"
   return files.map((file) => `### ${file.path}\n${file.content}`).join("\n\n")
@@ -214,7 +276,9 @@ function buildStateContent(
   snapshot: RepoSnapshot,
   existingSessions: CodingSession[],
   agentName: string,
+  identityPacket: CodingIdentityPacket,
   activeWorkFrame?: ActiveWorkFrame,
+  wakePacket?: string,
 ): string {
   const gitSection = snapshot.available
     ? [
@@ -233,6 +297,9 @@ function buildStateContent(
     `agent: ${request.parentAgent ?? agentName}`,
     formatOrigin(request),
     `obligationId: ${request.obligationId ?? "none"}`,
+    ...(wakePacket ? ["", "## Continuity", wakePacket] : []),
+    "",
+    formatIdentitySection(identityPacket),
     "",
     "## Workspace Snapshot",
     gitSection,
@@ -279,6 +346,7 @@ export function prepareCodingContextPack(
   const snapshot = captureRepoSnapshot(input.request.workdir, runCommand)
   const generatedAt = nowIso()
 
+  const identityPacket = buildIdentityPacket(snapshot, input.request)
   const scopeContent = buildScopeContent(input.request, contextFiles, skills, agentName)
   const stateContent = buildStateContent(
     input.request,
@@ -287,7 +355,9 @@ export function prepareCodingContextPack(
     snapshot,
     existingSessions,
     agentName,
+    identityPacket,
     input.activeWorkFrame,
+    input.wakePacket || undefined,
   )
 
   mkdirSync(contextDir, { recursive: true })
@@ -315,5 +385,32 @@ export function prepareCodingContextPack(
     stateFile,
     scopeContent,
     stateContent,
+    identityPacket,
   }
+}
+
+/**
+ * Emit a coding milestone episode when a session completes or blocks.
+ * This is the outbound leg of the coding round-trip: compact wake packet goes IN,
+ * episodes come BACK OUT.
+ */
+export function emitCodingEpisode(
+  agentRoot: string,
+  session: CodingSession,
+  outcome: string,
+): void {
+  emitEpisode(agentRoot, {
+    kind: "coding_milestone",
+    summary: `coding session ${session.id} (${session.runner}): ${outcome}`,
+    whyItMattered: `coding lane ${session.status}`,
+    relatedEntities: [`coding:${session.id}`],
+    salience: session.status === "failed" ? "high" : "medium",
+  })
+
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.coding_episode_emitted",
+    message: `coding episode emitted for ${session.id}`,
+    meta: { sessionId: session.id, outcome, status: session.status },
+  })
 }

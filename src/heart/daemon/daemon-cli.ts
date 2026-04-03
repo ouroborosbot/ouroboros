@@ -62,6 +62,7 @@ export type OuroCliCommand =
   | { kind: "daemon.stop" }
   | { kind: "daemon.status" }
   | { kind: "daemon.logs" }
+  | { kind: "outlook"; json?: boolean }
   | { kind: "auth.run"; agent: string; provider?: AgentProvider }
   | { kind: "auth.verify"; agent: string; provider?: AgentProvider }
   | { kind: "auth.switch"; agent: string; provider: AgentProvider; facing?: Facing }
@@ -116,7 +117,7 @@ export interface OuroCliDeps {
   fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
   listDiscoveredAgents?: () => Promise<string[]> | string[]
   runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
-  runAdoptionSpecialist?: () => Promise<string | null>
+  runSerpentGuide?: () => Promise<string | null>
   runAuthFlow?: (input: RuntimeAuthInput) => Promise<RuntimeAuthResult>
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
@@ -165,6 +166,7 @@ interface StatusOverviewRow {
   daemon: string
   health: string
   socketPath: string
+  outlookUrl: string
   version: string
   lastUpdated: string
   repoRoot: string
@@ -225,6 +227,7 @@ function parseStatusPayload(data: unknown): StatusPayload | null {
     daemon: stringField((overview as Record<string, unknown>).daemon) ?? "unknown",
     health: stringField((overview as Record<string, unknown>).health) ?? "unknown",
     socketPath: stringField((overview as Record<string, unknown>).socketPath) ?? "unknown",
+    outlookUrl: stringField((overview as Record<string, unknown>).outlookUrl) ?? "unavailable",
     version: stringField((overview as Record<string, unknown>).version) ?? "unknown",
     lastUpdated: stringField((overview as Record<string, unknown>).lastUpdated) ?? "unknown",
     repoRoot: stringField((overview as Record<string, unknown>).repoRoot) ?? "unknown",
@@ -297,7 +300,11 @@ function formatTable(headers: string[], rows: string[][]): string {
   const widths = headers.map((header, index) =>
     Math.max(header.length, ...rows.map((row) => row[index]!.length)),
   )
-  const renderRow = (row: string[]) => `| ${row.map((cell, index) => cell.padEnd(widths[index])).join(" | ")} |`
+  const renderRow = (row: string[]) => `| ${row.map((cell, index) => (
+    index === row.length - 1
+      ? cell
+      : cell.padEnd(widths[index])
+  )).join(" | ")} |`
   const divider = `|-${widths.map((width) => "-".repeat(width)).join("-|-")}-|`
   return [
     renderRow(headers),
@@ -315,6 +322,7 @@ function formatDaemonStatusOutput(response: DaemonResponse, fallback: string): s
     ["Socket", payload.overview.socketPath],
     ["Version", payload.overview.version],
     ["Last Updated", payload.overview.lastUpdated],
+    ["Outlook", payload.overview.outlookUrl],
     ["Entry Path", payload.overview.entryPath],
     ["Mode", payload.overview.mode],
     ["Workers", String(payload.overview.workerCount)],
@@ -422,6 +430,7 @@ function usage(): string {
     "  ouro [up]",
     "  ouro dev [--repo-path <path>] [--clone [--clone-path <path>]]",
     "  ouro stop|down|status|logs|hatch",
+    "  ouro outlook [--json]",
     "  ouro -v|--version",
     "  ouro config model --agent <name> <model-name>",
     "  ouro config models --agent <name>",
@@ -475,6 +484,7 @@ function buildStoppedStatusPayload(socketPath: string): StatusPayload {
       daemon: "stopped",
       health: "warn",
       socketPath,
+      outlookUrl: "unavailable",
       version: metadata.version,
       lastUpdated: metadata.lastUpdated,
       repoRoot: metadata.repoRoot,
@@ -1259,6 +1269,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
   if (head === "status") return { kind: "daemon.status" }
   if (head === "logs") return { kind: "daemon.logs" }
+  if (head === "outlook") return { kind: "outlook", ...(args.includes("--json") ? { json: true } : {}) }
   if (head === "hatch") return parseHatchCommand(args.slice(1))
   if (head === "auth") return parseAuthCommand(args.slice(1))
   if (head === "task") return parseTaskCommand(args.slice(1))
@@ -1303,11 +1314,16 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
 
 function defaultStartDaemonProcess(socketPath: string): Promise<{ pid: number | null }> {
   const entry = path.join(getRepoRoot(), "dist", "heart", "daemon", "daemon-entry.js")
+  // Redirect stdio to /dev/null via file descriptors — using 'ignore' causes EPIPE
+  // when the daemon's logging system writes to stderr after the parent exits.
+  const outFd = fs.openSync(os.devNull, "w")
+  const errFd = fs.openSync(os.devNull, "w")
   const child = spawn("node", [entry, "--socket", socketPath], {
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", outFd, errFd],
   })
   child.unref()
+  // Don't close fds — the child process needs them. They'll be cleaned up when the parent exits.
   return Promise.resolve({ pid: child.pid ?? null })
 }
 
@@ -1496,7 +1512,7 @@ export function discoverExistingCredentials(secretsRoot: string): DiscoveredCred
 }
 
 /* v8 ignore start -- integration: interactive terminal specialist session @preserve */
-async function defaultRunAdoptionSpecialist(): Promise<string | null> {
+async function defaultRunSerpentGuide(): Promise<string | null> {
   const { runCliSession } = await import("../../senses/cli")
   const { patchRuntimeConfig } = await import("../config")
   const { setAgentName, setAgentConfigOverride } = await import("../identity")
@@ -1525,10 +1541,38 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     // Default models per provider (used when entering new credentials)
     const defaultModels: Record<AgentProvider, string> = {
       anthropic: "claude-opus-4-6",
-      minimax: "MiniMax-Text-01",
+      minimax: "MiniMax-M2.7",
       "openai-codex": "gpt-5.4",
       "github-copilot": "claude-sonnet-4.6",
       azure: "",
+    }
+
+    // Scan environment variables for API keys
+    const envKeys: Array<{ provider: AgentProvider; envVar: string; credKey: string }> = [
+      { provider: "anthropic", envVar: "ANTHROPIC_API_KEY", credKey: "setupToken" },
+      { provider: "openai-codex", envVar: "OPENAI_API_KEY", credKey: "oauthAccessToken" },
+      { provider: "azure", envVar: "AZURE_OPENAI_API_KEY", credKey: "apiKey" },
+      { provider: "azure", envVar: "AZURE_OPENAI_KEY", credKey: "apiKey" },
+      { provider: "minimax", envVar: "MINIMAX_API_KEY", credKey: "apiKey" },
+      { provider: "github-copilot", envVar: "GITHUB_TOKEN", credKey: "token" },
+    ]
+    const envDiscovered: Array<DiscoveredCredential & { envVar: string }> = []
+    for (const { provider, envVar, credKey } of envKeys) {
+      const value = process.env[envVar]
+      if (value) {
+        const envCred: HatchCredentialsInput = { [credKey]: value }
+        // For Azure, also check for endpoint and deployment env vars
+        if (provider === "azure") {
+          const endpoint = process.env.AZURE_OPENAI_ENDPOINT
+          const deployment = process.env.AZURE_OPENAI_DEPLOYMENT
+          if (endpoint) envCred.endpoint = endpoint
+          if (deployment) envCred.deployment = deployment
+        }
+        const provCfg: Record<string, string> = { model: defaultModels[provider] }
+        if (provider === "azure" && envCred.deployment) provCfg.deployment = envCred.deployment
+        envDiscovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg, envVar })
+        discovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg })
+      }
     }
 
     if (discovered.length > 0) {
@@ -1538,7 +1582,9 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
       for (let i = 0; i < unique.length; i++) {
         const model = unique[i].providerConfig.model || unique[i].providerConfig.deployment || ""
         const modelLabel = model ? `, ${model}` : ""
-        process.stdout.write(`  ${i + 1}. ${unique[i].provider}${modelLabel} (from ${unique[i].agentName})\n`)
+        const envMatch = envDiscovered.find((e) => e.provider === unique[i].provider && unique[i].agentName === "env")
+        const sourceLabel = envMatch ? `from env: $${envMatch.envVar}` : `from ${unique[i].agentName}`
+        process.stdout.write(`  ${i + 1}. ${unique[i].provider}${modelLabel} (${sourceLabel})\n`)
       }
       process.stdout.write("\n")
       const choice = await coldPrompt("use one of these? enter number, or 'new' for a different key: ")
@@ -1590,19 +1636,19 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     coldRl.close()
     process.stdout.write("\n")
 
-    // Phase 2: configure runtime for adoption specialist
-    const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "AdoptionSpecialist.ouro")
+    // Phase 2: configure runtime for serpent guide
+    const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "SerpentGuide.ouro")
     const bundlesRoot = getAgentBundlesRoot()
     const secretsRoot2 = path.join(os.homedir(), ".agentsecrets")
 
-    // Suppress non-critical log noise during adoption (no secrets.json, etc.)
+    // Suppress non-critical log noise during hatch (no secrets.json, etc.)
     const { setRuntimeLogger } = await import("../../nerves/runtime")
     const { createLogger } = await import("../../nerves")
     setRuntimeLogger(createLogger({ level: "error" }))
 
     // Configure runtime: set agent identity + config override so runAgent
-    // doesn't try to read from ~/AgentBundles/AdoptionSpecialist.ouro/
-    setAgentName("AdoptionSpecialist")
+    // doesn't try to read from ~/AgentBundles/SerpentGuide.ouro/
+    setAgentName("SerpentGuide")
     // Build specialist system prompt
     const soulText = loadSoulText(bundleSourceDir)
     const identitiesDir = path.join(bundleSourceDir, "psyche", "identities")
@@ -1612,12 +1658,13 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     const { loadIdentityPhrases } = await import("./specialist-orchestrator")
     const phrases = loadIdentityPhrases(bundleSourceDir, identity.fileName)
 
+    const resolvedModel = providerConfig.model || providerConfig.deployment || ""
     setAgentConfigOverride({
       version: 2,
       enabled: true,
       provider: providerRaw,
-      humanFacing: { provider: providerRaw, model: "" },
-      agentFacing: { provider: providerRaw, model: "" },
+      humanFacing: { provider: providerRaw, model: resolvedModel },
+      agentFacing: { provider: providerRaw, model: resolvedModel },
       phrases,
     })
     patchRuntimeConfig({
@@ -1643,9 +1690,9 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
       animationWriter: (text: string) => process.stdout.write(text),
     })
 
-    // Run the adoption specialist session via runCliSession
+    // Run the serpent guide session via runCliSession
     const result = await runCliSession({
-      agentName: "AdoptionSpecialist",
+      agentName: "SerpentGuide",
       tools: specialistTools,
       execTool: specialistExecTool,
       exitOnToolCall: "complete_adoption",
@@ -1668,7 +1715,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
 
     return null
   } catch (err) {
-    process.stderr.write(`\nouro adoption error: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`)
+    process.stderr.write(`\nouro hatch error: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`)
     coldRl.close()
     return null
   } finally {
@@ -1706,7 +1753,7 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
     listDiscoveredAgents: defaultListDiscoveredAgents,
     runHatchFlow: defaultRunHatchFlow,
     promptInput: defaultPromptInput,
-    runAdoptionSpecialist: defaultRunAdoptionSpecialist,
+    runSerpentGuide: defaultRunSerpentGuide,
     runAuthFlow: defaultRunRuntimeAuthFlow,
     registerOuroBundleType: defaultRegisterOuroBundleUti,
     installOuroCommand: defaultInstallOuroCommand,
@@ -1825,7 +1872,7 @@ type McpServeCliCommand = Extract<OuroCliCommand, { kind: "mcp-serve" }>
 type SetupCliCommand = Extract<OuroCliCommand, { kind: "setup" }>
 type HookCliCommand = Extract<OuroCliCommand, { kind: "hook" }>
 type HabitLocalCliCommand = Extract<OuroCliCommand, { kind: "habit.list" } | { kind: "habit.create" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand | InnerStatusCliCommand | McpServeCliCommand | SetupCliCommand | HookCliCommand | HabitLocalCliCommand>): DaemonCommand {
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "outlook" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand | InnerStatusCliCommand | McpServeCliCommand | SetupCliCommand | HookCliCommand | HabitLocalCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2343,11 +2390,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const discovered = await Promise.resolve(
       deps.listDiscoveredAgents ? deps.listDiscoveredAgents() : defaultListDiscoveredAgents(),
     )
-    if (discovered.length === 0 && deps.runAdoptionSpecialist) {
+    if (discovered.length === 0 && deps.runSerpentGuide) {
       // System setup first — ouro command, subagents, UTI — before the interactive specialist
       await performSystemSetup(deps)
 
-      const hatchlingName = await deps.runAdoptionSpecialist()
+      const hatchlingName = await deps.runSerpentGuide()
       if (!hatchlingName) {
         return ""
       }
@@ -2476,20 +2523,6 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       }
     }
 
-    if (deps.ensureDaemonBootPersistence) {
-      try {
-        await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
-      } catch (error) {
-        emitNervesEvent({
-          level: "warn",
-          component: "daemon",
-          event: "daemon.system_setup_launchd_error",
-          message: "failed to persist daemon boot startup",
-          meta: { error: error instanceof Error ? error.message : String(error), socketPath: deps.socketPath },
-        })
-      }
-    }
-
     // Run update hooks before starting daemon so user sees the output
     registerUpdateHook(bundleMetaHook)
     registerUpdateHook(agentConfigV2Hook)
@@ -2528,6 +2561,24 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
+
+    // Persist boot startup AFTER daemon is running — bootstrap is safe now
+    // because the daemon socket exists, so launchd's KeepAlive registers
+    // for crash recovery without starting a competing process.
+    if (deps.ensureDaemonBootPersistence) {
+      try {
+        await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.system_setup_launchd_error",
+          message: "failed to persist daemon boot startup",
+          meta: { error: error instanceof Error ? error.message : String(error), socketPath: deps.socketPath },
+        })
+      }
+    }
+
     return daemonResult.message
   }
 
@@ -2728,6 +2779,43 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     return ""
   }
 
+  if (command.kind === "outlook") {
+    let status: DaemonResponse
+    try {
+      status = await deps.sendCommand(deps.socketPath, { kind: "daemon.status" })
+    /* v8 ignore start — error path: daemon not running */
+    } catch {
+      const message = "daemon unavailable — start with `ouro up` first"
+      deps.writeStdout(message)
+      return message
+    }
+    /* v8 ignore stop */
+
+    const payload = parseStatusPayload(status.data)
+    /* v8 ignore start -- ?? branch: outlookUrl always present in test fixtures */
+    const outlookUrl = payload?.overview.outlookUrl ?? "unavailable"
+    /* v8 ignore stop */
+    if (!command.json) {
+      deps.writeStdout(outlookUrl)
+      return outlookUrl
+    }
+
+    /* v8 ignore start — error path: outlook URL not available */
+    if (outlookUrl === "unavailable") {
+      deps.writeStdout(outlookUrl)
+      return outlookUrl
+    }
+    /* v8 ignore stop */
+
+    /* v8 ignore start -- ?? branch: tests always inject fetchImpl */
+    const fetchImpl = deps.fetchImpl ?? fetch
+    /* v8 ignore stop */
+    const response = await fetchImpl(`${outlookUrl}/api/machine`)
+    const data = await response.json() as unknown
+    const text = JSON.stringify(data, null, 2)
+    deps.writeStdout(text)
+    return text
+  }
   // ── hook: handle Claude Code lifecycle hooks ──
   /* v8 ignore start -- hook handler: reads real stdin, sends to real daemon @preserve */
   if (command.kind === "hook") {
@@ -2875,7 +2963,6 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     return ""
   }
   /* v8 ignore stop */
-
   // ── mcp subcommands (routed through daemon socket) ──
   if (command.kind === "mcp.list" || command.kind === "mcp.call") {
     const daemonCommand = toDaemonCommand(command)
@@ -3441,13 +3528,13 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   if (command.kind === "hatch.start") {
-    // Route through adoption specialist when no explicit hatch args were provided
+    // Route through serpent guide when no explicit hatch args were provided
     const hasExplicitHatchArgs = !!(command.agentName || command.humanName || command.provider || command.credentials)
-    if (deps.runAdoptionSpecialist && !hasExplicitHatchArgs) {
+    if (deps.runSerpentGuide && !hasExplicitHatchArgs) {
       // System setup first — ouro command, subagents, UTI — before the interactive specialist
       await performSystemSetup(deps)
 
-      const hatchlingName = await deps.runAdoptionSpecialist()
+      const hatchlingName = await deps.runSerpentGuide()
       if (!hatchlingName) {
         return ""
       }
