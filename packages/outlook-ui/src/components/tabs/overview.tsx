@@ -41,6 +41,21 @@ const URGENCY_WHY: Record<string, string> = {
 const STALE_URGENCIES = new Set(["stale-delegation"])
 const ACTION_URGENCIES = new Set(["owed-reply", "blocking-obligation", "broken-return", "return-ready", "overdue-habit"])
 
+interface OrientationView {
+  currentSession: { friendId: string; channel: string; key: string; lastActivityAt: string | null } | null
+  centerOfGravity: string
+  primaryObligation: { id: string; content: string; status: string; nextAction: string | null; waitingOn: string | null } | null
+  resumeHandle: {
+    sessionLabel: string | null
+    lane: string | null
+    artifact: string | null
+    blockerOrWaitingOn: string | null
+    nextAction: string | null
+    confidence: string
+  } | null
+  otherActiveSessions: Array<{ friendId: string; friendName: string; channel: string; key: string; lastActivityAt: string }>
+}
+
 interface ContinuityView {
   presence: {
     self: { agentName: string; availability: string; lane?: string; tempo?: string; updatedAt?: string } | null
@@ -55,6 +70,7 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
   const [needsMe, setNeedsMe] = useState<{ items: NeedsMeItem[] } | null>(null)
   const [codingDeep, setCodingDeep] = useState<{ items: Array<Record<string, unknown>> } | null>(null)
   const [continuity, setContinuity] = useState<ContinuityView | null>(null)
+  const [orientation, setOrientation] = useState<OrientationView | null>(null)
   const agent = view.agent as Record<string, unknown>
   const work = view.work as Record<string, unknown>
   const inner = view.inner as Record<string, unknown>
@@ -75,6 +91,7 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
     fetchJson<{ items: NeedsMeItem[] }>(`/agents/${encodeURIComponent(agent.agentName as string)}/needs-me`).then(setNeedsMe)
     fetchJson<{ items: Array<Record<string, unknown>> }>(`/agents/${encodeURIComponent(agent.agentName as string)}/coding`).then(setCodingDeep)
     fetchJson<ContinuityView>(`/agents/${encodeURIComponent(agent.agentName as string)}/continuity`).then(setContinuity).catch(() => {})
+    fetchJson<OrientationView>(`/agents/${encodeURIComponent(agent.agentName as string)}/orientation`).then(setOrientation).catch(() => {})
   }, [agent.agentName])
 
   return (
@@ -214,6 +231,71 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
           </div>
         )}
       </div>
+
+      {/* Orientation — resume handle and primary obligation */}
+      {orientation && (
+        <div className="rounded-xl bg-ouro-moss/10 p-4 ring-1 ring-ouro-glow/8">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ouro-glow">Orientation</p>
+          {orientation.currentSession && (
+            <div className="mt-2 flex items-center gap-2">
+              <Badge color="lime">active session</Badge>
+              <button
+                onClick={() => nav({ tab: "sessions", focus: `${orientation.currentSession!.friendId}/${orientation.currentSession!.channel}/${orientation.currentSession!.key}` })}
+                className="text-sm text-ouro-glow underline decoration-ouro-glow/30 underline-offset-2"
+              >
+                {orientation.currentSession.channel}/{orientation.currentSession.key}
+              </button>
+              {orientation.currentSession.lastActivityAt && (
+                <span className="text-xs text-ouro-shadow">{relTime(orientation.currentSession.lastActivityAt)}</span>
+              )}
+            </div>
+          )}
+          {orientation.primaryObligation && (
+            <div className="mt-2 rounded-lg bg-ouro-void/40 px-3 py-2 ring-1 ring-ouro-moss/15">
+              <div className="flex items-center gap-2">
+                <Badge color="yellow">{orientation.primaryObligation.status}</Badge>
+                <span className="text-sm font-medium text-ouro-bone">{truncate(orientation.primaryObligation.content, 80)}</span>
+              </div>
+              {orientation.primaryObligation.nextAction && (
+                <p className="mt-1 text-xs text-ouro-mist">Next: {orientation.primaryObligation.nextAction}</p>
+              )}
+              {orientation.primaryObligation.waitingOn && (
+                <p className="mt-0.5 text-xs text-ouro-shadow">Waiting on: {orientation.primaryObligation.waitingOn}</p>
+              )}
+            </div>
+          )}
+          {orientation.resumeHandle && (
+            <div className="mt-2 rounded-lg bg-ouro-void/40 px-3 py-2 ring-1 ring-ouro-moss/15">
+              <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-shadow">Resume handle</p>
+              <div className="mt-1 space-y-0.5 text-sm">
+                {orientation.resumeHandle.lane && <p className="text-ouro-bone">Lane: {orientation.resumeHandle.lane}</p>}
+                {orientation.resumeHandle.artifact && <p className="text-ouro-mist">Artifact: {orientation.resumeHandle.artifact}</p>}
+                {orientation.resumeHandle.nextAction && <p className="text-ouro-mist">Next: {orientation.resumeHandle.nextAction}</p>}
+                {orientation.resumeHandle.blockerOrWaitingOn && <p className="text-ouro-shadow">Blocked: {orientation.resumeHandle.blockerOrWaitingOn}</p>}
+                <Badge color={orientation.resumeHandle.confidence === "high" ? "lime" : orientation.resumeHandle.confidence === "medium" ? "yellow" : "zinc"}>
+                  {orientation.resumeHandle.confidence} confidence
+                </Badge>
+              </div>
+            </div>
+          )}
+          {orientation.otherActiveSessions.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] uppercase tracking-wider text-ouro-shadow">Other sessions ({orientation.otherActiveSessions.length})</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {orientation.otherActiveSessions.slice(0, 5).map((s) => (
+                  <button
+                    key={`${s.friendId}/${s.channel}/${s.key}`}
+                    onClick={() => nav({ tab: "sessions", focus: `${s.friendId}/${s.channel}/${s.key}` })}
+                    className="text-xs text-ouro-glow underline decoration-ouro-glow/30 underline-offset-2"
+                  >
+                    {s.friendName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Continuity — presence, cares, episodes */}
       {continuity && (
