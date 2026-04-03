@@ -14,6 +14,8 @@ import {
   readLogView,
   readMemoryView,
   readNeedsMeView,
+  readObligationDetailView,
+  readOrientationView,
   readOutlookAgentState,
   readOutlookContinuity,
   readOutlookMachineState,
@@ -30,6 +32,8 @@ import type {
   OutlookCodingDeep,
   OutlookContinuityView,
   OutlookDaemonHealthDeep,
+  OutlookObligationDetailView,
+  OutlookOrientationView,
   OutlookFriendView,
   OutlookHabitView,
   OutlookLogView,
@@ -58,6 +62,8 @@ export interface StartOutlookHttpServerOptions {
   readAgentMemory?: (agentName: string) => OutlookMemoryView
   readAgentFriends?: (agentName: string) => OutlookFriendView
   readAgentContinuity?: (agentName: string) => OutlookContinuityView
+  readAgentOrientation?: (agentName: string) => OutlookOrientationView
+  readAgentObligations?: (agentName: string) => OutlookObligationDetailView
   readAgentHabits?: (agentName: string) => OutlookHabitView
   readDaemonHealth?: () => OutlookDaemonHealthDeep | null
   readLogs?: () => OutlookLogView
@@ -237,6 +243,8 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     readAgentMemory: options.readAgentMemory ?? ((agentName: string) => readMemoryView(agentRoot(agentName))),
     readAgentFriends: options.readAgentFriends ?? ((agentName: string) => readFriendView(agentName, bundlesRoot ? { bundlesRoot } : undefined)),
     readAgentContinuity: options.readAgentContinuity ?? ((agentName: string) => readOutlookContinuity(agentRoot(agentName), agentName)),
+    readAgentOrientation: options.readAgentOrientation ?? ((agentName: string) => readOrientationView(agentRoot(agentName), agentName)),
+    readAgentObligations: options.readAgentObligations ?? ((agentName: string) => readObligationDetailView(agentRoot(agentName))),
     readAgentHabits: options.readAgentHabits ?? ((agentName: string) => readHabitView(agentRoot(agentName))),
     readDaemonHealth: options.readDaemonHealth ?? (() => readDaemonHealthDeep(options.healthPath)),
     readLogs: options.readLogs ?? (() => readLogView(options.logPath ?? null)),
@@ -366,6 +374,16 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
 
       if (surface === "continuity") {
         writeJson(response, 200, hooks.readAgentContinuity(agent))
+        return
+      }
+
+      if (surface === "orientation") {
+        writeJson(response, 200, hooks.readAgentOrientation(agent))
+        return
+      }
+
+      if (surface === "obligations") {
+        writeJson(response, 200, hooks.readAgentObligations(agent))
         return
       }
 

@@ -1310,4 +1310,108 @@ describe("outlook deep readers", () => {
       expect(habits.totalCount).toBe(0)
     })
   })
+
+  describe("readOrientationView", () => {
+    let agentRoot: string
+    let agentName: string
+
+    afterEach(() => {
+      if (agentRoot) fs.rmSync(agentRoot, { recursive: true, force: true })
+    })
+
+    it("returns empty orientation when no state exists", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "orient-empty-"))
+      agentName = "test-agent"
+      const { readOrientationView } = await import("../../../heart/daemon/outlook-read")
+      const orientation = readOrientationView(agentRoot, agentName)
+      expect(orientation.currentSession).toBeNull()
+      expect(orientation.centerOfGravity).toBeTruthy()
+      expect(orientation.primaryObligation).toBeNull()
+      expect(orientation.resumeHandle).toBeNull()
+      expect(orientation.otherActiveSessions).toEqual([])
+    })
+
+    it("derives orientation from obligations and sessions", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "orient-full-"))
+      agentName = "test-agent"
+      // Write obligation
+      writeJson(path.join(agentRoot, "state", "obligations", "ob-1.json"), {
+        id: "ob-1",
+        status: "pending",
+        content: "Deploy the new version",
+        nextAction: "Run deploy script",
+        origin: { friendId: "ari", channel: "cli", key: "chat" },
+        currentSurface: { kind: "coding", label: "deploy lane" },
+        meaning: { waitingOn: { detail: "CI pipeline" } },
+        currentArtifact: "dist/deploy.sh",
+        updatedAt: "2026-04-03T10:00:00Z",
+      })
+
+      const { readOrientationView } = await import("../../../heart/daemon/outlook-read")
+      const orientation = readOrientationView(agentRoot, agentName)
+      expect(orientation.primaryObligation).not.toBeNull()
+      expect(orientation.primaryObligation?.content).toBe("Deploy the new version")
+      expect(orientation.centerOfGravity).toBeTruthy()
+    })
+  })
+
+  describe("readObligationDetailView", () => {
+    let agentRoot: string
+
+    afterEach(() => {
+      if (agentRoot) fs.rmSync(agentRoot, { recursive: true, force: true })
+    })
+
+    it("returns empty detail view when no obligations exist", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "oblig-empty-"))
+      const { readObligationDetailView } = await import("../../../heart/daemon/outlook-read")
+      const view = readObligationDetailView(agentRoot)
+      expect(view.openCount).toBe(0)
+      expect(view.primaryId).toBeNull()
+      expect(view.items).toEqual([])
+    })
+
+    it("returns obligations with primary selection", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "oblig-full-"))
+      writeJson(path.join(agentRoot, "state", "obligations", "ob-1.json"), {
+        id: "ob-1",
+        status: "pending",
+        content: "Primary task",
+        nextAction: "Do the thing",
+        origin: { friendId: "ari", channel: "cli", key: "chat" },
+        currentSurface: null,
+        meaning: { waitingOn: { detail: "nothing" } },
+        updatedAt: "2026-04-03T10:00:00Z",
+      })
+      writeJson(path.join(agentRoot, "state", "obligations", "ob-2.json"), {
+        id: "ob-2",
+        status: "pending",
+        content: "Secondary task",
+        nextAction: null,
+        origin: { friendId: "bob", channel: "teams", key: "meeting" },
+        currentSurface: null,
+        meaning: null,
+        updatedAt: "2026-04-03T09:00:00Z",
+      })
+      // Fulfilled obligations should be excluded
+      writeJson(path.join(agentRoot, "state", "obligations", "ob-3.json"), {
+        id: "ob-3",
+        status: "fulfilled",
+        content: "Done task",
+        nextAction: null,
+        origin: { friendId: "ari", channel: "cli", key: "chat" },
+        currentSurface: null,
+        meaning: null,
+        updatedAt: "2026-04-03T08:00:00Z",
+      })
+      const { readObligationDetailView } = await import("../../../heart/daemon/outlook-read")
+      const view = readObligationDetailView(agentRoot)
+      expect(view.openCount).toBe(2)
+      expect(view.primaryId).toBeTruthy()
+      expect(view.items.length).toBe(2)
+      expect(view.items.some((i) => i.isPrimary)).toBe(true)
+      // Fulfilled obligation should not be in the list
+      expect(view.items.find((i) => i.id === "ob-3")).toBeUndefined()
+    })
+  })
 })

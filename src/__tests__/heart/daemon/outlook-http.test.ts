@@ -566,4 +566,61 @@ describe("outlook http", () => {
 
     await server.stop()
   })
+
+  it("serves /api/agents/:agent/orientation endpoint", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const mockOrientation = {
+      currentSession: { friendId: "ari", channel: "cli", key: "chat", lastActivityAt: "2026-04-03T10:00:00Z" },
+      centerOfGravity: "Deploying v2",
+      primaryObligation: { id: "ob-1", content: "Deploy", status: "pending", nextAction: "run script", waitingOn: null },
+      resumeHandle: null,
+      otherActiveSessions: [],
+      rawState: null,
+    }
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentOrientation: () => mockOrientation,
+    })
+
+    const res = await fetch(`${server.origin}/api/agents/slugger/orientation`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(mockOrientation)
+
+    await server.stop()
+  })
+
+  it("serves /api/agents/:agent/obligations endpoint", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const mockObligations = {
+      openCount: 2,
+      primaryId: "ob-1",
+      primarySelectionReason: "most recent pending",
+      items: [
+        { id: "ob-1", status: "pending", content: "Deploy", updatedAt: "2026-04-03T10:00:00Z", nextAction: "run", origin: null, currentSurface: null, meaning: null, isPrimary: true },
+        { id: "ob-2", status: "pending", content: "Review", updatedAt: "2026-04-03T09:00:00Z", nextAction: null, origin: null, currentSurface: null, meaning: null, isPrimary: false },
+      ],
+    }
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentObligations: () => mockObligations,
+    })
+
+    const res = await fetch(`${server.origin}/api/agents/slugger/obligations`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(mockObligations)
+
+    await server.stop()
+  })
 })
