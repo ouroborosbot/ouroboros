@@ -594,7 +594,7 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     const wakePacket = buildWakePacket(temporalView, {
       canonicalObligations: {
         primary: activeWorkFrame.primaryObligation,
-        all: activeWorkFrame.pendingObligations ?? [],
+        all: activeWorkFrame.pendingObligations,
       },
     })
     renderedWakePacket = renderWakePacket(wakePacket)
