@@ -4,9 +4,21 @@
     {
       "version": "0.1.0-alpha.190",
       "changes": [
-        "feat(coding): coding-lane identity packet (repo, branch, commit, worktree, dirty, verification)",
-        "feat(prompt): self-fix workflow contract (8-step loop in workspaceDiscipline)",
-        "feat(coding): verification truthfulness (not-verified default, review anchoring)"
+        "feat(coding): coding-lane identity packet",
+        "feat(prompt): self-fix workflow contract",
+        "feat(coding): verification truthfulness"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.189",
+      "changes": [
+        "feat(heart): ResumeHandle type, primary obligation selection, status priority",
+        "feat(heart): lane/obligation precedence rules",
+        "feat(heart): cross-session change detection (snapshot, diff, format)",
+        "feat(cli): TUI edge-case hardening (44 new tests)",
+        "feat(mind): memory judgement heuristics in system prompt",
+        "feat(mind): memory feedback loop (noise prevention)",
+        "fix(cli): blockquote wrap width for narrow terminals"
       ]
     },
     {
