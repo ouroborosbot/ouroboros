@@ -2,6 +2,23 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.182",
+      "changes": [
+        "fix(cli): remove persistent status bar from input box (header already shows info)",
+        "fix(cli): Meta+B/F word movement (Option+Arrow on macOS)",
+        "fix(cli): Meta+D delete word forward"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.181",
+      "changes": [
+        "feat(cli): Option+Arrow word jumping, Ctrl+A/E home/end, cursor positioning",
+        "feat(cli): never suppress input \u2014 type while agent responds (TTFA)",
+        "fix(cli): blockquote continuation lines keep \u2502 prefix on wrap",
+        "feat(cli): Option+Backspace to delete word"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.180",
       "changes": [
         "fix(cli): suppress React unmount warning on TUI exit"
