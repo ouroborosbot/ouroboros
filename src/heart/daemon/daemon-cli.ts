@@ -1497,6 +1497,8 @@ export function discoverExistingCredentials(secretsRoot: string): DiscoveredCred
         found.push({ agentName: entry.name, provider: "minimax", credentials: { apiKey: provConfig.apiKey }, providerConfig: { ...provConfig } })
       } else if (provName === "azure" && provConfig.apiKey && provConfig.endpoint && provConfig.deployment) {
         found.push({ agentName: entry.name, provider: "azure", credentials: { apiKey: provConfig.apiKey, endpoint: provConfig.endpoint, deployment: provConfig.deployment }, providerConfig: { ...provConfig } })
+      } else if (provName === "github-copilot" && provConfig.githubToken) {
+        found.push({ agentName: entry.name, provider: "github-copilot", credentials: { githubToken: provConfig.githubToken, baseUrl: provConfig.baseUrl }, providerConfig: { ...provConfig } })
       }
     }
   }
@@ -1554,7 +1556,7 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
       { provider: "azure", envVar: "AZURE_OPENAI_API_KEY", credKey: "apiKey" },
       { provider: "azure", envVar: "AZURE_OPENAI_KEY", credKey: "apiKey" },
       { provider: "minimax", envVar: "MINIMAX_API_KEY", credKey: "apiKey" },
-      { provider: "github-copilot", envVar: "GITHUB_TOKEN", credKey: "token" },
+      { provider: "github-copilot", envVar: "GITHUB_TOKEN", credKey: "githubToken" },
     ]
     const envDiscovered: Array<DiscoveredCredential & { envVar: string }> = []
     for (const { provider, envVar, credKey } of envKeys) {
