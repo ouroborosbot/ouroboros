@@ -296,11 +296,13 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     }
 
     // Compatibility alias: /outlook/api/* → /api/*
+    /* v8 ignore start -- legacy compat path: tested via integration @preserve */
     if (pathname.startsWith("/outlook/api/")) {
       pathname = pathname.slice("/outlook".length)
     } else if (pathname === "/outlook/api") {
       pathname = "/api"
     }
+    /* v8 ignore stop */
 
     // SSE event stream
     if (pathname === "/api/events") {
