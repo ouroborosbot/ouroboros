@@ -224,14 +224,12 @@ describe("wake packet", () => {
       expect(tokens).toBeLessThanOrEqual(TEMPO_BUDGETS.crisis.max)
     })
 
-    it("empty temporal view produces minimal packet", () => {
+    it("empty temporal view produces empty packet (sparse state is normal)", () => {
       const view = makeView({ tempo: "brief" })
       const packet = buildWakePacket(view)
       const rendered = renderWakePacket(packet)
-      expect(rendered.length).toBeGreaterThan(0)
-      // Minimal but non-empty
-      const tokens = estimateTokens(rendered)
-      expect(tokens).toBeLessThan(TEMPO_BUDGETS.brief.max)
+      // Empty state produces empty output — not failure, just quiet
+      expect(rendered).toBe("")
     })
 
     it("contains expected section markers", () => {

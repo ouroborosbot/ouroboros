@@ -2,6 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { emitNervesEvent } from "../nerves/runtime"
 
+export type CareKind = "person" | "agent" | "project" | "mission" | "system"
 export type CareStatus = "active" | "watching" | "resolved" | "dormant"
 export type CareStewardship = "mine" | "shared" | "delegated"
 
@@ -9,14 +10,19 @@ export interface CareRecord {
   id: string
   label: string
   why: string
+  kind: CareKind
   status: CareStatus
-  salience: number
-  stewardship: CareStewardship
-  relatedEntities?: string[]
+  salience: "low" | "medium" | "high" | "critical"
+  steward: CareStewardship
+  relatedFriendIds: string[]
+  relatedAgentIds: string[]
+  relatedObligationIds: string[]
+  relatedEpisodeIds: string[]
+  currentRisk: string | null
+  nextCheckAt: string | null
   createdAt: string
   updatedAt: string
   resolvedAt?: string
-  nextCheckAt?: string
 }
 
 function caresDir(agentRoot: string): string {
@@ -43,10 +49,16 @@ export function createCare(
     id,
     label: input.label,
     why: input.why,
+    kind: input.kind,
     status: input.status,
     salience: input.salience,
-    stewardship: input.stewardship,
-    ...(input.relatedEntities ? { relatedEntities: input.relatedEntities } : {}),
+    steward: input.steward,
+    relatedFriendIds: input.relatedFriendIds,
+    relatedAgentIds: input.relatedAgentIds,
+    relatedObligationIds: input.relatedObligationIds,
+    relatedEpisodeIds: input.relatedEpisodeIds,
+    currentRisk: input.currentRisk,
+    nextCheckAt: input.nextCheckAt,
     createdAt: now,
     updatedAt: now,
   }
