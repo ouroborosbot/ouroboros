@@ -1960,6 +1960,57 @@ describe("delegation router", () => {
     expect(rendered).toContain("return obligations: 1 active (canonical details in **Owed** section of wake packet)")
   })
 
+  it("suppresses obligation pointer when hasWakePacket is true but all obligations are fulfilled", async () => {
+    const { formatActiveWorkFrame, buildActiveWorkFrame } = await import("../../heart/active-work")
+
+    const fulfilledFrame = buildActiveWorkFrame({
+      currentSession: {
+        friendId: "friend-1",
+        channel: "cli",
+        key: "session",
+        sessionPath: "/tmp/state/sessions/friend-1/cli/session.json",
+      },
+      mustResolveBeforeHandoff: false,
+      inner: {
+        status: "idle",
+        hasPending: false,
+        job: {
+          status: "idle" as const,
+          content: null,
+          origin: null,
+          mode: "reflect" as const,
+          obligationStatus: null,
+          surfacedResult: null,
+          queuedAt: null,
+          startedAt: null,
+          surfacedAt: null,
+        },
+      },
+      bridges: [],
+      pendingObligations: [
+        {
+          id: "ob-done",
+          origin: { friendId: "friend-1", channel: "cli", key: "session" },
+          content: "already done",
+          status: "fulfilled" as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
+      },
+      friendActivity: [],
+    })
+
+    const rendered = formatActiveWorkFrame(fulfilledFrame, { hasWakePacket: true })
+    expect(rendered).not.toContain("## return obligations")
+    expect(rendered).not.toContain("return obligations:")
+    expect(rendered).not.toContain("canonical details in **Owed**")
+  })
+
   it("renders queued inner thought content when present", async () => {
     const { formatActiveWorkFrame } = await import("../../heart/active-work")
 
