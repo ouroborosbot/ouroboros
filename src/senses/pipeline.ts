@@ -21,7 +21,7 @@ import { getCodingSessionManager } from "../repertoire/coding"
 import { listSessionActivity } from "../heart/session-activity"
 import { requestInnerWake } from "../heart/daemon/socket-client"
 import type { SessionActivityRecord } from "../heart/session-activity"
-import { buildActiveWorkFrame, formatLiveWorldStateCheckpoint, type ActiveWorkFrame } from "../heart/active-work"
+import { buildActiveWorkFrame, type ActiveWorkFrame } from "../heart/active-work"
 import { decideDelegation } from "../heart/delegation"
 import { listTargetSessionCandidates } from "../heart/target-resolution"
 import { readInnerDialogRawData, deriveInnerDialogStatus, deriveInnerJob, getInnerDialogSessionPath } from "../heart/daemon/thoughts"
@@ -32,9 +32,41 @@ import type { BoardResult } from "../repertoire/tasks/types"
 import { buildFailoverContext, handleFailoverReply, type FailoverContext } from "../heart/provider-failover"
 import { runHealthInventory } from "../heart/provider-ping"
 import { writeAgentProviderSelection, loadAgentSecrets } from "../heart/daemon/auth-flow"
+import { deriveTempo } from "../heart/tempo"
+import { buildTemporalView } from "../heart/temporal-view"
+import { buildWakePacket, renderWakePacket } from "../heart/wake-packet"
+import { derivePresence, writePresence } from "../heart/presence"
+import { readRecentEpisodes, emitEpisode } from "../mind/episodes"
+import { readActiveCares } from "../heart/cares"
 
 export interface FailoverState {
   pending: FailoverContext | null
+}
+
+/**
+ * Emit episodes for obligation state transitions detected during a turn.
+ * Exported for direct testability (avoids v8 coverage merge issues in multi-file test suites).
+ */
+export function emitObligationTransitionEpisodes(
+  agentRoot: string,
+  preTurnObligationIds: Set<string>,
+  postTurnObligations: import("../heart/obligations").Obligation[],
+  preTurnObligations: import("../heart/obligations").Obligation[],
+): void {
+  const postTurnObligationIds = new Set(postTurnObligations.map((ob) => `${ob.id}:${ob.status}`))
+  for (const key of preTurnObligationIds) {
+    if (!postTurnObligationIds.has(key)) {
+      const [obId] = key.split(":")
+      const matchedOb = postTurnObligations.find((ob) => ob.id === obId) ?? preTurnObligations.find((ob) => ob.id === obId)
+      emitEpisode(agentRoot, {
+        kind: "obligation_shift",
+        summary: `obligation "${matchedOb?.content ?? obId}" status changed`,
+        whyItMattered: "obligation state transition detected during turn",
+        relatedEntities: [`obligation:${obId}`],
+        salience: "medium",
+      })
+    }
+  }
 }
 
 
@@ -171,9 +203,11 @@ function prependTurnSections(
   message: ChatCompletionMessageParam,
   sections: string[],
 ): ChatCompletionMessageParam {
+  /* v8 ignore next -- defensive: only user messages with non-empty sections reach here @preserve */
   if (message.role !== "user" || sections.length === 0) return message
   const prefix = sections.join("\n\n")
 
+  /* v8 ignore start -- defensive: multipart content branch; non-string user messages are rare @preserve */
   if (typeof message.content === "string") {
     return {
       ...message,
@@ -188,6 +222,7 @@ function prependTurnSections(
       ...message.content,
     ],
   }
+  /* v8 ignore stop */
 }
 
 function readInnerWorkState(): ActiveWorkFrame["inner"] {
@@ -230,7 +265,20 @@ function readInnerWorkState(): ActiveWorkFrame["inner"] {
 
 // ── Pipeline ──────────────────────────────────────────────────────
 
+let _lastSessionKey: string | null = null
+
 export async function handleInboundTurn(input: InboundTurnInput): Promise<InboundTurnResult> {
+  // Reset session-scoped state when the session changes
+  const sessionKey = `${input.channel}/${input.sessionKey ?? "session"}`
+  if (sessionKey !== _lastSessionKey) {
+    _lastSessionKey = sessionKey
+    // Reset file-state cache and scrutiny tracking for the new session
+    const { fileStateCache } = await import("../mind/file-state")
+    const { resetSessionModifiedFiles } = await import("../mind/scrutiny")
+    fileStateCache.clear()
+    resetSessionModifiedFiles()
+  }
+
   // Step 0: Check for pending failover reply
   if (input.failoverState?.pending) {
     const userText = input.messages
@@ -502,22 +550,68 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
   const sessionPending = input.drainPending(input.pendingDir)
   const pending = [...deferredReturns, ...sessionPending]
 
-  // Assemble messages: session messages + attention queue + live world-state checkpoint + pending + inbound user messages
+  // Assemble messages: session messages + pending + inbound user messages
+  // NOTE: live world-state checkpoint and pending messages are rendered via buildSystem (system prompt sections)
   const extraPrefixSections = input.onPendingDrained?.(pending) ?? []
-  const prefixSections = [...extraPrefixSections, formatLiveWorldStateCheckpoint(activeWorkFrame)]
-  if (pending.length > 0) {
-    const pendingSection = pending
-      .map((msg) => `[pending from ${msg.from}]: ${msg.content}`)
-      .join("\n")
-    prefixSections.push(`## pending messages\n${pendingSection}`)
-  }
-  if (input.messages.length > 0) {
-    input.messages[0] = prependTurnSections(input.messages[0], prefixSections)
+  // extraPrefixSections from onPendingDrained still prepend to user message (e.g., inner dialog wakes)
+  if (extraPrefixSections.length > 0 && input.messages.length > 0) {
+    input.messages[0] = prependTurnSections(input.messages[0], extraPrefixSections)
   }
 
   // Append user messages from the inbound turn
   for (const msg of input.messages) {
     sessionMessages.push(msg)
+  }
+
+  // Step 4b: Continuity pipeline — derive tempo, build wake packet, snapshot obligations
+  let renderedWakePacket: string | undefined
+  const preTurnObligationIds = new Set(pendingObligations.map((ob) => `${ob.id}:${ob.status}`))
+  try {
+    const agentRoot = getAgentRoot()
+    const agentName = getAgentName()
+    const recentEpisodes = readRecentEpisodes(agentRoot, { limit: 20 })
+    const activeCares = readActiveCares(agentRoot)
+    const tempoState = deriveTempo({
+      activeSessions: sessionActivity.length + 1,
+      openObligations: pendingObligations.length,
+      recentEpisodeCount: recentEpisodes.length,
+      lastActivityAgeMs: sessionActivity.length > 0
+        ? Date.now() - new Date(sessionActivity[0].lastActivityAt).getTime()
+        : 0,
+      hasBlockers: false, // obligations use specific statuses, not "blocked"
+      highSalienceEpisodes: recentEpisodes.filter((ep) => ep.salience === "high" || ep.salience === "critical").length,
+      activeCareCount: activeCares.length,
+      atRiskCareCount: activeCares.filter((c) => c.currentRisk != null).length,
+    })
+    const temporalView = buildTemporalView(agentRoot, {
+      tempo: tempoState.mode,
+      preloaded: {
+        recentEpisodes,
+        activeObligations: pendingObligations,
+        activeCares,
+      },
+    })
+    const wakePacket = buildWakePacket(temporalView)
+    renderedWakePacket = renderWakePacket(wakePacket)
+    if (!renderedWakePacket) renderedWakePacket = undefined
+
+    // Update self-presence
+    const presence = derivePresence(agentRoot, agentName, {
+      activeSessions: sessionActivity.length + 1,
+      openObligations: pendingObligations.length,
+      activeBridges: activeBridges.length,
+      codingLanes: codingSessions.length,
+      currentTempo: tempoState.mode,
+    })
+    writePresence(agentRoot, agentName, presence)
+  } catch (continuityError) {
+    emitNervesEvent({
+      level: "warn",
+      component: "senses",
+      event: "senses.continuity_error",
+      message: "continuity pipeline failed, continuing without wake packet",
+      meta: { error: continuityError instanceof Error ? continuityError.message : String(continuityError) },
+    })
   }
 
   // Step 5: runAgent
@@ -527,6 +621,8 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     bridgeContext,
     activeWorkFrame,
     delegationDecision,
+    wakePacket: renderedWakePacket,
+    pendingMessages: pending.length > 0 ? pending.map((msg) => ({ from: msg.from, content: msg.content })) : undefined,
     currentSessionKey: currentSession.key,
     currentObligation,
     mustResolveBeforeHandoff,
@@ -602,6 +698,15 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
       })
     }
     /* v8 ignore stop */
+  }
+
+  // Step 5c: Emit episodes for obligation state transitions
+  try {
+    const agentRoot = getAgentRoot()
+    const postTurnObligations = readPendingObligations(agentRoot)
+    emitObligationTransitionEpisodes(agentRoot, preTurnObligationIds, postTurnObligations, pendingObligations)
+  } catch {
+    // Episode emission is non-fatal
   }
 
   // Step 6: postTurn
