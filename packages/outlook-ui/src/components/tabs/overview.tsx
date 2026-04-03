@@ -56,6 +56,13 @@ interface OrientationView {
   otherActiveSessions: Array<{ friendId: string; friendName: string; channel: string; key: string; lastActivityAt: string }>
 }
 
+interface ChangesView {
+  changeCount: number
+  items: Array<{ kind: string; id: string; from: string | null; to: string | null; summary: string }>
+  snapshotAge: string | null
+  formatted: string
+}
+
 interface ContinuityView {
   presence: {
     self: { agentName: string; availability: string; lane?: string; tempo?: string; updatedAt?: string } | null
@@ -71,6 +78,7 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
   const [codingDeep, setCodingDeep] = useState<{ items: Array<Record<string, unknown>> } | null>(null)
   const [continuity, setContinuity] = useState<ContinuityView | null>(null)
   const [orientation, setOrientation] = useState<OrientationView | null>(null)
+  const [changes, setChanges] = useState<ChangesView | null>(null)
   const agent = view.agent as Record<string, unknown>
   const work = view.work as Record<string, unknown>
   const inner = view.inner as Record<string, unknown>
@@ -92,6 +100,7 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
     fetchJson<{ items: Array<Record<string, unknown>> }>(`/agents/${encodeURIComponent(agent.agentName as string)}/coding`).then(setCodingDeep)
     fetchJson<ContinuityView>(`/agents/${encodeURIComponent(agent.agentName as string)}/continuity`).then(setContinuity).catch(() => {})
     fetchJson<OrientationView>(`/agents/${encodeURIComponent(agent.agentName as string)}/orientation`).then(setOrientation).catch(() => {})
+    fetchJson<ChangesView>(`/agents/${encodeURIComponent(agent.agentName as string)}/changes`).then(setChanges).catch(() => {})
   }, [agent.agentName])
 
   return (
@@ -294,6 +303,29 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* What changed — cross-session drift */}
+      {changes && changes.changeCount > 0 && (
+        <div className="rounded-xl bg-ouro-gold/5 p-4 ring-1 ring-ouro-gold/15">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ouro-gold">
+            What changed ({changes.changeCount})
+          </p>
+          {changes.snapshotAge && (
+            <p className="mt-0.5 text-xs text-ouro-shadow">Since {relTime(changes.snapshotAge)}</p>
+          )}
+          <div className="mt-2 space-y-1">
+            {changes.items.slice(0, 8).map((c, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <Badge color={c.kind.includes("status") ? "yellow" : "zinc"}>{c.kind.replace(/_/g, " ")}</Badge>
+                <span className="truncate text-ouro-mist">{c.summary}</span>
+              </div>
+            ))}
+            {changes.items.length > 8 && (
+              <p className="text-xs text-ouro-shadow">+{changes.items.length - 8} more changes</p>
+            )}
+          </div>
         </div>
       )}
 
