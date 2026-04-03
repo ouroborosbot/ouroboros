@@ -932,3 +932,148 @@ export function formatLiveWorldStateCheckpoint(frame: ActiveWorkFrame): string {
 
   return lines.join("\n")
 }
+
+// ── Cross-session change detection ──────────────────────────────
+
+export interface ObligationSnapshot {
+  id: string
+  status: string
+  artifact: string | null
+  nextAction: string | null
+}
+
+export interface CodingSnapshot {
+  id: string
+  status: string
+  artifact: string | null
+  checkpoint: string | null
+}
+
+export interface ActiveWorkSnapshot {
+  obligationSnapshots: ObligationSnapshot[]
+  codingSnapshots: CodingSnapshot[]
+  timestamp: string
+}
+
+export type ActiveWorkChangeKind =
+  | "obligation_status_changed"
+  | "obligation_appeared"
+  | "obligation_artifact_changed"
+  | "coding_status_changed"
+  | "coding_artifact_changed"
+  | "coding_checkpoint_changed"
+
+export interface ActiveWorkChange {
+  kind: ActiveWorkChangeKind
+  id: string
+  from: string | null
+  to: string | null
+  summary: string
+}
+
+export function snapshotActiveWork(frame: ActiveWorkFrame): ActiveWorkSnapshot {
+  return {
+    obligationSnapshots: (frame.pendingObligations ?? []).map((ob) => ({
+      id: ob.id,
+      status: ob.status,
+      artifact: ob.currentArtifact?.trim() || null,
+      nextAction: ob.nextAction?.trim() || null,
+    })),
+    codingSnapshots: (frame.codingSessions ?? []).map((cs) => ({
+      id: cs.id,
+      status: cs.status,
+      artifact: cs.artifactPath?.trim() || null,
+      checkpoint: cs.checkpoint?.trim() || null,
+    })),
+    timestamp: new Date().toISOString(),
+  }
+}
+
+export function detectActiveWorkChanges(
+  previous: ActiveWorkSnapshot,
+  current: ActiveWorkSnapshot,
+): ActiveWorkChange[] {
+  const changes: ActiveWorkChange[] = []
+
+  const prevObMap = new Map(previous.obligationSnapshots.map((ob) => [ob.id, ob]))
+  const currObMap = new Map(current.obligationSnapshots.map((ob) => [ob.id, ob]))
+
+  // Detect new and changed obligations
+  for (const [id, curr] of currObMap) {
+    const prev = prevObMap.get(id)
+    if (!prev) {
+      changes.push({
+        kind: "obligation_appeared",
+        id,
+        from: null,
+        to: curr.status,
+        summary: `new obligation: ${curr.status}`,
+      })
+      continue
+    }
+    if (prev.status !== curr.status) {
+      changes.push({
+        kind: "obligation_status_changed",
+        id,
+        from: prev.status,
+        to: curr.status,
+        summary: `obligation ${prev.status} -> ${curr.status}`,
+      })
+    }
+    if (prev.artifact !== curr.artifact) {
+      changes.push({
+        kind: "obligation_artifact_changed",
+        id,
+        from: prev.artifact,
+        to: curr.artifact,
+        summary: curr.artifact ? `artifact updated: ${curr.artifact}` : "artifact cleared",
+      })
+    }
+  }
+
+  const prevCodingMap = new Map(previous.codingSnapshots.map((cs) => [cs.id, cs]))
+  const currCodingMap = new Map(current.codingSnapshots.map((cs) => [cs.id, cs]))
+
+  for (const [id, curr] of currCodingMap) {
+    const prev = prevCodingMap.get(id)
+    if (!prev) continue
+    if (prev.status !== curr.status) {
+      changes.push({
+        kind: "coding_status_changed",
+        id,
+        from: prev.status,
+        to: curr.status,
+        summary: `coding ${prev.status} -> ${curr.status}`,
+      })
+    }
+    if (prev.artifact !== curr.artifact) {
+      changes.push({
+        kind: "coding_artifact_changed",
+        id,
+        from: prev.artifact,
+        to: curr.artifact,
+        summary: curr.artifact ? `artifact updated: ${curr.artifact}` : "artifact cleared",
+      })
+    }
+    if (prev.checkpoint !== curr.checkpoint) {
+      changes.push({
+        kind: "coding_checkpoint_changed",
+        id,
+        from: prev.checkpoint,
+        to: curr.checkpoint,
+        summary: curr.checkpoint ? `checkpoint: ${curr.checkpoint}` : "checkpoint cleared",
+      })
+    }
+  }
+
+  return changes
+}
+
+export function formatActiveWorkChanges(changes: ActiveWorkChange[]): string {
+  if (changes.length === 0) return ""
+  const lines = ["## what changed since last looked"]
+  for (const change of changes) {
+    lines.push(`- ${change.summary}`)
+  }
+  return lines.join("\n")
+}

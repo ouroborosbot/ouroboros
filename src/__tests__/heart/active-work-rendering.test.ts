@@ -543,3 +543,106 @@ describe("resume handle contract", () => {
     expect(checkpoint).toContain("last checkpoint: compiles but 2 tests failing")
   })
 })
+
+// ── Unit 1.4: Cross-session change detection ──
+
+describe("cross-session change detection", () => {
+  let detectActiveWorkChanges: typeof import("../../heart/active-work").detectActiveWorkChanges
+
+  beforeAll(async () => {
+    const mod = await import("../../heart/active-work")
+    detectActiveWorkChanges = mod.detectActiveWorkChanges
+  })
+
+  function recentIso(minutesAgo: number): string {
+    return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString()
+  }
+
+  it("detects obligation status transition from investigating to fulfilled", () => {
+    const previous: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [
+        { id: "ob-1", status: "investigating", artifact: "/tmp/pr-1", nextAction: "merge the PR" },
+      ],
+      codingSnapshots: [],
+      timestamp: recentIso(10),
+    }
+    const current: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [
+        { id: "ob-1", status: "fulfilled", artifact: "/tmp/pr-1", nextAction: null },
+      ],
+      codingSnapshots: [],
+      timestamp: recentIso(0),
+    }
+
+    const changes = detectActiveWorkChanges(previous, current)
+    expect(changes.length).toBeGreaterThan(0)
+    expect(changes.some((c) => c.kind === "obligation_status_changed" && c.id === "ob-1")).toBe(true)
+  })
+
+  it("detects coding session artifact change", () => {
+    const previous: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [],
+      codingSnapshots: [
+        { id: "coding-001", status: "running", artifact: null, checkpoint: "compiling" },
+      ],
+      timestamp: recentIso(10),
+    }
+    const current: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [],
+      codingSnapshots: [
+        { id: "coding-001", status: "running", artifact: "/tmp/pr-new", checkpoint: "tests passing" },
+      ],
+      timestamp: recentIso(0),
+    }
+
+    const changes = detectActiveWorkChanges(previous, current)
+    expect(changes.length).toBeGreaterThan(0)
+    expect(changes.some((c) => c.kind === "coding_artifact_changed" && c.id === "coding-001")).toBe(true)
+  })
+
+  it("detects new obligation appearing", () => {
+    const previous: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [],
+      codingSnapshots: [],
+      timestamp: recentIso(10),
+    }
+    const current: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [
+        { id: "ob-new", status: "pending", artifact: null, nextAction: "investigate" },
+      ],
+      codingSnapshots: [],
+      timestamp: recentIso(0),
+    }
+
+    const changes = detectActiveWorkChanges(previous, current)
+    expect(changes.length).toBeGreaterThan(0)
+    expect(changes.some((c) => c.kind === "obligation_appeared" && c.id === "ob-new")).toBe(true)
+  })
+
+  it("returns empty changes array when nothing changed", () => {
+    const snapshot: import("../../heart/active-work").ActiveWorkSnapshot = {
+      obligationSnapshots: [
+        { id: "ob-1", status: "investigating", artifact: "/tmp/pr-1", nextAction: "merge" },
+      ],
+      codingSnapshots: [],
+      timestamp: recentIso(5),
+    }
+
+    const changes = detectActiveWorkChanges(snapshot, snapshot)
+    expect(changes).toEqual([])
+  })
+
+  it("formats changes into concise human-readable summary", async () => {
+    const { formatActiveWorkChanges } = await import("../../heart/active-work")
+
+    const changes: import("../../heart/active-work").ActiveWorkChange[] = [
+      { kind: "obligation_status_changed", id: "ob-1", from: "investigating", to: "fulfilled", summary: "obligation fulfilled" },
+      { kind: "coding_artifact_changed", id: "coding-001", from: null, to: "/tmp/pr-new", summary: "PR created" },
+    ]
+
+    const formatted = formatActiveWorkChanges(changes)
+    expect(formatted).toContain("obligation fulfilled")
+    expect(formatted).toContain("PR created")
+    expect(formatted.split("\n").length).toBeLessThanOrEqual(changes.length + 2) // concise
+  })
+})
