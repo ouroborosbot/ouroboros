@@ -6,16 +6,17 @@ import { migrateAgentConfigV1ToV2 } from "./migrate-config"
 
 export type AgentProvider = "azure" | "minimax" | "anthropic" | "openai-codex" | "github-copilot"
 
-/** Single source of truth for per-provider credential field names and env var mappings. */
+/** Single source of truth for per-provider credential field names, env var mappings, and prompt labels. */
 export const PROVIDER_CREDENTIALS: Record<AgentProvider, {
   required: string[]
   envVars: Record<string, string>
+  promptLabels: Record<string, string>
 }> = {
-  anthropic:        { required: ["setupToken"],                        envVars: { ANTHROPIC_API_KEY: "setupToken" } },
-  "openai-codex":   { required: ["oauthAccessToken"],                  envVars: { OPENAI_API_KEY: "oauthAccessToken" } },
-  azure:            { required: ["apiKey", "endpoint", "deployment"],   envVars: { AZURE_OPENAI_API_KEY: "apiKey", AZURE_OPENAI_KEY: "apiKey", AZURE_OPENAI_ENDPOINT: "endpoint", AZURE_OPENAI_DEPLOYMENT: "deployment" } },
-  minimax:          { required: ["apiKey"],                             envVars: { MINIMAX_API_KEY: "apiKey" } },
-  "github-copilot": { required: ["githubToken"],                       envVars: { GITHUB_TOKEN: "githubToken" } },
+  anthropic:        { required: ["setupToken"],                        envVars: { ANTHROPIC_API_KEY: "setupToken" },                                                                                        promptLabels: { setupToken: "Anthropic setup-token" } },
+  "openai-codex":   { required: ["oauthAccessToken"],                  envVars: { OPENAI_API_KEY: "oauthAccessToken" },                                                                                     promptLabels: { oauthAccessToken: "OpenAI Codex OAuth token" } },
+  azure:            { required: ["apiKey", "endpoint", "deployment"],   envVars: { AZURE_OPENAI_API_KEY: "apiKey", AZURE_OPENAI_KEY: "apiKey", AZURE_OPENAI_ENDPOINT: "endpoint", AZURE_OPENAI_DEPLOYMENT: "deployment" }, promptLabels: { apiKey: "Azure API key", endpoint: "Azure endpoint", deployment: "Azure deployment" } },
+  minimax:          { required: ["apiKey"],                             envVars: { MINIMAX_API_KEY: "apiKey" },                                                                                              promptLabels: { apiKey: "MiniMax API key" } },
+  "github-copilot": { required: ["githubToken"],                       envVars: { GITHUB_TOKEN: "githubToken" },                                                                                            promptLabels: { githubToken: "GitHub token" } },
 }
 export type SenseName = "cli" | "teams" | "bluebubbles"
 

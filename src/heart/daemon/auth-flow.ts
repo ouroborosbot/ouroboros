@@ -3,7 +3,7 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
-import { getAgentBundlesRoot, getAgentSecretsPath, type AgentConfig, type AgentProvider } from "../identity"
+import { getAgentBundlesRoot, getAgentSecretsPath, PROVIDER_CREDENTIALS, type AgentConfig, type AgentProvider } from "../identity"
 import { migrateAgentConfigV1ToV2 } from "../migrate-config"
 import type { Facing } from "../../mind/friends/channel"
 import type { HatchCredentialsInput } from "./hatch-flow"
@@ -465,53 +465,40 @@ export async function collectRuntimeAuthCredentials(
   return { apiKey, endpoint, deployment }
 }
 
+/** Providers that support interactive auth flows (gh auth login, codex login, claude setup-token). */
+const AUTH_FLOW_PROVIDERS: AgentProvider[] = ["github-copilot", "anthropic", "openai-codex"]
+
+function hasMissingRequired(provider: AgentProvider, credentials: HatchCredentialsInput): boolean {
+  const cred = credentials as Record<string, unknown>
+  return PROVIDER_CREDENTIALS[provider].required.some((key) => !cred[key])
+}
+
 export async function resolveHatchCredentials(
   input: HatchCredentialResolutionInput,
 ): Promise<HatchCredentialsInput> {
   const prompt = input.promptInput
   const credentials: HatchCredentialsInput = { ...(input.credentials ?? {}) }
 
-  if (input.provider === "github-copilot" && !credentials.githubToken && input.runAuthFlow) {
+  // Try interactive auth flow for providers that support it
+  if (input.runAuthFlow && AUTH_FLOW_PROVIDERS.includes(input.provider) && hasMissingRequired(input.provider, credentials)) {
     const result = await input.runAuthFlow({
       agentName: input.agentName,
-      provider: "github-copilot",
+      provider: input.provider,
       promptInput: prompt,
     })
     Object.assign(credentials, result.credentials)
   }
 
-  if (input.provider === "anthropic" && !credentials.setupToken && input.runAuthFlow) {
-    const result = await input.runAuthFlow({
-      agentName: input.agentName,
-      provider: "anthropic",
-      promptInput: prompt,
-    })
-    Object.assign(credentials, result.credentials)
-  }
-  if (input.provider === "anthropic" && !credentials.setupToken && prompt) {
-    credentials.setupToken = await prompt("Anthropic setup-token: ")
-  }
-
-  if (input.provider === "openai-codex" && !credentials.oauthAccessToken && input.runAuthFlow) {
-    const result = await input.runAuthFlow({
-      agentName: input.agentName,
-      provider: "openai-codex",
-      promptInput: prompt,
-    })
-    Object.assign(credentials, result.credentials)
-  }
-  if (input.provider === "openai-codex" && !credentials.oauthAccessToken && prompt) {
-    credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
-  }
-
-  if (input.provider === "minimax" && !credentials.apiKey && prompt) {
-    credentials.apiKey = await prompt("MiniMax API key: ")
-  }
-
-  if (input.provider === "azure") {
-    if (!credentials.apiKey && prompt) credentials.apiKey = await prompt("Azure API key: ")
-    if (!credentials.endpoint && prompt) credentials.endpoint = await prompt("Azure endpoint: ")
-    if (!credentials.deployment && prompt) credentials.deployment = await prompt("Azure deployment: ")
+  // Prompt for any still-missing required fields
+  if (prompt) {
+    const desc = PROVIDER_CREDENTIALS[input.provider]
+    const cred = credentials as Record<string, string>
+    for (const field of desc.required) {
+      if (!cred[field]) {
+        const label = desc.promptLabels[field] ?? field
+        cred[field] = await prompt(`${label}: `)
+      }
+    }
   }
 
   return credentials
@@ -522,30 +509,13 @@ function applyCredentials(
   provider: AgentProvider,
   credentials: HatchCredentialsInput,
 ): void {
-  if (provider === "anthropic") {
-    secrets.providers.anthropic.setupToken = credentials.setupToken!.trim()
-    /* v8 ignore start -- token refresh fields: populated when OAuth exchange succeeds @preserve */
-    if (credentials.refreshToken) secrets.providers.anthropic.refreshToken = credentials.refreshToken
-    if (credentials.expiresAt) secrets.providers.anthropic.expiresAt = credentials.expiresAt
-    /* v8 ignore stop */
-    return
+  const target = secrets.providers[provider] as Record<string, unknown>
+  // Copy all non-empty credential fields to the provider's secrets block
+  for (const [key, value] of Object.entries(credentials)) {
+    if (value != null && value !== "") {
+      target[key] = typeof value === "string" ? value.trim() : value
+    }
   }
-  if (provider === "github-copilot") {
-    secrets.providers["github-copilot"].githubToken = credentials.githubToken!.trim()
-    secrets.providers["github-copilot"].baseUrl = credentials.baseUrl!.trim()
-    return
-  }
-  if (provider === "openai-codex") {
-    secrets.providers["openai-codex"].oauthAccessToken = credentials.oauthAccessToken!.trim()
-    return
-  }
-  if (provider === "minimax") {
-    secrets.providers.minimax.apiKey = credentials.apiKey!.trim()
-    return
-  }
-  secrets.providers.azure.apiKey = credentials.apiKey!.trim()
-  secrets.providers.azure.endpoint = credentials.endpoint!.trim()
-  secrets.providers.azure.deployment = credentials.deployment!.trim()
 }
 
 export async function runRuntimeAuthFlow(

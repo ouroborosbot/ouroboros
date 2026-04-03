@@ -1503,6 +1503,16 @@ export function discoverExistingCredentials(secretsRoot: string): DiscoveredCred
   })
 }
 
+async function promptForCredentials(provider: AgentProvider, prompt: (q: string) => Promise<string>): Promise<HatchCredentialsInput> {
+  const desc = PROVIDER_CREDENTIALS[provider]
+  const creds: HatchCredentialsInput = {}
+  for (const field of desc.required) {
+    const label = desc.promptLabels[field] ?? field
+    ;(creds as Record<string, string>)[field] = await prompt(`${label}: `)
+  }
+  return creds
+}
+
 /* v8 ignore start -- integration: interactive terminal specialist session @preserve */
 async function defaultRunSerpentGuide(): Promise<string | null> {
   const { runCliSession } = await import("../../senses/cli")
@@ -1589,14 +1599,7 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
         }
         providerRaw = pRaw
         providerConfig = { model: defaultModels[providerRaw] }
-        if (providerRaw === "anthropic") credentials.setupToken = await coldPrompt("API key: ")
-        if (providerRaw === "openai-codex") credentials.oauthAccessToken = await coldPrompt("OAuth token: ")
-        if (providerRaw === "minimax") credentials.apiKey = await coldPrompt("API key: ")
-        if (providerRaw === "azure") {
-          credentials.apiKey = await coldPrompt("API key: ")
-          credentials.endpoint = await coldPrompt("endpoint: ")
-          credentials.deployment = await coldPrompt("deployment: ")
-        }
+        credentials = await promptForCredentials(providerRaw, coldPrompt)
       }
     } else {
       process.stdout.write(`\n\ud83d\udc0d welcome to ouroboros! ${hatchVerb}\n`)
@@ -1609,14 +1612,7 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
       }
       providerRaw = pRaw
       providerConfig = { model: defaultModels[providerRaw] }
-      if (providerRaw === "anthropic") credentials.setupToken = await coldPrompt("API key: ")
-      if (providerRaw === "openai-codex") credentials.oauthAccessToken = await coldPrompt("OAuth token: ")
-      if (providerRaw === "minimax") credentials.apiKey = await coldPrompt("API key: ")
-      if (providerRaw === "azure") {
-        credentials.apiKey = await coldPrompt("API key: ")
-        credentials.endpoint = await coldPrompt("endpoint: ")
-        credentials.deployment = await coldPrompt("deployment: ")
-      }
+      credentials = await promptForCredentials(providerRaw, coldPrompt)
     }
 
     coldRl.close()
