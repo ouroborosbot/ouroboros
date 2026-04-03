@@ -107,6 +107,32 @@ export function registerDefaultCommands(registry: CommandRegistry): void {
   })
 
   registry.register({
+    name: "help",
+    description: "show keyboard shortcuts and tips",
+    channels: ["cli"],
+    handler: () => ({
+      action: "response",
+      message: [
+        "Keyboard shortcuts:",
+        "  Ctrl-C        abort current generation / clear input / exit (twice within 2s)",
+        "  Escape        clear input",
+        "  ↑ / ↓         browse input history (includes previous sessions)",
+        "  Option+← / →  jump between words",
+        "  Ctrl+A / E    jump to start / end of line",
+        "  Option+Delete  delete word backward",
+        "  Option+D      delete word forward",
+        "  Alt+Enter     insert newline (multi-line input)",
+        "",
+        "Commands:",
+        "  /help         this help",
+        "  /commands     list all commands",
+        "  /new          start a new conversation",
+        "  /exit         quit",
+      ].join("\n"),
+    }),
+  })
+
+  registry.register({
     name: "tool-required",
     description: "toggle tool_choice required mode (forces tool calls)",
     channels: ["cli"],
