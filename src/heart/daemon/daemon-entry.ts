@@ -153,11 +153,9 @@ void daemon.start().then(() => {
     scheduler.watchForChanges()
     habitSchedulers.push(scheduler)
   }
+/* v8 ignore start -- startup failure + signal handlers: call process.exit, untestable in vitest @preserve */
 }).catch(async (err: unknown) => {
-/* v8 ignore stop */
-  /* v8 ignore start — instanceof branch defensive; catch always receives Error in practice @preserve */
   const error = err instanceof Error ? err : new Error(String(err))
-  /* v8 ignore stop */
   writeDaemonTombstone("startupFailure", error)
   emitNervesEvent({
     level: "error",
@@ -182,6 +180,7 @@ process.on("SIGTERM", () => {
   setTimeout(() => process.exit(1), 5_000).unref()
   void daemon.stop().then(() => process.exit(0))
 })
+/* v8 ignore stop */
 
 // Suppress EPIPE on stdout/stderr — normal when detached daemon's parent exits
 /* v8 ignore start -- EPIPE suppression: only fires when parent process exits @preserve */

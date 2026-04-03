@@ -314,7 +314,7 @@ function readCodexAccessToken(homeDir: string): string {
     const raw = fs.readFileSync(authPath, "utf8")
     const parsed = JSON.parse(raw) as { tokens?: { access_token?: unknown } }
     const token = parsed?.tokens?.access_token
-    return typeof token === "string" ? token.trim() : ""
+    return typeof token === "string" ? token.trim() : /* v8 ignore next -- defensive: codex login always writes a string token @preserve */ ""
   } catch {
     return ""
   }
