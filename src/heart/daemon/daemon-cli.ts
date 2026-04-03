@@ -1651,6 +1651,18 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
         [providerRaw]: { ...providerConfig, ...credentials },
       },
     })
+
+    // Ping-verify credentials before entering the serpent guide session
+    const { pingProvider } = await import("../provider-ping")
+    const pingResult = await pingProvider(
+      providerRaw,
+      { ...providerConfig, ...credentials } as Parameters<typeof pingProvider>[1],
+    )
+    if (!pingResult.ok) {
+      process.stdout.write(`credentials didn't work (${pingResult.message}). run 'ouro hatch' to try again.\n`)
+      return null
+    }
+
     const existingBundles = listExistingBundles(bundlesRoot)
     const systemPrompt = buildSpecialistSystemPrompt(soulText, identity.content, existingBundles, {
       tempDir,
