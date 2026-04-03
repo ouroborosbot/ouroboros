@@ -43,6 +43,32 @@ export interface FailoverState {
   pending: FailoverContext | null
 }
 
+/**
+ * Emit episodes for obligation state transitions detected during a turn.
+ * Exported for direct testability (avoids v8 coverage merge issues in multi-file test suites).
+ */
+export function emitObligationTransitionEpisodes(
+  agentRoot: string,
+  preTurnObligationIds: Set<string>,
+  postTurnObligations: import("../heart/obligations").Obligation[],
+  preTurnObligations: import("../heart/obligations").Obligation[],
+): void {
+  const postTurnObligationIds = new Set(postTurnObligations.map((ob) => `${ob.id}:${ob.status}`))
+  for (const key of preTurnObligationIds) {
+    if (!postTurnObligationIds.has(key)) {
+      const [obId] = key.split(":")
+      const matchedOb = postTurnObligations.find((ob) => ob.id === obId) ?? preTurnObligations.find((ob) => ob.id === obId)
+      emitEpisode(agentRoot, {
+        kind: "obligation_shift",
+        summary: `obligation "${matchedOb?.content ?? obId}" status changed`,
+        whyItMattered: "obligation state transition detected during turn",
+        relatedEntities: [`obligation:${obId}`],
+        salience: "medium",
+      })
+    }
+  }
+}
+
 
 // ── Input / Output types ──────────────────────────────────────────
 
@@ -671,22 +697,7 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
   try {
     const agentRoot = getAgentRoot()
     const postTurnObligations = readPendingObligations(agentRoot)
-    const postTurnObligationIds = new Set(postTurnObligations.map((ob) => `${ob.id}:${ob.status}`))
-
-    // Detect obligations whose status changed during this turn
-    for (const key of preTurnObligationIds) {
-      if (!postTurnObligationIds.has(key)) {
-        const [obId] = key.split(":")
-        const matchedOb = postTurnObligations.find((ob) => ob.id === obId) ?? pendingObligations.find((ob) => ob.id === obId)
-        emitEpisode(agentRoot, {
-          kind: "obligation_shift",
-          summary: `obligation "${matchedOb?.content ?? obId}" status changed`,
-          whyItMattered: "obligation state transition detected during turn",
-          relatedEntities: [`obligation:${obId}`],
-          salience: "medium",
-        })
-      }
-    }
+    emitObligationTransitionEpisodes(agentRoot, preTurnObligationIds, postTurnObligations, pendingObligations)
   } catch {
     // Episode emission is non-fatal
   }

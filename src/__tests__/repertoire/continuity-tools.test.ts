@@ -317,6 +317,26 @@ describe("continuity tools", () => {
       const result = await tool.handler({})
       expect(result).toBe("[]")
     })
+
+    it("passes kind filter when provided", async () => {
+      mockReadRecentEpisodes.mockReturnValue([])
+      const tool = findTool("query_episodes")
+      await tool.handler({ kind: "turning_point" })
+      expect(mockReadRecentEpisodes).toHaveBeenCalledWith(
+        "/mock/agent-root",
+        expect.objectContaining({ kinds: ["turning_point"] }),
+      )
+    })
+
+    it("passes limit when provided", async () => {
+      mockReadRecentEpisodes.mockReturnValue([])
+      const tool = findTool("query_episodes")
+      await tool.handler({ limit: "5" })
+      expect(mockReadRecentEpisodes).toHaveBeenCalledWith(
+        "/mock/agent-root",
+        expect.objectContaining({ limit: 5 }),
+      )
+    })
   })
 
   describe("query_presence edge cases", () => {
@@ -352,6 +372,13 @@ describe("continuity tools", () => {
         "c-1",
         expect.objectContaining({ label: "renamed", why: "reprioritized", salience: "high" }),
       )
+    })
+
+    it("handles unknown action gracefully (no create/update/resolve match)", async () => {
+      const tool = findTool("care_manage")
+      const result = await tool.handler({ action: "unknown-action" })
+      // JSON.stringify(undefined) returns undefined (not a string)
+      expect(result).toBeUndefined()
     })
 
     it("updates a care with only why (no label or salience)", async () => {

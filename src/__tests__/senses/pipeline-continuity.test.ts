@@ -462,30 +462,69 @@ describe("pipeline continuity integration", () => {
   })
 
   describe("episode emission at obligation transitions", () => {
-    it("emits episode when obligation state changes between turns", async () => {
-      // Before turn: one obligation pending
-      const beforeObligations = [
-        { id: "ob-1", content: "review PR", status: "pending", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-01T10:00:00Z" },
-      ]
-      // After turn: obligation status changed
-      const afterObligations = [
-        { id: "ob-1", content: "review PR", status: "fulfilled", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-02T10:00:00Z" },
-      ]
+    it("emits episode when obligation status changes (direct function test)", async () => {
+      const { emitObligationTransitionEpisodes } = await import("../../senses/pipeline")
 
-      // readPendingObligations is called at multiple points in the pipeline:
-      //   1. Inner dialog (line 222) — may or may not execute depending on readInnerDialogRawData
-      //   2. Pre-turn snapshot (line 461) — always executes
-      //   3. Post-turn check (line 673) — always executes
-      // Use a stack: all calls return beforeObligations except the very last call which returns afterObligations.
-      // We achieve this by defaulting to beforeObligations and tracking when the post-turn code runs.
-      // The post-turn code is after runAgent, so we use the runAgent mock to switch the return value.
-      mockReadPendingObligations.mockReturnValue(beforeObligations)
+      const preTurnIds = new Set(["ob-1:pending"])
+      const postTurnObligations = [
+        { id: "ob-1", content: "review PR", status: "fulfilled", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-02T10:00:00Z" },
+      ] as any[]
+      const preTurnObligations = [
+        { id: "ob-1", content: "review PR", status: "pending", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-01T10:00:00Z" },
+      ] as any[]
+
+      emitObligationTransitionEpisodes("/tmp/test-agent-root", preTurnIds, postTurnObligations, preTurnObligations)
+
+      expect(mockEmitEpisode).toHaveBeenCalledWith(
+        "/tmp/test-agent-root",
+        expect.objectContaining({
+          kind: "obligation_shift",
+          summary: expect.stringContaining("review PR"),
+          salience: "medium",
+        }),
+      )
+    })
+
+    it("does not emit episode when obligation status unchanged", async () => {
+      const { emitObligationTransitionEpisodes } = await import("../../senses/pipeline")
+
+      const preTurnIds = new Set(["ob-1:pending"])
+      const postTurnObligations = [
+        { id: "ob-1", content: "review PR", status: "pending", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-01T10:00:00Z" },
+      ] as any[]
+
+      emitObligationTransitionEpisodes("/tmp/test-agent-root", preTurnIds, postTurnObligations, postTurnObligations)
+
+      expect(mockEmitEpisode).not.toHaveBeenCalled()
+    })
+
+    it("uses obligation id as fallback when content is missing", async () => {
+      const { emitObligationTransitionEpisodes } = await import("../../senses/pipeline")
+
+      const preTurnIds = new Set(["ob-gone:pending"])
+      // Obligation not found in either pre or post lists
+      emitObligationTransitionEpisodes("/tmp/test-agent-root", preTurnIds, [], [])
+
+      expect(mockEmitEpisode).toHaveBeenCalledWith(
+        "/tmp/test-agent-root",
+        expect.objectContaining({
+          summary: expect.stringContaining("ob-gone"),
+        }),
+      )
+    })
+
+    it("emits episodes via pipeline when obligation state changes between turns", async () => {
+      // Also test through the full pipeline to ensure the extracted function is wired correctly
+      mockReadPendingObligations.mockReturnValue([
+        { id: "ob-1", content: "review PR", status: "pending", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-01T10:00:00Z" },
+      ])
 
       const originalRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
       const runAgentWrapper = async (...args: any[]) => {
         const result = await originalRunAgent(...args)
-        // After runAgent completes, switch the mock to return the post-turn state
-        mockReadPendingObligations.mockReturnValue(afterObligations)
+        mockReadPendingObligations.mockReturnValue([
+          { id: "ob-1", content: "review PR", status: "fulfilled", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-02T10:00:00Z" },
+        ])
         return result
       }
 
@@ -493,7 +532,6 @@ describe("pipeline continuity integration", () => {
       const { handleInboundTurn } = await import("../../senses/pipeline")
       await handleInboundTurn(input)
 
-      // Verify emitEpisode was called for the obligation shift
       expect(mockEmitEpisode).toHaveBeenCalledWith(
         "/tmp/test-agent-root",
         expect.objectContaining({
