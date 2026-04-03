@@ -1960,19 +1960,23 @@ describe("delegation router", () => {
     expect(rendered).toContain("return obligations: 1 active (canonical details in **Owed** section of wake packet)")
   })
 
-  it("suppresses obligation pointer when hasWakePacket is true but all obligations are fulfilled", async () => {
-    const { formatActiveWorkFrame, buildActiveWorkFrame } = await import("../../heart/active-work")
+  it("suppresses obligation rendering when all obligations in the frame are fulfilled", async () => {
+    const { formatActiveWorkFrame } = await import("../../heart/active-work")
 
-    const fulfilledFrame = buildActiveWorkFrame({
+    // Construct frame manually (bypassing buildActiveWorkFrame normalization)
+    // to simulate a frame with obligations that are all fulfilled
+    const fulfilledFrame = {
       currentSession: {
         friendId: "friend-1",
-        channel: "cli",
+        channel: "cli" as const,
         key: "session",
         sessionPath: "/tmp/state/sessions/friend-1/cli/session.json",
       },
+      currentObligation: null,
       mustResolveBeforeHandoff: false,
+      centerOfGravity: "local-turn" as const,
       inner: {
-        status: "idle",
+        status: "idle" as const,
         hasPending: false,
         job: {
           status: "idle" as const,
@@ -1987,6 +1991,9 @@ describe("delegation router", () => {
         },
       },
       bridges: [],
+      taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
+      friendActivity: { freshestForCurrentFriend: null, otherLiveSessionsForCurrentFriend: [] },
+      codingSessions: [],
       pendingObligations: [
         {
           id: "ob-done",
@@ -1997,18 +2004,20 @@ describe("delegation router", () => {
           updatedAt: new Date().toISOString(),
         },
       ],
-      taskBoard: {
-        compact: "",
-        activeBridges: [],
-        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
-      },
-      friendActivity: [],
-    })
+      innerReturnObligations: [],
+      bridgeSuggestion: null,
+    }
 
+    // With hasWakePacket — should suppress (openCount=0, no pointer)
     const rendered = formatActiveWorkFrame(fulfilledFrame, { hasWakePacket: true })
     expect(rendered).not.toContain("## return obligations")
     expect(rendered).not.toContain("return obligations:")
     expect(rendered).not.toContain("canonical details in **Owed**")
+
+    // Without hasWakePacket — should also suppress (openCount=0, no list)
+    const renderedWithoutWake = formatActiveWorkFrame(fulfilledFrame)
+    expect(renderedWithoutWake).not.toContain("## return obligations")
+    expect(renderedWithoutWake).not.toContain("return obligations:")
   })
 
   it("renders queued inner thought content when present", async () => {
