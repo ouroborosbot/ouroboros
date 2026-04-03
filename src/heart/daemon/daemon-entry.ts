@@ -148,33 +148,57 @@ void daemon.start().then(() => {
     message: "daemon entrypoint failed",
     meta: { error: error.message },
   })
+  setTimeout(() => process.exit(1), 5_000).unref()
   await daemon.stop()
   process.exit(1)
 })
 
 process.on("SIGINT", () => {
   for (const s of habitSchedulers) { s.stopWatching(); s.stop() }
+  setTimeout(() => process.exit(1), 5_000).unref()
   void daemon.stop().then(() => process.exit(0))
 })
 
 process.on("SIGTERM", () => {
   for (const s of habitSchedulers) { s.stopWatching(); s.stop() }
+  setTimeout(() => process.exit(1), 5_000).unref()
   void daemon.stop().then(() => process.exit(0))
 })
 
 /* v8 ignore start -- global exception handlers: genuinely untestable in vitest; exercised by real daemon crashes @preserve */
+let _uncaughtCount = 0
+const CIRCUIT_BREAKER_WINDOW_MS = 60_000
+const CIRCUIT_BREAKER_MAX = 10
+
 process.on("uncaughtException", (error) => {
+  // EPIPE is normal for detached daemon processes — parent closed the pipe
+  if ((error as NodeJS.ErrnoException).code === "EPIPE") return
+
+  _uncaughtCount++
+  setTimeout(() => { _uncaughtCount-- }, CIRCUIT_BREAKER_WINDOW_MS).unref()
+
   writeDaemonTombstone("uncaughtException", error)
   emitNervesEvent({
     level: "error",
     component: "daemon",
     event: "daemon.uncaught_exception",
-    message: "uncaught exception in daemon process",
-    meta: { error: error.message, stack: error.stack ?? null },
+    message: "uncaught exception in daemon process (continuing)",
+    meta: { error: error.message, stack: error.stack ?? null, uncaughtCount: _uncaughtCount },
   })
-  // Graceful 5-second shutdown window
-  setTimeout(() => process.exit(1), 5_000).unref()
-  void daemon.stop().then(() => process.exit(1))
+
+  // Circuit breaker: if too many exceptions in a short window, the process
+  // is in a bad state — exit so launchd/self-spawn can restart fresh.
+  if (_uncaughtCount >= CIRCUIT_BREAKER_MAX) {
+    emitNervesEvent({
+      level: "error",
+      component: "daemon",
+      event: "daemon.circuit_breaker_exit",
+      message: `daemon exiting: ${_uncaughtCount} uncaught exceptions in ${CIRCUIT_BREAKER_WINDOW_MS / 1000}s`,
+      meta: { uncaughtCount: _uncaughtCount },
+    })
+    setTimeout(() => process.exit(1), 5_000).unref()
+    void daemon.stop().then(() => process.exit(1))
+  }
 })
 
 process.on("unhandledRejection", (reason) => {
