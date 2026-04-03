@@ -311,6 +311,17 @@ describe("wake packet", () => {
       expect(packet.plotLine).toContain("PR merged for auth module")
     })
 
+    it("renders currentRisk when present on care", () => {
+      const view = makeView({
+        activeCares: [
+          makeCare({ label: "deployment health", salience: "critical", currentRisk: "overnight deploy may fail" }),
+        ],
+      })
+
+      const packet = buildWakePacket(view)
+      expect(packet.cares).toContain("overnight deploy may fail")
+    })
+
     it("salience labels match authored source record values, not re-derived", () => {
       const view = makeView({
         activeCares: [
@@ -354,6 +365,110 @@ describe("wake packet", () => {
     })
   })
 
+  describe("formatSections edge cases", () => {
+    it("renders presence section when peers exist", () => {
+      const view = makeView({
+        tempo: "standard",
+        peerPresence: [
+          {
+            agentName: "slugger",
+            availability: "active",
+            lane: "coding",
+            mission: "working",
+            tempo: "standard",
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        activeObligations: [makeObligation()],
+      })
+      const packet = buildWakePacket(view)
+      const rendered = renderWakePacket(packet)
+      expect(rendered).toContain("Peers:")
+      expect(rendered).toContain("slugger")
+    })
+  })
+
+  describe("plotLine tempo variation", () => {
+    it("crisis mode limits plotLine to 3 episodes", () => {
+      const episodes = Array.from({ length: 6 }, (_, i) =>
+        makeEpisode({ id: `ep-${i}`, summary: `crisis event ${i}` }),
+      )
+      const view = makeView({ tempo: "crisis", recentEpisodes: episodes })
+      const packet = buildWakePacket(view)
+      // In crisis mode, plotLine should only mention up to 3 episodes
+      const lines = packet.plotLine.split("\n").filter((l) => l.startsWith("- "))
+      expect(lines.length).toBeLessThanOrEqual(3)
+    })
+
+    it("brief mode omits whyItMattered from episodes", () => {
+      const view = makeView({
+        tempo: "brief",
+        recentEpisodes: [makeEpisode({ summary: "thing happened", whyItMattered: "secret reason" })],
+      })
+      const packet = buildWakePacket(view)
+      expect(packet.plotLine).toContain("thing happened")
+      expect(packet.plotLine).not.toContain("secret reason")
+    })
+
+    it("standard mode includes whyItMattered", () => {
+      const view = makeView({
+        tempo: "standard",
+        recentEpisodes: [makeEpisode({ summary: "thing happened", whyItMattered: "because context" })],
+      })
+      const packet = buildWakePacket(view)
+      expect(packet.plotLine).toContain("because context")
+    })
+  })
+
+  describe("over-budget hard cap", () => {
+    it("hard caps when even removing sections is not enough", () => {
+      // Create a packet with a very large protected resumeHint
+      const longHint = "x".repeat(2000)
+      const view = makeView({
+        tempo: "brief",
+        openIntentions: [makeIntention({ content: longHint })],
+      })
+      const packet = buildWakePacket(view)
+      const rendered = renderWakePacket(packet)
+      const tokens = estimateTokens(rendered)
+      // Should be hard-capped to budget max
+      expect(tokens).toBeLessThanOrEqual(TEMPO_BUDGETS.brief.max)
+    })
+  })
+
+  describe("obligation enrichment rendering", () => {
+    it("shows staleness when not fresh", () => {
+      const view = makeView({
+        activeObligations: [
+          makeObligation({
+            content: "stale task",
+            meaning: { salience: "high", stalenessClass: "stale", resumeHint: "check status" },
+          }),
+        ],
+      })
+      const packet = buildWakePacket(view)
+      expect(packet.obligations).toContain("stale")
+    })
+
+    it("shows waitingOn info when present", () => {
+      const view = makeView({
+        activeObligations: [
+          makeObligation({
+            content: "blocked task",
+            meaning: {
+              salience: "high",
+              stalenessClass: "fresh",
+              waitingOn: { kind: "friend", target: "ari", detail: "review" },
+            },
+          }),
+        ],
+      })
+      const packet = buildWakePacket(view)
+      expect(packet.obligations).toContain("friend")
+      expect(packet.obligations).toContain("ari")
+    })
+  })
+
   describe("renderCompactWakePacket", () => {
     it("produces ultra-compact output (max 200 tokens)", () => {
       const view = makeView({
@@ -381,6 +496,18 @@ describe("wake packet", () => {
       const packet = buildWakePacket(view)
       const compact = renderCompactWakePacket(packet)
       expect(typeof compact).toBe("string")
+    })
+
+    it("hard caps at 200 tokens when content is very large", () => {
+      const longContent = "a".repeat(1000)
+      const view = makeView({
+        activeObligations: [makeObligation({ content: longContent })],
+        openIntentions: [makeIntention({ content: longContent })],
+      })
+      const packet = buildWakePacket(view)
+      const compact = renderCompactWakePacket(packet)
+      const tokens = estimateTokens(compact)
+      expect(tokens).toBeLessThanOrEqual(200)
     })
   })
 })

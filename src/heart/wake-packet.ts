@@ -189,11 +189,9 @@ export function renderWakePacket(packet: WakePacket): string {
 
     // Remove this section entirely
     const idx = sections.findIndex((s) => s.label === section.label)
-    if (idx >= 0) {
-      sections.splice(idx, 1)
-      rendered = formatSections(sections)
-      tokens = estimateTokens(rendered)
-    }
+    sections.splice(idx, 1)
+    rendered = formatSections(sections)
+    tokens = estimateTokens(rendered)
   }
 
   // If still over budget after removing all non-protected sections, trim what's left
