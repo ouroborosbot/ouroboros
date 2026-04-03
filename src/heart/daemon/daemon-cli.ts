@@ -4,7 +4,7 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 import * as semver from "semver"
-import { getAgentBundlesRoot, getAgentDaemonLogsDir, getAgentName, getAgentRoot, getRepoRoot, HARNESS_CANONICAL_REPO_URL, type AgentProvider } from "../identity"
+import { getAgentBundlesRoot, getAgentDaemonLogsDir, getAgentName, getAgentRoot, getRepoRoot, HARNESS_CANONICAL_REPO_URL, PROVIDER_CREDENTIALS, type AgentProvider } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { FileFriendStore } from "../../mind/friends/store-file"
 import type { FriendStore } from "../../mind/friends/store"
@@ -697,16 +697,9 @@ function isAgentProvider(value: unknown): value is AgentProvider {
   return value === "azure" || value === "anthropic" || value === "minimax" || value === "openai-codex" || value === "github-copilot"
 }
 
-/* v8 ignore start -- hasStoredCredentials: per-provider branches tested via auth switch tests @preserve */
 function hasStoredCredentials(provider: AgentProvider, providerSecrets: Record<string, unknown>): boolean {
-  if (provider === "anthropic") return !!(providerSecrets as { setupToken?: string }).setupToken
-  if (provider === "openai-codex") return !!(providerSecrets as { oauthAccessToken?: string }).oauthAccessToken
-  if (provider === "github-copilot") return !!(providerSecrets as { githubToken?: string }).githubToken
-  if (provider === "minimax") return !!(providerSecrets as { apiKey?: string }).apiKey
-  // azure
-  return !!(providerSecrets as { endpoint?: string }).endpoint && !!(providerSecrets as { apiKey?: string }).apiKey
+  return PROVIDER_CREDENTIALS[provider].required.every((key) => !!providerSecrets[key])
 }
-/* v8 ignore stop */
 
 /* v8 ignore start -- verifyProviderCredentials: delegates to pingProvider @preserve */
 async function verifyProviderCredentials(
@@ -1489,16 +1482,13 @@ export function discoverExistingCredentials(secretsRoot: string): DiscoveredCred
     if (!parsed.providers) continue
 
     for (const [provName, provConfig] of Object.entries(parsed.providers)) {
-      if (provName === "anthropic" && provConfig.setupToken) {
-        found.push({ agentName: entry.name, provider: "anthropic", credentials: { setupToken: provConfig.setupToken }, providerConfig: { ...provConfig } })
-      } else if (provName === "openai-codex" && provConfig.oauthAccessToken) {
-        found.push({ agentName: entry.name, provider: "openai-codex", credentials: { oauthAccessToken: provConfig.oauthAccessToken }, providerConfig: { ...provConfig } })
-      } else if (provName === "minimax" && provConfig.apiKey) {
-        found.push({ agentName: entry.name, provider: "minimax", credentials: { apiKey: provConfig.apiKey }, providerConfig: { ...provConfig } })
-      } else if (provName === "azure" && provConfig.apiKey && provConfig.endpoint && provConfig.deployment) {
-        found.push({ agentName: entry.name, provider: "azure", credentials: { apiKey: provConfig.apiKey, endpoint: provConfig.endpoint, deployment: provConfig.deployment }, providerConfig: { ...provConfig } })
-      } else if (provName === "github-copilot" && provConfig.githubToken) {
-        found.push({ agentName: entry.name, provider: "github-copilot", credentials: { githubToken: provConfig.githubToken, baseUrl: provConfig.baseUrl }, providerConfig: { ...provConfig } })
+      const desc = PROVIDER_CREDENTIALS[provName as AgentProvider]
+      if (!desc) continue
+      const hasRequired = desc.required.every((key) => !!provConfig[key])
+      if (hasRequired) {
+        const credentials: Record<string, string> = {}
+        for (const key of Object.keys(provConfig)) credentials[key] = provConfig[key]
+        found.push({ agentName: entry.name, provider: provName as AgentProvider, credentials, providerConfig: { ...provConfig } })
       }
     }
   }
@@ -1549,30 +1539,24 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
       azure: "",
     }
 
-    // Scan environment variables for API keys
-    const envKeys: Array<{ provider: AgentProvider; envVar: string; credKey: string }> = [
-      { provider: "anthropic", envVar: "ANTHROPIC_API_KEY", credKey: "setupToken" },
-      { provider: "openai-codex", envVar: "OPENAI_API_KEY", credKey: "oauthAccessToken" },
-      { provider: "azure", envVar: "AZURE_OPENAI_API_KEY", credKey: "apiKey" },
-      { provider: "azure", envVar: "AZURE_OPENAI_KEY", credKey: "apiKey" },
-      { provider: "minimax", envVar: "MINIMAX_API_KEY", credKey: "apiKey" },
-      { provider: "github-copilot", envVar: "GITHUB_TOKEN", credKey: "githubToken" },
-    ]
+    // Scan environment variables for API keys using the canonical descriptor
     const envDiscovered: Array<DiscoveredCredential & { envVar: string }> = []
-    for (const { provider, envVar, credKey } of envKeys) {
-      const value = process.env[envVar]
-      if (value) {
-        const envCred: HatchCredentialsInput = { [credKey]: value }
-        // For Azure, also check for endpoint and deployment env vars
-        if (provider === "azure") {
-          const endpoint = process.env.AZURE_OPENAI_ENDPOINT
-          const deployment = process.env.AZURE_OPENAI_DEPLOYMENT
-          if (endpoint) envCred.endpoint = endpoint
-          if (deployment) envCred.deployment = deployment
+    for (const [provider, desc] of Object.entries(PROVIDER_CREDENTIALS) as Array<[AgentProvider, typeof PROVIDER_CREDENTIALS[AgentProvider]]>) {
+      const envCred: HatchCredentialsInput = {}
+      let firstEnvVar: string | undefined
+      for (const [envVar, credKey] of Object.entries(desc.envVars)) {
+        const value = process.env[envVar]
+        if (value) {
+          ;(envCred as Record<string, string>)[credKey] = value
+          if (!firstEnvVar) firstEnvVar = envVar
         }
+      }
+      // Only register if at least one required field was found
+      const hasRequired = desc.required.some((key) => !!(envCred as Record<string, string>)[key])
+      if (hasRequired && firstEnvVar) {
         const provCfg: Record<string, string> = { model: defaultModels[provider] }
         if (provider === "azure" && envCred.deployment) provCfg.deployment = envCred.deployment
-        envDiscovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg, envVar })
+        envDiscovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg, envVar: firstEnvVar })
         discovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg })
       }
     }

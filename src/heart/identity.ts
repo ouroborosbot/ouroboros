@@ -5,6 +5,18 @@ import { emitNervesEvent } from "../nerves/runtime"
 import { migrateAgentConfigV1ToV2 } from "./migrate-config"
 
 export type AgentProvider = "azure" | "minimax" | "anthropic" | "openai-codex" | "github-copilot"
+
+/** Single source of truth for per-provider credential field names and env var mappings. */
+export const PROVIDER_CREDENTIALS: Record<AgentProvider, {
+  required: string[]
+  envVars: Record<string, string>
+}> = {
+  anthropic:        { required: ["setupToken"],                        envVars: { ANTHROPIC_API_KEY: "setupToken" } },
+  "openai-codex":   { required: ["oauthAccessToken"],                  envVars: { OPENAI_API_KEY: "oauthAccessToken" } },
+  azure:            { required: ["apiKey", "endpoint", "deployment"],   envVars: { AZURE_OPENAI_API_KEY: "apiKey", AZURE_OPENAI_KEY: "apiKey", AZURE_OPENAI_ENDPOINT: "endpoint", AZURE_OPENAI_DEPLOYMENT: "deployment" } },
+  minimax:          { required: ["apiKey"],                             envVars: { MINIMAX_API_KEY: "apiKey" } },
+  "github-copilot": { required: ["githubToken"],                       envVars: { GITHUB_TOKEN: "githubToken" } },
+}
 export type SenseName = "cli" | "teams" | "bluebubbles"
 
 export type LogLevel = "debug" | "info" | "warn" | "error"
