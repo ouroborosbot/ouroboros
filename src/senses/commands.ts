@@ -110,6 +110,7 @@ export function registerDefaultCommands(registry: CommandRegistry): void {
     name: "help",
     description: "show keyboard shortcuts and tips",
     channels: ["cli"],
+    /* v8 ignore start -- integration: /help command tested via E2E @preserve */
     handler: () => ({
       action: "response",
       message: [
@@ -130,6 +131,7 @@ export function registerDefaultCommands(registry: CommandRegistry): void {
         "  /exit         quit",
       ].join("\n"),
     }),
+    /* v8 ignore stop */
   })
 
   registry.register({
