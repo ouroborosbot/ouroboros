@@ -583,7 +583,14 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
       activeCareCount: activeCares.length,
       atRiskCareCount: activeCares.filter((c) => c.currentRisk != null).length,
     })
-    const temporalView = buildTemporalView(agentRoot, { tempo: tempoState.mode })
+    const temporalView = buildTemporalView(agentRoot, {
+      tempo: tempoState.mode,
+      preloaded: {
+        recentEpisodes,
+        activeObligations: pendingObligations,
+        activeCares,
+      },
+    })
     const wakePacket = buildWakePacket(temporalView)
     renderedWakePacket = renderWakePacket(wakePacket)
     if (!renderedWakePacket) renderedWakePacket = undefined

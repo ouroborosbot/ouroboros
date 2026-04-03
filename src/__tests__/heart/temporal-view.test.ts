@@ -145,6 +145,55 @@ describe("temporal view", () => {
       expect(view.peerPresence).toEqual([])
     })
 
+    it("uses preloaded data instead of reading from disk when provided", () => {
+      // Create real data on disk
+      emitEpisode(tmpDir, {
+        kind: "turning_point",
+        summary: "disk episode",
+        whyItMattered: "on disk",
+        relatedEntities: [],
+        salience: "low",
+      })
+      createObligation(tmpDir, {
+        origin: { friendId: "f1", channel: "cli", key: "s1" },
+        content: "disk obligation",
+      })
+
+      // Pass preloaded data that differs from disk
+      const preloadedEpisodes = [{
+        id: "ep-preloaded",
+        timestamp: new Date().toISOString(),
+        kind: "coding_milestone" as const,
+        summary: "preloaded episode",
+        whyItMattered: "from preloaded",
+        relatedEntities: [],
+        salience: "medium" as const,
+      }]
+      const preloadedObligations = [{
+        id: "ob-preloaded",
+        origin: { friendId: "f2", channel: "teams", key: "s2" },
+        content: "preloaded obligation",
+        status: "pending" as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }]
+
+      const view = buildTemporalView(tmpDir, {
+        preloaded: {
+          recentEpisodes: preloadedEpisodes,
+          activeObligations: preloadedObligations,
+        },
+      })
+
+      // Should use preloaded, not disk
+      expect(view.recentEpisodes).toHaveLength(1)
+      expect(view.recentEpisodes[0].summary).toBe("preloaded episode")
+      expect(view.activeObligations).toHaveLength(1)
+      expect(view.activeObligations[0].content).toBe("preloaded obligation")
+      // Cares should still read from disk (not preloaded)
+      expect(view.activeCares).toEqual([])
+    })
+
     it("default episodeLimit is 20", () => {
       for (let i = 0; i < 25; i++) {
         emitEpisode(tmpDir, {

@@ -526,7 +526,7 @@ export function wakePacketSection(options?: BuildSystemOptions): string {
 
 function activeWorkSection(options?: BuildSystemOptions): string {
   if (!options?.activeWorkFrame) return ""
-  return formatActiveWorkFrame(options.activeWorkFrame)
+  return formatActiveWorkFrame(options.activeWorkFrame, { hasWakePacket: !!options?.wakePacket })
 }
 
 function liveWorldStateSection(options?: BuildSystemOptions): string {
@@ -1102,15 +1102,14 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     commitmentsSection(options),
     delegationHintSection(options),
     bridgeContextSection(options),
-    // Gate session summary when wake packet already provides peer presence
-    ...(options?.wakePacket ? [] : [buildSessionSummary({
+    buildSessionSummary({
       sessionsDir: path.join(getAgentRoot(), "state", "sessions"),
       friendsDir: path.join(getAgentRoot(), "friends"),
       agentName: getAgentName(),
       currentFriendId: context?.friend?.id,
       currentChannel: channel,
       currentKey: options?.currentSessionKey ?? "session",
-    })]),
+    }),
 
     // Group 8: friend context
     "# friend context",

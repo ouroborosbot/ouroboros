@@ -18,14 +18,23 @@ export interface TemporalView {
 
 export function buildTemporalView(
   agentRoot: string,
-  options?: { episodeLimit?: number; tempo?: TempoMode },
+  options?: {
+    episodeLimit?: number
+    tempo?: TempoMode
+    /** Pre-read data to avoid redundant disk reads when the pipeline already has these. */
+    preloaded?: {
+      recentEpisodes?: EpisodeRecord[]
+      activeObligations?: Obligation[]
+      activeCares?: CareRecord[]
+    }
+  },
 ): TemporalView {
   const episodeLimit = options?.episodeLimit ?? 20
   const tempo = options?.tempo ?? "brief"
 
-  const recentEpisodes = readRecentEpisodes(agentRoot, { limit: episodeLimit })
-  const activeObligations = readPendingObligations(agentRoot)
-  const activeCares = readActiveCares(agentRoot)
+  const recentEpisodes = options?.preloaded?.recentEpisodes ?? readRecentEpisodes(agentRoot, { limit: episodeLimit })
+  const activeObligations = options?.preloaded?.activeObligations ?? readPendingObligations(agentRoot)
+  const activeCares = options?.preloaded?.activeCares ?? readActiveCares(agentRoot)
   const openIntentions = readOpenIntentions(agentRoot)
   const peerPresence = readPeerPresence(agentRoot)
 
