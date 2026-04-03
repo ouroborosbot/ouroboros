@@ -23,6 +23,7 @@ const mockEmitEpisode = vi.fn()
 const mockReadPendingObligations = vi.fn()
 const mockReadRecentEpisodes = vi.fn()
 const mockReadActiveCares = vi.fn()
+const mockListSessionActivity = vi.fn()
 
 vi.mock("../../heart/tempo", async () => {
   const actual = await vi.importActual<typeof import("../../heart/tempo")>("../../heart/tempo")
@@ -127,6 +128,14 @@ vi.mock("../../mind/file-state", () => ({
 vi.mock("../../mind/scrutiny", () => ({
   resetSessionModifiedFiles: vi.fn(),
 }))
+
+vi.mock("../../heart/session-activity", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/session-activity")>("../../heart/session-activity")
+  return {
+    ...actual,
+    listSessionActivity: (...args: any[]) => mockListSessionActivity(...args),
+  }
+})
 
 // ── Test helpers ─────────────────────────────────────────────────
 
@@ -243,6 +252,7 @@ describe("pipeline continuity integration", () => {
     vi.spyOn(pending, "getInnerDialogPendingDir").mockReturnValue("/tmp/inner-pending")
 
     // Default continuity mock returns
+    mockListSessionActivity.mockReturnValue([])
     mockReadRecentEpisodes.mockReturnValue([])
     mockReadActiveCares.mockReturnValue([])
     mockReadPendingObligations.mockReturnValue([])
@@ -296,6 +306,7 @@ describe("pipeline continuity integration", () => {
     mockReadRecentEpisodes.mockReset()
     mockReadActiveCares.mockReset()
     mockReadPendingObligations.mockReset()
+    mockListSessionActivity.mockReset()
   })
 
   describe("wake packet threading", () => {
@@ -367,7 +378,7 @@ describe("pipeline continuity integration", () => {
       )
     })
 
-    it("gracefully handles continuity pipeline errors", async () => {
+    it("gracefully handles continuity pipeline errors (Error instance)", async () => {
       mockDeriveTempo.mockImplementation(() => {
         throw new Error("tempo derivation failed")
       })
@@ -377,6 +388,36 @@ describe("pipeline continuity integration", () => {
       // Should not throw -- continuity errors are non-fatal
       const result = await handleInboundTurn(input)
       expect(result.turnOutcome).toBe("settled")
+    })
+
+    it("gracefully handles continuity pipeline errors (non-Error thrown)", async () => {
+      mockDeriveTempo.mockImplementation(() => {
+        throw "string-error-not-Error-instance" // eslint-disable-line no-throw-literal
+      })
+
+      const input = makeInput()
+      const { handleInboundTurn } = await import("../../senses/pipeline")
+      const result = await handleInboundTurn(input)
+      expect(result.turnOutcome).toBe("settled")
+    })
+
+    it("computes lastActivityAgeMs from sessionActivity when sessions exist", async () => {
+      mockListSessionActivity.mockReturnValue([
+        { friendId: "f-1", channel: "cli", key: "s-1", lastActivityAt: new Date(Date.now() - 60_000).toISOString() },
+      ])
+
+      const input = makeInput()
+      const { handleInboundTurn } = await import("../../senses/pipeline")
+      await handleInboundTurn(input)
+      // deriveTempo should be called with lastActivityAgeMs > 0 and activeSessions = 2 (1 existing + 1 current)
+      expect(mockDeriveTempo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeSessions: 2,
+          lastActivityAgeMs: expect.any(Number),
+        }),
+      )
+      const tempoArgs = mockDeriveTempo.mock.calls[0][0]
+      expect(tempoArgs.lastActivityAgeMs).toBeGreaterThan(0)
     })
   })
 
@@ -434,7 +475,8 @@ describe("pipeline continuity integration", () => {
       let callCount = 0
       mockReadPendingObligations.mockImplementation(() => {
         callCount++
-        // First call returns before-state, second returns after-state
+        // readPendingObligations is called at: (1) pre-turn snapshot (line 461), (2) post-turn check (line 673)
+        // Inner dialog call (line 222) is skipped because readInnerDialogRawData returns null
         return callCount <= 1 ? beforeObligations : afterObligations
       })
 
