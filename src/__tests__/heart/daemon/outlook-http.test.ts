@@ -531,4 +531,39 @@ describe("outlook http", () => {
 
     await server.stop()
   })
+
+  it("serves /api/agents/:agent/continuity endpoint", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const mockContinuity = {
+      presence: {
+        self: { agentName: "slugger", availability: "active" },
+        peers: [{ agentName: "ouroboros", availability: "idle" }],
+      },
+      cares: { activeCount: 2, items: [{ id: "c-1", label: "deploy", status: "active", salience: "high" }] },
+      episodes: { recentCount: 1, items: [{ id: "ep-1", kind: "milestone", summary: "shipped", timestamp: "2026-04-03T10:00:00Z" }] },
+    }
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentContinuity: () => mockContinuity,
+    })
+
+    // Canonical route
+    const res = await fetch(`${server.origin}/api/agents/slugger/continuity`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(mockContinuity)
+
+    // Compatibility alias
+    const legacyRes = await fetch(`${server.origin}/outlook/api/agents/slugger/continuity`)
+    expect(legacyRes.status).toBe(200)
+    const legacyBody = await legacyRes.json()
+    expect(legacyBody).toEqual(mockContinuity)
+
+    await server.stop()
+  })
 })

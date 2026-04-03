@@ -15,6 +15,7 @@ import {
   readMemoryView,
   readNeedsMeView,
   readOutlookAgentState,
+  readOutlookContinuity,
   readOutlookMachineState,
   readSessionInventory,
   readSessionTranscript,
@@ -27,6 +28,7 @@ import type {
   OutlookAttentionView,
   OutlookBridgeInventory,
   OutlookCodingDeep,
+  OutlookContinuityView,
   OutlookDaemonHealthDeep,
   OutlookFriendView,
   OutlookHabitView,
@@ -55,6 +57,7 @@ export interface StartOutlookHttpServerOptions {
   readAgentBridges?: (agentName: string) => OutlookBridgeInventory
   readAgentMemory?: (agentName: string) => OutlookMemoryView
   readAgentFriends?: (agentName: string) => OutlookFriendView
+  readAgentContinuity?: (agentName: string) => OutlookContinuityView
   readAgentHabits?: (agentName: string) => OutlookHabitView
   readDaemonHealth?: () => OutlookDaemonHealthDeep | null
   readLogs?: () => OutlookLogView
@@ -233,6 +236,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     readAgentBridges: options.readAgentBridges ?? ((agentName: string) => readBridgeInventory(agentRoot(agentName))),
     readAgentMemory: options.readAgentMemory ?? ((agentName: string) => readMemoryView(agentRoot(agentName))),
     readAgentFriends: options.readAgentFriends ?? ((agentName: string) => readFriendView(agentName, bundlesRoot ? { bundlesRoot } : undefined)),
+    readAgentContinuity: options.readAgentContinuity ?? ((agentName: string) => readOutlookContinuity(agentRoot(agentName), agentName)),
     readAgentHabits: options.readAgentHabits ?? ((agentName: string) => readHabitView(agentRoot(agentName))),
     readDaemonHealth: options.readDaemonHealth ?? (() => readDaemonHealthDeep(options.healthPath)),
     readLogs: options.readLogs ?? (() => readLogView(options.logPath ?? null)),
@@ -357,6 +361,11 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
 
       if (surface === "friends") {
         writeJson(response, 200, hooks.readAgentFriends(agent))
+        return
+      }
+
+      if (surface === "continuity") {
+        writeJson(response, 200, hooks.readAgentContinuity(agent))
         return
       }
 
