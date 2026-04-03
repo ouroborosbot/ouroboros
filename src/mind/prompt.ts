@@ -520,6 +520,10 @@ function bridgeContextSection(options?: BuildSystemOptions): string {
   return bridgeContext.startsWith("## ") ? bridgeContext : `## active bridge work\n${bridgeContext}`
 }
 
+export function wakePacketSection(options?: BuildSystemOptions): string {
+  return options?.wakePacket ?? ""
+}
+
 function activeWorkSection(options?: BuildSystemOptions): string {
   if (!options?.activeWorkFrame) return ""
   return formatActiveWorkFrame(options.activeWorkFrame)
@@ -543,6 +547,10 @@ function pendingMessagesSection(options?: BuildSystemOptions): string {
 function familyCrossSessionTruthSection(context?: ResolvedContext, options?: BuildSystemOptions): string {
   if (!options?.activeWorkFrame) return ""
   if (context?.friend?.trustLevel !== "family") return ""
+  // When wake packet is present, compress to one line
+  if (options?.wakePacket) {
+    return "When family asks whole-self status, answer from the cross-session picture above."
+  }
   return `## cross-session truth
 When family asks what I'm up to or how things are going, I answer from the live world-state across visible sessions and lanes, not just the current thread.
 When live state conflicts with older transcript history, live state wins.
@@ -1086,6 +1094,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
 
     // Group 7: dynamic state for this turn
     "# dynamic state for this turn",
+    wakePacketSection(options),
     liveWorldStateSection(options),
     pendingMessagesSection(options),
     activeWorkSection(options),
@@ -1093,14 +1102,15 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     commitmentsSection(options),
     delegationHintSection(options),
     bridgeContextSection(options),
-    buildSessionSummary({
+    // Gate session summary when wake packet already provides peer presence
+    ...(options?.wakePacket ? [] : [buildSessionSummary({
       sessionsDir: path.join(getAgentRoot(), "state", "sessions"),
       friendsDir: path.join(getAgentRoot(), "friends"),
       agentName: getAgentName(),
       currentFriendId: context?.friend?.id,
       currentChannel: channel,
       currentKey: options?.currentSessionKey ?? "session",
-    }),
+    })]),
 
     // Group 8: friend context
     "# friend context",

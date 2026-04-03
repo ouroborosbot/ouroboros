@@ -111,7 +111,11 @@ describe("wake packet prompt section", () => {
     const fs = await import("fs")
     const fsMock = vi.mocked(fs)
     fsMock.existsSync.mockReturnValue(false)
-    fsMock.readFileSync.mockReturnValue("")
+    fsMock.readFileSync.mockImplementation((filePath: any) => {
+      const p = String(filePath)
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "0.0.0-test" })
+      return ""
+    })
     fsMock.readdirSync.mockReturnValue([])
 
     const { buildSystem } = await import("../../mind/prompt")
@@ -130,7 +134,11 @@ describe("wake packet prompt section", () => {
     const fs = await import("fs")
     const fsMock = vi.mocked(fs)
     fsMock.existsSync.mockReturnValue(false)
-    fsMock.readFileSync.mockReturnValue("")
+    fsMock.readFileSync.mockImplementation((filePath: any) => {
+      const p = String(filePath)
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "0.0.0-test" })
+      return ""
+    })
     fsMock.readdirSync.mockReturnValue([])
 
     const { buildSystem } = await import("../../mind/prompt")
@@ -142,7 +150,11 @@ describe("wake packet prompt section", () => {
     const fs = await import("fs")
     const fsMock = vi.mocked(fs)
     fsMock.existsSync.mockReturnValue(false)
-    fsMock.readFileSync.mockReturnValue("")
+    fsMock.readFileSync.mockImplementation((filePath: any) => {
+      const p = String(filePath)
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "0.0.0-test" })
+      return ""
+    })
     fsMock.readdirSync.mockReturnValue([])
 
     const { buildSystem } = await import("../../mind/prompt")
