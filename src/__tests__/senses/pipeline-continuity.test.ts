@@ -498,7 +498,25 @@ describe("pipeline continuity integration", () => {
       expect(mockEmitEpisode).not.toHaveBeenCalled()
     })
 
-    it("uses obligation id as fallback when content is missing", async () => {
+    it("falls back to preTurnObligations when obligation removed from post-turn", async () => {
+      const { emitObligationTransitionEpisodes } = await import("../../senses/pipeline")
+
+      const preTurnIds = new Set(["ob-1:pending"])
+      const preTurnObligations = [
+        { id: "ob-1", content: "deploy fix", status: "pending", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-01T10:00:00Z" },
+      ] as any[]
+      // Obligation fully removed from post-turn (e.g., deleted) — preTurnObligations.find() is the fallback
+      emitObligationTransitionEpisodes("/tmp/test-agent-root", preTurnIds, [], preTurnObligations)
+
+      expect(mockEmitEpisode).toHaveBeenCalledWith(
+        "/tmp/test-agent-root",
+        expect.objectContaining({
+          summary: expect.stringContaining("deploy fix"),
+        }),
+      )
+    })
+
+    it("uses obligation id as fallback when not found in either list", async () => {
       const { emitObligationTransitionEpisodes } = await import("../../senses/pipeline")
 
       const preTurnIds = new Set(["ob-gone:pending"])
