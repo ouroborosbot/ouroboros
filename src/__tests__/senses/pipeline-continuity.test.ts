@@ -411,7 +411,7 @@ describe("pipeline continuity integration", () => {
         "/tmp/test-agent-root",
         expect.objectContaining({
           kind: "obligation_shift",
-          source: "pipeline",
+          salience: "medium",
         }),
       )
     })

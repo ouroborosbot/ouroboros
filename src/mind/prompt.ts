@@ -509,6 +509,8 @@ export interface BuildSystemOptions {
   supportedReasoningEfforts?: readonly string[];
   mcpManager?: McpManager;
   pendingMessages?: Array<{ from: string; content: string }>;
+  /** Rendered wake packet for continuity-aware prompt. */
+  wakePacket?: string;
 }
 
 function bridgeContextSection(options?: BuildSystemOptions): string {
