@@ -25,10 +25,23 @@ interface ObligationDetailView {
   items: ObligationDetailItem[]
 }
 
+interface SelfFixStep {
+  label: string
+  status: "done" | "active" | "pending" | "skipped"
+  detail: string | null
+}
+
+interface SelfFixView {
+  active: boolean
+  currentStep: string | null
+  steps: SelfFixStep[]
+}
+
 export function WorkTab({ agentName, view, focus, onFocusConsumed }: { agentName: string; view: Record<string, unknown>; focus?: string; onFocusConsumed?: () => void }) {
   const nav = useNavigate()
   const [coding, setCoding] = useState<Record<string, unknown> | null>(null)
   const [obligationDetail, setObligationDetail] = useState<ObligationDetailView | null>(null)
+  const [selfFix, setSelfFix] = useState<SelfFixView | null>(null)
   const work = view.work as Record<string, unknown>
   const obligations = work.obligations as { openCount: number; items: ObligationItem[] }
   const tasks = work.tasks as { liveCount: number; blockedCount: number; liveTaskNames: string[]; actionRequired: string[] }
@@ -36,6 +49,7 @@ export function WorkTab({ agentName, view, focus, onFocusConsumed }: { agentName
   useEffect(() => {
     fetchJson<Record<string, unknown>>(`/agents/${encodeURIComponent(agentName)}/coding`).then(setCoding)
     fetchJson<ObligationDetailView>(`/agents/${encodeURIComponent(agentName)}/obligations`).then(setObligationDetail).catch(() => {})
+    fetchJson<SelfFixView>(`/agents/${encodeURIComponent(agentName)}/self-fix`).then(setSelfFix).catch(() => {})
   }, [agentName])
 
   // Use enriched obligations when available, fall back to summary
@@ -130,6 +144,40 @@ export function WorkTab({ agentName, view, focus, onFocusConsumed }: { agentName
           <p className="mt-2 text-sm text-ouro-shadow">No open obligations.</p>
         )}
       </section>
+
+      {/* Self-fix workflow */}
+      {selfFix && selfFix.steps.length > 0 && (
+        <section>
+          <SH label={`Self-fix ${selfFix.active ? "(active)" : "(inactive)"}`} />
+          {selfFix.currentStep && (
+            <p className="mt-1 text-xs text-ouro-glow">Current: {selfFix.currentStep}</p>
+          )}
+          <div className="mt-3 space-y-1.5">
+            {selfFix.steps.map((step, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 ring-1 ${
+                  step.status === "active" ? "bg-ouro-glow/5 ring-ouro-glow/20" :
+                  step.status === "done" ? "bg-ouro-void/40 ring-ouro-glow/10" :
+                  "bg-ouro-void/40 ring-ouro-moss/10"
+                }`}
+              >
+                <Badge color={
+                  step.status === "done" ? "lime" :
+                  step.status === "active" ? "yellow" :
+                  step.status === "skipped" ? "zinc" : "zinc"
+                }>
+                  {step.status}
+                </Badge>
+                <span className={`text-sm ${step.status === "active" ? "font-medium text-ouro-bone" : "text-ouro-mist"}`}>
+                  {step.label}
+                </span>
+                {step.detail && <span className="ml-auto text-xs text-ouro-shadow">{step.detail}</span>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Coding lanes */}
       <section>
