@@ -1957,7 +1957,7 @@ describe("delegation router", () => {
 
     const rendered = formatActiveWorkFrame(wakeFrame, { hasWakePacket: true })
     expect(rendered).not.toContain("## return obligations")
-    expect(rendered).toContain("return obligations: 1 active (see continuity above)")
+    expect(rendered).toContain("return obligations: 1 active (canonical details in **Owed** section of wake packet)")
   })
 
   it("renders queued inner thought content when present", async () => {

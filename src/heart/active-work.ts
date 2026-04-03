@@ -753,7 +753,7 @@ export function formatActiveWorkFrame(frame: ActiveWorkFrame, options?: { hasWak
       // Wake packet carries enriched obligations (with resumeHint, stalenessClass, waitingOn).
       // Avoid duplicating the full list — just anchor the count here.
       lines.push("")
-      lines.push(`return obligations: ${openCount} active (see continuity above)`)
+      lines.push(`return obligations: ${openCount} active (canonical details in **Owed** section of wake packet)`)
     } else if (openCount > 0) {
       lines.push("")
       lines.push("## return obligations")
