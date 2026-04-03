@@ -412,4 +412,123 @@ describe("outlook http", () => {
     controller.abort()
     await server.stop()
   })
+
+  it("serves /api/machine at root namespace (canonical)", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({
+        productName: "Ouro Outlook",
+        agentCount: 1,
+      }),
+      readAgentState: () => null,
+    })
+
+    const res = await fetch(`${server.origin}/api/machine`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(expect.objectContaining({ productName: "Ouro Outlook" }))
+
+    await server.stop()
+  })
+
+  it("serves /api/agents/:agent at root namespace (canonical)", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentView: (name: string) =>
+        name === "slugger"
+          ? { productName: "Ouro Outlook", interactionModel: "read-only", agent: { agentName: "slugger" } } as any
+          : null,
+    })
+
+    const res = await fetch(`${server.origin}/api/agents/slugger`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(expect.objectContaining({ agent: expect.objectContaining({ agentName: "slugger" }) }))
+
+    // Missing agent
+    const missing = await fetch(`${server.origin}/api/agents/missing`)
+    expect(missing.status).toBe(404)
+
+    await server.stop()
+  })
+
+  it("streams SSE events at /api/events (canonical)", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 0 }) as any,
+      readAgentState: () => null,
+    })
+
+    const controller = new AbortController()
+    const sseResponse = await fetch(`${server.origin}/api/events`, {
+      headers: { accept: "text/event-stream" },
+      signal: controller.signal,
+    })
+
+    expect(sseResponse.status).toBe(200)
+    expect(sseResponse.headers.get("content-type")).toBe("text/event-stream")
+
+    server.broadcast("state-changed", { at: "2026-04-03T10:00:00.000Z" })
+
+    const reader = sseResponse.body!.getReader()
+    const decoder = new TextDecoder()
+    let accumulated = ""
+    while (!accumulated.includes("state-changed")) {
+      const { value, done } = await reader.read()
+      if (done) break
+      accumulated += decoder.decode(value, { stream: true })
+    }
+
+    expect(accumulated).toContain("event: state-changed")
+    expect(accumulated).toContain("2026-04-03T10:00:00.000Z")
+
+    controller.abort()
+    await server.stop()
+  })
+
+  it("serves /api/agents/:agent/coding and other surfaces at root namespace", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentSessions: () => ({ totalCount: 2, activeCount: 1, staleCount: 1, items: [] }),
+      readAgentCoding: () => ({ totalCount: 1, activeCount: 1, blockedCount: 0, items: [] }),
+      readAgentAttention: () => ({ queueLength: 0, queueItems: [], pendingChannels: [], returnObligations: [] }),
+      readAgentBridges: () => ({ totalCount: 0, activeCount: 0, items: [] }),
+      readAgentMemory: () => ({ diaryEntryCount: 0, recentDiaryEntries: [], journalEntryCount: 0, recentJournalEntries: [] }),
+      readAgentFriends: () => ({ totalFriends: 0, friends: [] }),
+      readAgentHabits: () => ({ totalCount: 0, activeCount: 0, pausedCount: 0, degradedCount: 0, overdueCount: 0, items: [] }),
+      readDaemonHealth: () => ({ status: "ok", mode: "dev", pid: 1, startedAt: "", uptimeSeconds: 0, safeMode: null, degradedComponents: [], agentHealth: {}, habitHealth: {} }),
+      readLogs: () => ({ logPath: null, totalLines: 0, entries: [] }),
+    })
+
+    // Canonical root-namespace agent surfaces
+    const sessions = await fetch(`${server.origin}/api/agents/test/sessions`).then((r) => r.json())
+    expect(sessions).toEqual(expect.objectContaining({ totalCount: 2 }))
+
+    const coding = await fetch(`${server.origin}/api/agents/test/coding`).then((r) => r.json())
+    expect(coding).toEqual(expect.objectContaining({ totalCount: 1 }))
+
+    const health = await fetch(`${server.origin}/api/machine/health`).then((r) => r.json())
+    expect(health).toEqual(expect.objectContaining({ status: "ok" }))
+
+    const logs = await fetch(`${server.origin}/api/machine/logs`).then((r) => r.json())
+    expect(logs).toEqual(expect.objectContaining({ totalLines: 0 }))
+
+    await server.stop()
+  })
 })

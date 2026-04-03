@@ -247,15 +247,8 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
   /* v8 ignore stop */
 
   const server = http.createServer((request, response) => {
-    const pathname = normalizePath(request.url)
+    let pathname = normalizePath(request.url)
     const origin = `http://${host}:${(server.address() as AddressInfo).port}`
-
-    if (pathname === "/outlook/api/events") {
-      response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "connection": "keep-alive", "access-control-allow-origin": "*" })
-      response.write(":ok\n\n")
-      sse.add(response)
-      return
-    }
 
     /* v8 ignore start — SPA static asset serving */
     // Serve built SPA static assets: /assets/*
@@ -278,26 +271,41 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
       return
     }
 
-    if (pathname === "/outlook/api/machine") {
+    // Compatibility alias: /outlook/api/* → /api/*
+    if (pathname.startsWith("/outlook/api/")) {
+      pathname = pathname.slice("/outlook".length)
+    } else if (pathname === "/outlook/api") {
+      pathname = "/api"
+    }
+
+    // SSE event stream
+    if (pathname === "/api/events") {
+      response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "connection": "keep-alive", "access-control-allow-origin": "*" })
+      response.write(":ok\n\n")
+      sse.add(response)
+      return
+    }
+
+    if (pathname === "/api/machine") {
       const machine = readMachineState()
       const machineView = readMachineView?.({ origin, machine })
       writeJson(response, 200, machineView ?? machine)
       return
     }
 
-    if (pathname === "/outlook/api/machine/health") {
+    if (pathname === "/api/machine/health") {
       const health = hooks.readDaemonHealth()
       writeJson(response, 200, health ?? { status: "unavailable" })
       return
     }
 
-    if (pathname === "/outlook/api/machine/logs") {
+    if (pathname === "/api/machine/logs") {
       writeJson(response, 200, hooks.readLogs())
       return
     }
 
-    // Agent-level endpoints: /outlook/api/agents/:agent[/:surface[/:params...]]
-    const agentMatch = /^\/outlook\/api\/agents\/([^/]+)(?:\/(.+))?$/.exec(pathname)
+    // Agent-level endpoints: /api/agents/:agent[/:surface[/:params...]]
+    const agentMatch = /^\/api\/agents\/([^/]+)(?:\/(.+))?$/.exec(pathname)
     if (agentMatch) {
       const agent = decodeURIComponent(agentMatch[1]!)
       const surface = agentMatch[2] ?? null
