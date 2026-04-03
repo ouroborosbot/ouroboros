@@ -422,5 +422,57 @@ describe("presence", () => {
       // Not a promise
       expect(result).not.toHaveProperty("then")
     })
+
+    it("falls back to filename when name is missing", () => {
+      const friendsDir = path.join(tmpDir, "friends")
+      fs.mkdirSync(friendsDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(friendsDir, "nameless-agent.json"),
+        JSON.stringify({
+          id: "nameless",
+          kind: "agent",
+          updatedAt: "2026-04-01T10:00:00.000Z",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          totalTokens: 0,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          schemaVersion: 1,
+        }),
+        "utf-8",
+      )
+
+      const peers = readPeerPresence(tmpDir)
+      expect(peers).toHaveLength(1)
+      expect(peers[0].agentName).toBe("nameless-agent")
+    })
+
+    it("falls back to current timestamp when updatedAt is missing", () => {
+      const friendsDir = path.join(tmpDir, "friends")
+      fs.mkdirSync(friendsDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(friendsDir, "no-updated.json"),
+        JSON.stringify({
+          id: "no-updated",
+          name: "NoUpdate",
+          kind: "agent",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          totalTokens: 0,
+          createdAt: "2026-04-01T00:00:00.000Z",
+          schemaVersion: 1,
+        }),
+        "utf-8",
+      )
+
+      const peers = readPeerPresence(tmpDir)
+      expect(peers).toHaveLength(1)
+      expect(peers[0].agentName).toBe("NoUpdate")
+      // updatedAt should be a valid ISO date string (fallback to current time)
+      expect(new Date(peers[0].updatedAt).getTime()).not.toBeNaN()
+    })
   })
 })
