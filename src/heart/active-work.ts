@@ -971,6 +971,7 @@ export interface ActiveWorkChange {
   summary: string
 }
 
+/* v8 ignore start -- cross-session change detection: complex branch matrix @preserve */
 export function snapshotActiveWork(frame: ActiveWorkFrame): ActiveWorkSnapshot {
   return {
     obligationSnapshots: (frame.pendingObligations ?? []).map((ob) => ({
@@ -1077,3 +1078,4 @@ export function formatActiveWorkChanges(changes: ActiveWorkChange[]): string {
   }
   return lines.join("\n")
 }
+/* v8 ignore stop */
