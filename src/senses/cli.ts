@@ -825,7 +825,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
             continue
           }
         } else {
-          // Legacy path: inline runAgent (used by adoption specialist and tests)
+          // Legacy path: inline runAgent (used by serpent guide and tests)
           const prefix = options.getContentPrefix?.()
           messages.push({ role: "user", content: prefix ? `${prefix}\n\n${input}` : input })
           const traceId = createTraceId()
