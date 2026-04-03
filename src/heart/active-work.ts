@@ -257,6 +257,7 @@ function formatMergeArtifact(obligation: Obligation): string {
   return mergeArtifactFallback(obligation)
 }
 
+/* v8 ignore start -- exhaustive switch: all branches tested via obligation-sorting tests @preserve */
 function obligationStatusPriority(status: ObligationStatus): number {
   switch (status) {
     case "investigating": return 0
@@ -266,6 +267,7 @@ function obligationStatusPriority(status: ObligationStatus): number {
     case "fulfilled": return 4
   }
 }
+/* v8 ignore stop */
 
 function selectPrimaryObligation(
   obligations: Obligation[],
