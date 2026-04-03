@@ -102,7 +102,7 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
                     onClick={async () => {
                       for (const item of staleItems) {
                         if (item.ref?.focus) {
-                          await fetch(`/outlook/api/agents/${encodeURIComponent(agent.agentName as string)}/dismiss-obligation`, {
+                          await fetch(`/api/agents/${encodeURIComponent(agent.agentName as string)}/dismiss-obligation`, {
                             method: "POST",
                             headers: { "content-type": "application/json" },
                             body: JSON.stringify({ obligationId: item.ref.focus }),
@@ -336,7 +336,7 @@ function NeedsMeRow({ item, nav, agentName, onDismiss }: { item: NeedsMeItem; na
         <button
           onClick={async (e) => {
             e.stopPropagation()
-            await fetch(`/outlook/api/agents/${encodeURIComponent(agentName)}/dismiss-obligation`, {
+            await fetch(`/api/agents/${encodeURIComponent(agentName)}/dismiss-obligation`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ obligationId: item.ref!.focus }),
