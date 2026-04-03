@@ -2,6 +2,12 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.177",
+      "changes": [
+        "feat(mcp): dynamic server add/remove without restart"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.176",
       "changes": [
         "feat(mcp): dynamic MCP server add/remove \u2014 agents can add/remove MCP servers in agent.json without daemon restart"
