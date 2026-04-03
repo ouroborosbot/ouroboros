@@ -353,6 +353,30 @@ describe("continuity tools", () => {
         expect.objectContaining({ label: "renamed", why: "reprioritized", salience: "high" }),
       )
     })
+
+    it("updates a care with only why (no label or salience)", async () => {
+      const mockCare = { id: "c-2", label: "unchanged", status: "active" }
+      mockUpdateCare.mockReturnValue(mockCare)
+
+      const tool = findTool("care_manage")
+      await tool.handler({ action: "update", id: "c-2", why: "new reason" })
+      const updates = mockUpdateCare.mock.calls[mockUpdateCare.mock.calls.length - 1][2]
+      expect(updates).toEqual({ why: "new reason" })
+      expect(updates).not.toHaveProperty("label")
+      expect(updates).not.toHaveProperty("salience")
+    })
+  })
+
+  describe("query_episodes edge cases", () => {
+    it("passes since filter when provided", async () => {
+      mockReadRecentEpisodes.mockReturnValue([])
+      const tool = findTool("query_episodes")
+      await tool.handler({ since: "2026-04-01T00:00:00Z" })
+      expect(mockReadRecentEpisodes).toHaveBeenCalledWith(
+        "/mock/agent-root",
+        expect.objectContaining({ since: "2026-04-01T00:00:00Z" }),
+      )
+    })
   })
 
   describe("intention_capture edge cases", () => {
