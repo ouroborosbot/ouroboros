@@ -557,7 +557,7 @@ export function wakePacketSection(options?: BuildSystemOptions): string {
 
 function activeWorkSection(options?: BuildSystemOptions): string {
   if (!options?.activeWorkFrame) return ""
-  return formatActiveWorkFrame(options.activeWorkFrame, { hasWakePacket: !!options?.wakePacket })
+  return formatActiveWorkFrame(options.activeWorkFrame, { enrichedObligationsAvailable: !!options?.wakePacket })
 }
 
 function liveWorldStateSection(options?: BuildSystemOptions): string {
