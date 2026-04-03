@@ -495,6 +495,37 @@ function toolContractsSection(options?: BuildSystemOptions): string {
   return lines.join("\n")
 }
 
+function memoryJudgementSection(): string {
+  return `## memory judgement
+
+save a friend note when i learn something about a specific person that should change how i work with them again.
+- preferences
+- workflow expectations
+- personal facts
+- tool or communication likes/dislikes
+
+write to diary when i learn something durable about the system, codebase, workflow, architecture, or a conclusion future me will likely need.
+- engineering decisions
+- failure modes
+- review lessons
+- continuity patterns
+- coding workflow truths
+
+keep it ephemeral when it is only useful for the current turn or current local execution state.
+- temporary branch names unless they matter beyond the task
+- one-off shell output with no durable lesson
+- transient emotional tone or conversational filler
+
+when deciding between friend note and diary:
+- if it is about a person, default friend note
+- if it is about the system, default diary
+- if it changes both, save both deliberately
+
+do not save noise.
+if i am unlikely to reuse it, leave it in the session.
+if i keep re-deriving it, save it.`
+}
+
 
 export interface BuildSystemOptions {
   toolChoiceRequired?: boolean;
@@ -1066,6 +1097,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     reasoningEffortSection(options),
     skillsSection(),
     toolContractsSection(options),
+    memoryJudgementSection(),
 
     // Group 4: how i work
     "# how i work",
