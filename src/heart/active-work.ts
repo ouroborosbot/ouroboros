@@ -338,13 +338,18 @@ function formatCodingArtifact(session: CodingSession | null | undefined): string
 }
 
 function formatCurrentArtifact(frame: ActiveWorkFrame, obligation: Obligation | null): string | null {
+  // Live coding session artifact takes precedence (fresher evidence)
+  const liveCodingSession = frame.codingSessions?.[0]
+  if (liveCodingSession?.artifactPath?.trim()) {
+    return liveCodingSession.artifactPath.trim()
+  }
   if (obligation?.currentArtifact?.trim()) {
     return obligation.currentArtifact.trim()
   }
   if (obligation?.currentSurface?.kind === "merge" && obligation.currentSurface.label.trim()) {
     return obligation.currentSurface.label.trim()
   }
-  const liveCodingArtifact = formatCodingArtifact(frame.codingSessions?.[0])
+  const liveCodingArtifact = formatCodingArtifact(liveCodingSession)
   if (liveCodingArtifact) {
     return liveCodingArtifact
   }
