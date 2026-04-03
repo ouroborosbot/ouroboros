@@ -1547,6 +1547,34 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
       azure: "",
     }
 
+    // Scan environment variables for API keys
+    const envKeys: Array<{ provider: AgentProvider; envVar: string; credKey: string }> = [
+      { provider: "anthropic", envVar: "ANTHROPIC_API_KEY", credKey: "setupToken" },
+      { provider: "openai-codex", envVar: "OPENAI_API_KEY", credKey: "oauthAccessToken" },
+      { provider: "azure", envVar: "AZURE_OPENAI_API_KEY", credKey: "apiKey" },
+      { provider: "azure", envVar: "AZURE_OPENAI_KEY", credKey: "apiKey" },
+      { provider: "minimax", envVar: "MINIMAX_API_KEY", credKey: "apiKey" },
+      { provider: "github-copilot", envVar: "GITHUB_TOKEN", credKey: "token" },
+    ]
+    const envDiscovered: Array<DiscoveredCredential & { envVar: string }> = []
+    for (const { provider, envVar, credKey } of envKeys) {
+      const value = process.env[envVar]
+      if (value) {
+        const envCred: HatchCredentialsInput = { [credKey]: value }
+        // For Azure, also check for endpoint and deployment env vars
+        if (provider === "azure") {
+          const endpoint = process.env.AZURE_OPENAI_ENDPOINT
+          const deployment = process.env.AZURE_OPENAI_DEPLOYMENT
+          if (endpoint) envCred.endpoint = endpoint
+          if (deployment) envCred.deployment = deployment
+        }
+        const provCfg: Record<string, string> = { model: defaultModels[provider] }
+        if (provider === "azure" && envCred.deployment) provCfg.deployment = envCred.deployment
+        envDiscovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg, envVar })
+        discovered.push({ provider, agentName: "env", credentials: envCred, providerConfig: provCfg })
+      }
+    }
+
     if (discovered.length > 0) {
       process.stdout.write(`\n\ud83d\udc0d welcome to ouroboros! ${hatchVerb}\n`)
       process.stdout.write("i found existing API credentials:\n\n")
@@ -1554,7 +1582,9 @@ async function defaultRunSerpentGuide(): Promise<string | null> {
       for (let i = 0; i < unique.length; i++) {
         const model = unique[i].providerConfig.model || unique[i].providerConfig.deployment || ""
         const modelLabel = model ? `, ${model}` : ""
-        process.stdout.write(`  ${i + 1}. ${unique[i].provider}${modelLabel} (from ${unique[i].agentName})\n`)
+        const envMatch = envDiscovered.find((e) => e.provider === unique[i].provider && unique[i].agentName === "env")
+        const sourceLabel = envMatch ? `from env: $${envMatch.envVar}` : `from ${unique[i].agentName}`
+        process.stdout.write(`  ${i + 1}. ${unique[i].provider}${modelLabel} (${sourceLabel})\n`)
       }
       process.stdout.write("\n")
       const choice = await coldPrompt("use one of these? enter number, or 'new' for a different key: ")
