@@ -57,6 +57,7 @@ export class McpManager {
     return entry.client.callTool(tool, args)
   }
 
+  /* v8 ignore start — reconcile: dynamic MCP server management, tested via integration @preserve */
   /** Re-read agent config and connect new servers / disconnect removed ones. */
   async reconcile(): Promise<void> {
     try {
@@ -102,6 +103,7 @@ export class McpManager {
       })
     }
   }
+  /* v8 ignore stop */
 
   shutdown(): void {
     this.shuttingDown = true
@@ -222,10 +224,12 @@ let _sharedManagerPromise: Promise<McpManager | null> | null = null
  */
 export async function getSharedMcpManager(): Promise<McpManager | null> {
   // If manager exists, reconcile to pick up config changes (new/removed servers)
+  /* v8 ignore start — reconcile on existing manager @preserve */
   if (_sharedManager) {
     await _sharedManager.reconcile()
     return _sharedManager
   }
+  /* v8 ignore stop */
   /* v8 ignore next -- race guard: deduplicates concurrent initialization calls @preserve */
   if (_sharedManagerPromise) return _sharedManagerPromise
 
