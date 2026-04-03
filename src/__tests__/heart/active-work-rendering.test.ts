@@ -351,3 +351,195 @@ describe("formatActiveWorkFrame (selfhood framing)", () => {
     expect(emitNervesEvent).toBeDefined()
   })
 })
+
+// ── Unit 1.2: Resume handle contract ──
+
+describe("resume handle contract", () => {
+  let buildActiveWorkFrame: typeof import("../../heart/active-work").buildActiveWorkFrame
+  let formatActiveWorkFrame: typeof import("../../heart/active-work").formatActiveWorkFrame
+  let formatLiveWorldStateCheckpoint: typeof import("../../heart/active-work").formatLiveWorldStateCheckpoint
+
+  beforeAll(async () => {
+    const mod = await import("../../heart/active-work")
+    buildActiveWorkFrame = mod.buildActiveWorkFrame
+    formatActiveWorkFrame = mod.formatActiveWorkFrame
+    formatLiveWorldStateCheckpoint = mod.formatLiveWorldStateCheckpoint
+  })
+
+  function recentIso(minutesAgo: number): string {
+    return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString()
+  }
+
+  it("produces a resume handle with all fields for a full active work state", () => {
+    const frame = buildActiveWorkFrame({
+      currentSession: { friendId: "friend-1", channel: "cli", key: "session", sessionPath: "/tmp/s.json" },
+      mustResolveBeforeHandoff: true,
+      inner: { status: "idle", hasPending: false },
+      bridges: [],
+      codingSessions: [{
+        id: "coding-001",
+        runner: "codex",
+        status: "running",
+        startedAt: recentIso(15),
+        originSession: { friendId: "friend-1", channel: "cli", key: "session" },
+        artifactPath: "/tmp/pr-789",
+        checkpoint: "tests passing, awaiting review",
+        lastActivityAt: recentIso(2),
+        failure: null,
+      }],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
+      },
+      friendActivity: [],
+      pendingObligations: [{
+        id: "ob-1",
+        origin: { friendId: "friend-1", channel: "cli", key: "session" },
+        content: "fix the build system",
+        status: "investigating",
+        createdAt: recentIso(20),
+        updatedAt: recentIso(5),
+        currentArtifact: "/tmp/pr-789",
+        nextAction: "review PR and merge",
+        currentSurface: { kind: "coding", label: "codex coding-001" },
+      }],
+    })
+
+    expect(frame.resumeHandle).toBeDefined()
+    expect(frame.resumeHandle?.sessionLabel).toBe("cli/session")
+    expect(frame.resumeHandle?.lane).toContain("codex coding-001")
+    expect(frame.resumeHandle?.artifact).toBe("/tmp/pr-789")
+    expect(frame.resumeHandle?.nextAction).toBe("review PR and merge")
+    expect(frame.resumeHandle?.confidence).toBeDefined()
+    // Coding identity hook should be populated from coding session
+    expect(frame.resumeHandle?.codingIdentity).toBeDefined()
+  })
+
+  it("produces an empty resume handle for a minimal idle frame", () => {
+    const frame = buildActiveWorkFrame({
+      currentSession: { friendId: "friend-1", channel: "cli", key: "session", sessionPath: "/tmp/s.json" },
+      mustResolveBeforeHandoff: false,
+      inner: { status: "idle", hasPending: false },
+      bridges: [],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
+      },
+      friendActivity: [],
+    })
+
+    // For idle state, resumeHandle should still exist but with null/empty fields
+    expect(frame.resumeHandle).toBeDefined()
+    expect(frame.resumeHandle?.sessionLabel).toBe("cli/session")
+    expect(frame.resumeHandle?.lane).toBeNull()
+    expect(frame.resumeHandle?.artifact).toBeNull()
+    expect(frame.resumeHandle?.nextAction).toBeNull()
+  })
+
+  it("produces a partial resume handle when only obligation exists without coding", () => {
+    const frame = buildActiveWorkFrame({
+      currentSession: { friendId: "friend-1", channel: "cli", key: "session", sessionPath: "/tmp/s.json" },
+      mustResolveBeforeHandoff: true,
+      inner: { status: "idle", hasPending: false },
+      bridges: [],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
+      },
+      friendActivity: [],
+      pendingObligations: [{
+        id: "ob-1",
+        origin: { friendId: "friend-1", channel: "cli", key: "session" },
+        content: "review the design doc",
+        status: "pending",
+        createdAt: recentIso(10),
+        updatedAt: recentIso(10),
+      }],
+    })
+
+    expect(frame.resumeHandle).toBeDefined()
+    expect(frame.resumeHandle?.sessionLabel).toBe("cli/session")
+    expect(frame.resumeHandle?.lane).toBeNull()
+    expect(frame.resumeHandle?.codingIdentity).toBeNull()
+    // nextAction should derive from the obligation content
+    expect(frame.resumeHandle?.nextAction).toBeDefined()
+  })
+
+  it("renders resume handle fields in formatted active work output", () => {
+    const frame = buildActiveWorkFrame({
+      currentSession: { friendId: "friend-1", channel: "cli", key: "session", sessionPath: "/tmp/s.json" },
+      mustResolveBeforeHandoff: true,
+      inner: { status: "idle", hasPending: false },
+      bridges: [],
+      codingSessions: [{
+        id: "coding-001",
+        runner: "codex",
+        status: "running",
+        startedAt: recentIso(15),
+        originSession: { friendId: "friend-1", channel: "cli", key: "session" },
+        artifactPath: "/tmp/pr-789",
+        checkpoint: "tests passing",
+        lastActivityAt: recentIso(2),
+        failure: null,
+      }],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
+      },
+      friendActivity: [],
+      pendingObligations: [{
+        id: "ob-1",
+        origin: { friendId: "friend-1", channel: "cli", key: "session" },
+        content: "fix the build",
+        status: "investigating",
+        createdAt: recentIso(20),
+        updatedAt: recentIso(5),
+        currentArtifact: "/tmp/pr-789",
+        nextAction: "review PR and merge",
+        currentSurface: { kind: "coding", label: "codex coding-001" },
+      }],
+    })
+
+    const formatted = formatActiveWorkFrame(frame)
+    // The resume handle fields should appear in the concrete state section
+    expect(formatted).toContain("## current concrete state")
+    expect(formatted).toContain("active lane:")
+    expect(formatted).toContain("current artifact:")
+    expect(formatted).toContain("next action:")
+    // Last verified checkpoint from coding session
+    expect(formatted).toContain("last checkpoint: tests passing")
+  })
+
+  it("includes last verified checkpoint in live world-state checkpoint", () => {
+    const frame = buildActiveWorkFrame({
+      currentSession: { friendId: "friend-1", channel: "cli", key: "session", sessionPath: "/tmp/s.json" },
+      mustResolveBeforeHandoff: false,
+      inner: { status: "idle", hasPending: false },
+      bridges: [],
+      codingSessions: [{
+        id: "coding-001",
+        runner: "codex",
+        status: "running",
+        startedAt: recentIso(15),
+        originSession: { friendId: "friend-1", channel: "cli", key: "session" },
+        artifactPath: null,
+        checkpoint: "compiles but 2 tests failing",
+        lastActivityAt: recentIso(2),
+        failure: null,
+      }],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
+      },
+      friendActivity: [],
+    })
+
+    const checkpoint = formatLiveWorldStateCheckpoint(frame)
+    expect(checkpoint).toContain("last checkpoint: compiles but 2 tests failing")
+  })
+})

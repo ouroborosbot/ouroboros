@@ -6,7 +6,7 @@ import type { ReturnObligation } from "../mind/obligations"
 import { bridgeStateLabel } from "./bridges/state-machine"
 import type { BridgeRecord } from "./bridges/store"
 import type { InnerJob } from "./daemon/thoughts"
-import { isOpenObligation, isOpenObligationStatus, type Obligation } from "./obligations"
+import { isOpenObligation, isOpenObligationStatus, type Obligation, type ObligationStatus } from "./obligations"
 import type { SessionActivityRecord } from "./session-activity"
 import { formatTargetSessionCandidates, type TargetSessionCandidate } from "./target-resolution"
 import { sanitizeKey } from "./config"
@@ -28,6 +28,25 @@ export type BridgeSuggestion =
       targetSession: TargetSessionCandidate
       reason: "shared-work-candidate"
     }
+
+export type ResumeHandleConfidence = "high" | "medium" | "low"
+
+export interface CodingIdentityHook {
+  sessionId: string
+  runner: string
+  status: string
+}
+
+export interface ResumeHandle {
+  sessionLabel: string
+  lane: string | null
+  artifact: string | null
+  blockerOrWaitingOn: string | null
+  nextAction: string | null
+  lastVerifiedCheckpoint: string | null
+  confidence: ResumeHandleConfidence
+  codingIdentity: CodingIdentityHook | null
+}
 
 export interface ActiveWorkFrame {
   currentSession: {
@@ -64,6 +83,8 @@ export interface ActiveWorkFrame {
   targetCandidates?: TargetSessionCandidate[]
   innerReturnObligations: ReturnObligation[]
   bridgeSuggestion: BridgeSuggestion | null
+  primaryObligation: Obligation | null
+  resumeHandle: ResumeHandle | null
 }
 
 interface BuildActiveWorkFrameInput {
@@ -236,10 +257,45 @@ function formatMergeArtifact(obligation: Obligation): string {
   return mergeArtifactFallback(obligation)
 }
 
+function obligationStatusPriority(status: ObligationStatus): number {
+  switch (status) {
+    case "investigating": return 0
+    case "waiting_for_merge": return 1
+    case "updating_runtime": return 2
+    case "pending": return 3
+    case "fulfilled": return 4
+  }
+}
+
+function selectPrimaryObligation(
+  obligations: Obligation[],
+  currentSession: ActiveWorkFrame["currentSession"],
+): Obligation | null {
+  const open = obligations.filter(isOpenObligation)
+  if (open.length === 0) return null
+
+  // Prefer current-session match among advanced (non-pending) obligations
+  const sessionMatch = currentSession
+    ? open.find((ob) =>
+      ob.status !== "pending"
+      && ob.origin.friendId === currentSession.friendId
+      && ob.origin.channel === currentSession.channel
+      && sanitizeKey(ob.origin.key) === sanitizeKey(currentSession.key),
+    )
+    : null
+  if (sessionMatch) return sessionMatch
+
+  // Then any advanced obligation, sorted by status priority then freshness
+  const sorted = [...open].sort((a, b) => {
+    const statusDiff = obligationStatusPriority(a.status) - obligationStatusPriority(b.status)
+    if (statusDiff !== 0) return statusDiff
+    return obligationTimestampMs(b) - obligationTimestampMs(a)
+  })
+  return sorted[0] ?? null
+}
+
 function findPrimaryOpenObligation(frame: ActiveWorkFrame): Obligation | null {
-  return (frame.pendingObligations ?? []).find((ob) => ob.status !== "pending" && ob.status !== "fulfilled")
-    ?? (frame.pendingObligations ?? []).find(isOpenObligation)
-    ?? null
+  return frame.primaryObligation ?? selectPrimaryObligation(frame.pendingObligations ?? [], frame.currentSession)
 }
 
 function matchesCurrentSession(frame: ActiveWorkFrame, obligation: Obligation): boolean {
@@ -559,6 +615,50 @@ function formatSessionLabel(
   return `${session.channel}/${session.key}`
 }
 
+function deriveResumeHandleConfidence(
+  primaryObligation: Obligation | null,
+  codingSession: CodingSession | null | undefined,
+): ResumeHandleConfidence {
+  if (primaryObligation?.currentArtifact?.trim() && primaryObligation.nextAction?.trim()) return "high"
+  if (codingSession?.checkpoint?.trim()) return "medium"
+  if (primaryObligation) return "low"
+  return "low"
+}
+
+function buildResumeHandle(
+  currentSession: ActiveWorkFrame["currentSession"],
+  primaryObligation: Obligation | null,
+  codingSessions: CodingSession[],
+): ResumeHandle | null {
+  const sessionLabel = currentSession ? formatSessionLabel(currentSession) : null
+  if (!sessionLabel) return null
+
+  const liveCoding = codingSessions[0] ?? null
+  const lane = liveCoding
+    ? `${formatCodingLaneLabel(liveCoding)}${describeCodingSessionScope(liveCoding, currentSession)}`
+    : (primaryObligation?.currentSurface?.label?.trim() || null)
+  const artifact = primaryObligation?.currentArtifact?.trim()
+    || (liveCoding?.artifactPath?.trim() || null)
+  const blockerOrWaitingOn = primaryObligation?.meaning?.waitingOn?.detail?.trim() || null
+  const nextAction = primaryObligation?.nextAction?.trim()
+    || (primaryObligation?.content?.trim() ? `work on "${primaryObligation.content.trim()}" and bring back a concrete artifact` : null)
+  const lastVerifiedCheckpoint = liveCoding?.checkpoint?.trim() || null
+  const codingIdentity = liveCoding
+    ? { sessionId: liveCoding.id, runner: liveCoding.runner, status: liveCoding.status }
+    : null
+
+  return {
+    sessionLabel,
+    lane,
+    artifact,
+    blockerOrWaitingOn,
+    nextAction,
+    lastVerifiedCheckpoint,
+    confidence: deriveResumeHandleConfidence(primaryObligation, liveCoding),
+    codingIdentity,
+  }
+}
+
 export function buildActiveWorkFrame(input: BuildActiveWorkFrameInput): ActiveWorkFrame {
   const friendSessions = input.currentSession
     ? input.friendActivity
@@ -578,6 +678,9 @@ export function buildActiveWorkFrame(input: BuildActiveWorkFrameInput): ActiveWo
     : (input.inner.status === "running" || input.inner.hasPending || input.mustResolveBeforeHandoff || openObligations > 0 || liveCodingSessions.length > 0)
       ? "inward-work"
       : "local-turn"
+
+  const primaryObligation = selectPrimaryObligation(pendingObligations, input.currentSession ?? null)
+  const resumeHandle = buildResumeHandle(input.currentSession ?? null, primaryObligation, liveCodingSessions)
 
   const frame: ActiveWorkFrame = {
     currentSession: input.currentSession ?? null,
@@ -610,6 +713,8 @@ export function buildActiveWorkFrame(input: BuildActiveWorkFrameInput): ActiveWo
       taskBoard: input.taskBoard,
       targetCandidates: input.targetCandidates,
     }),
+    primaryObligation,
+    resumeHandle,
   }
 
   emitNervesEvent({
@@ -673,6 +778,9 @@ export function formatActiveWorkFrame(frame: ActiveWorkFrame, options?: { hasWak
     }
     if (nextAction) {
       lines.push(`- next action: ${nextAction}`)
+    }
+    if (frame.resumeHandle?.lastVerifiedCheckpoint) {
+      lines.push(`- last checkpoint: ${frame.resumeHandle.lastVerifiedCheckpoint}`)
     }
   }
 
@@ -808,6 +916,9 @@ export function formatLiveWorldStateCheckpoint(frame: ActiveWorkFrame): string {
     `- current artifact: ${currentArtifact}`,
     `- next action: ${nextAction}`,
   ]
+  if (frame.resumeHandle?.lastVerifiedCheckpoint) {
+    lines.push(`- last checkpoint: ${frame.resumeHandle.lastVerifiedCheckpoint}`)
+  }
 
   if (otherActiveSessions.length > 0) {
     lines.push("other active sessions:")
