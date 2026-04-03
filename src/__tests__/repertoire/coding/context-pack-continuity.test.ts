@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 import type { CodingSession, CodingSessionRequest } from "../../../repertoire/coding/types"
-import { prepareCodingContextPack } from "../../../repertoire/coding/context-pack"
+import { prepareCodingContextPack, emitCodingEpisode } from "../../../repertoire/coding/context-pack"
+
+const mockEmitEpisode = vi.fn()
+vi.mock("../../../mind/episodes", () => ({
+  emitEpisode: (...args: any[]) => mockEmitEpisode(...args),
+}))
 
 function makeRequest(overrides: Partial<CodingSessionRequest> = {}): CodingSessionRequest {
   return {
@@ -83,5 +88,31 @@ describe("coding context pack continuity integration", () => {
 
     // Empty string should not add a continuity section
     expect(result.stateContent).not.toContain("## Continuity")
+  })
+})
+
+describe("emitCodingEpisode", () => {
+  it("emits a coding_milestone episode on session completion", () => {
+    const session = makeSession({ id: "coding-042", status: "completed" })
+    emitCodingEpisode("/mock/agent-root", session, "task completed successfully")
+    expect(mockEmitEpisode).toHaveBeenCalledWith(
+      "/mock/agent-root",
+      expect.objectContaining({
+        kind: "coding_milestone",
+        salience: "medium",
+      }),
+    )
+  })
+
+  it("emits high salience for failed sessions", () => {
+    const session = makeSession({ id: "coding-042", status: "failed" })
+    emitCodingEpisode("/mock/agent-root", session, "compilation error")
+    expect(mockEmitEpisode).toHaveBeenCalledWith(
+      "/mock/agent-root",
+      expect.objectContaining({
+        kind: "coding_milestone",
+        salience: "high",
+      }),
+    )
   })
 })
