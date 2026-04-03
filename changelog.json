@@ -2,6 +2,19 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.183",
+      "changes": [
+        "feat(continuity): wake packets, episodes, cares, intentions, peer presence, and temporal self",
+        "feat(continuity): 9 new modules — episodes, cares, agent-relationships, intentions, presence, tempo, temporal-view, wake-packet, obligation enrichment",
+        "feat(continuity): 8 new tools — query_episodes, capture_episode, query_presence, query_cares, care_manage, query_relationships, intention_capture, intention_manage",
+        "feat(continuity): 3-layer architecture — durable state, derived views, surfaces",
+        "feat(pipeline): continuity threading — tempo derivation, wake packet assembly, presence update, episode emission on every turn",
+        "feat(prompt): wake packet prompt section with token budget and truncation priority",
+        "feat(coding): coding context receives compact wake packet, coding completion emits episodes",
+        "feat(outlook): expose continuity data (presence, cares, episodes) to outlook surfaces"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.182",
       "changes": [
         "fix(cli): remove persistent status bar from input box (header already shows info)",
