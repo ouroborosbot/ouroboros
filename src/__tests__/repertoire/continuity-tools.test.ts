@@ -310,6 +310,38 @@ describe("continuity tools", () => {
     })
   })
 
+  describe("query_episodes edge cases", () => {
+    it("returns empty array when no episodes exist", async () => {
+      mockReadRecentEpisodes.mockReturnValue([])
+      const tool = findTool("query_episodes")
+      const result = await tool.handler({})
+      expect(result).toBe("[]")
+    })
+  })
+
+  describe("query_presence edge cases", () => {
+    it("handles null self presence", async () => {
+      mockReadPresence.mockReturnValue(null)
+      mockReadPeerPresence.mockReturnValue([])
+      const tool = findTool("query_presence")
+      const result = await tool.handler({})
+      expect(result).toContain("null")
+    })
+  })
+
+  describe("care_manage edge cases", () => {
+    it("uses defaults when optional fields omitted on create", async () => {
+      const mockCare = { id: "c-default", label: "untitled", status: "active" }
+      mockCreateCare.mockReturnValue(mockCare)
+      const tool = findTool("care_manage")
+      await tool.handler({ action: "create" })
+      expect(mockCreateCare).toHaveBeenCalledWith(
+        "/mock/agent-root",
+        expect.objectContaining({ label: "untitled", kind: "project", salience: "medium" }),
+      )
+    })
+  })
+
   describe("intention_manage", () => {
     it("tool exists in baseToolDefinitions", () => {
       const tool = findTool("intention_manage")
