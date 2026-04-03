@@ -661,6 +661,91 @@ export interface OutlookObligationDetailView {
 }
 
 // ---------------------------------------------------------------------------
+// Changes — cross-session drift detection
+// ---------------------------------------------------------------------------
+
+export interface OutlookChangeItem {
+  kind: string
+  id: string
+  from: string | null
+  to: string | null
+  summary: string
+}
+
+export interface OutlookChangesView {
+  changeCount: number
+  items: OutlookChangeItem[]
+  snapshotAge: string | null
+  formatted: string
+}
+
+// ---------------------------------------------------------------------------
+// Coding identity — enriched coding truth
+// ---------------------------------------------------------------------------
+
+export interface OutlookCodingIdentity {
+  repo: string | null
+  worktree: string | null
+  branch: string | null
+  commit: string | null
+  dirty: boolean
+  taskRef: string | null
+  verificationCommands: string[]
+  verificationStatus: "verified-pass" | "verified-fail" | "not-verified"
+}
+
+export interface OutlookCodingEnrichedItem {
+  id: string
+  runner: string
+  status: string
+  workdir: string
+  lastActivityAt: string
+  checkpoint: string | null
+  taskRef: string | null
+  identity: OutlookCodingIdentity | null
+}
+
+export interface OutlookCodingEnrichedView {
+  totalCount: number
+  activeCount: number
+  blockedCount: number
+  items: OutlookCodingEnrichedItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Self-fix workflow state
+// ---------------------------------------------------------------------------
+
+export interface OutlookSelfFixStep {
+  label: string
+  status: "done" | "active" | "pending" | "skipped"
+  detail: string | null
+}
+
+export interface OutlookSelfFixView {
+  active: boolean
+  currentStep: string | null
+  steps: OutlookSelfFixStep[]
+}
+
+// ---------------------------------------------------------------------------
+// Memory decisions — save/skip judgement log
+// ---------------------------------------------------------------------------
+
+export interface OutlookMemoryDecision {
+  kind: "diary_write" | "save_friend_note" | "memory_skip"
+  decision: "saved" | "skipped"
+  reason: string | null
+  excerpt: string | null
+  timestamp: string
+}
+
+export interface OutlookMemoryDecisionView {
+  totalCount: number
+  items: OutlookMemoryDecision[]
+}
+
+// ---------------------------------------------------------------------------
 // Log / event inspection
 // ---------------------------------------------------------------------------
 

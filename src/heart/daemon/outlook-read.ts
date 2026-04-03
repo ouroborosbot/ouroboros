@@ -51,6 +51,11 @@ import {
   type OutlookOrientationView,
   type OutlookObligationDetailView,
   type OutlookObligationDetailItem,
+  type OutlookChangesView,
+  type OutlookSelfFixView,
+  type OutlookSelfFixStep,
+  type OutlookMemoryDecisionView,
+  type OutlookMemoryDecision,
 } from "./outlook-types"
 import { readPresence, readPeerPresence } from "../presence"
 import { readActiveCares } from "../cares"
@@ -1650,4 +1655,148 @@ export function readObligationDetailView(agentRoot: string): OutlookObligationDe
     primarySelectionReason,
     items,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Changes reader — cross-session drift via snapshot comparison
+// ---------------------------------------------------------------------------
+
+import { detectActiveWorkChanges, formatActiveWorkChanges, type ActiveWorkSnapshot } from "../active-work"
+
+export function readChangesView(agentRoot: string): OutlookChangesView {
+  const snapshotPath = path.join(agentRoot, "state", "outlook", "active-work-snapshot.json")
+
+  // Read prior snapshot
+  let previous: ActiveWorkSnapshot | null = null
+  try {
+    const raw = fs.readFileSync(snapshotPath, "utf-8")
+    previous = JSON.parse(raw) as ActiveWorkSnapshot
+    if (!previous.obligationSnapshots || !previous.codingSnapshots) previous = null
+  } catch {
+    previous = null
+  }
+
+  // Build current snapshot from raw state
+  let obligations: ReturnType<typeof readObligations> = []
+  try { obligations = readObligations(agentRoot) } catch { obligations = [] }
+  const openObligations = obligations.filter(isOpenObligation)
+
+  const current: ActiveWorkSnapshot = {
+    obligationSnapshots: openObligations.map((ob) => ({
+      id: ob.id,
+      status: ob.status,
+      artifact: ob.currentArtifact?.trim() || null,
+      nextAction: ob.nextAction?.trim() || null,
+    })),
+    codingSnapshots: [],
+    timestamp: new Date().toISOString(),
+  }
+
+  // Persist current as the new snapshot
+  try {
+    fs.mkdirSync(path.dirname(snapshotPath), { recursive: true })
+    fs.writeFileSync(snapshotPath, JSON.stringify(current, null, 2) + "\n", "utf-8")
+  } catch {
+    // Best effort
+  }
+
+  if (!previous) {
+    return { changeCount: 0, items: [], snapshotAge: null, formatted: "" }
+  }
+
+  const changes = detectActiveWorkChanges(previous, current)
+  const formatted = formatActiveWorkChanges(changes)
+
+  emitNervesEvent({
+    component: "heart",
+    event: "heart.outlook_changes_read",
+    message: `outlook changes: ${changes.length} detected`,
+    meta: { changeCount: changes.length, snapshotAge: previous.timestamp },
+  })
+
+  return {
+    changeCount: changes.length,
+    items: changes.map((c) => ({ kind: c.kind, id: c.id, from: c.from, to: c.to, summary: c.summary })),
+    snapshotAge: previous.timestamp,
+    formatted,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Self-fix workflow reader — derived from task board and coding state
+// ---------------------------------------------------------------------------
+
+export function readSelfFixView(agentRoot: string): OutlookSelfFixView {
+  // Derive self-fix state from task scanner
+  let tasks: { name: string; title: string; status: string }[] = []
+  try {
+    const scanned = scanTasks(path.join(agentRoot, "tasks"))
+    tasks = scanned.tasks.map((t) => ({ name: t.name, title: t.title, status: t.status }))
+  } catch {
+    tasks = []
+  }
+
+  // Look for self-fix-related tasks
+  const selfFixTasks = tasks.filter((t) =>
+    t.title.toLowerCase().includes("fix") || t.title.toLowerCase().includes("self-fix"),
+  )
+
+  if (selfFixTasks.length === 0) {
+    return { active: false, currentStep: null, steps: [] }
+  }
+
+  const steps: OutlookSelfFixStep[] = selfFixTasks.map((t) => ({
+    label: t.title,
+    status: t.status === "done" ? "done" : t.status === "processing" ? "active" : "pending",
+    detail: `task ${t.name}: ${t.status}`,
+  }))
+
+  const activeStep = steps.find((s) => s.status === "active")
+
+  emitNervesEvent({
+    component: "heart",
+    event: "heart.outlook_selffix_read",
+    message: `outlook self-fix: ${selfFixTasks.length} tasks`,
+    meta: { taskCount: selfFixTasks.length, active: !!activeStep },
+  })
+
+  return {
+    active: !!activeStep,
+    currentStep: activeStep?.label ?? null,
+    steps,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Memory decisions reader — append-only JSONL log
+// ---------------------------------------------------------------------------
+
+export function readMemoryDecisionView(agentRoot: string, limit = 50): OutlookMemoryDecisionView {
+  const logPath = path.join(agentRoot, "state", "outlook", "memory-decisions.jsonl")
+
+  let lines: string[] = []
+  try {
+    const raw = fs.readFileSync(logPath, "utf-8")
+    lines = raw.split("\n").filter((l) => l.trim().length > 0)
+  } catch {
+    return { totalCount: 0, items: [] }
+  }
+
+  const items: OutlookMemoryDecision[] = []
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line) as OutlookMemoryDecision
+      if (parsed.kind && parsed.decision && parsed.timestamp) {
+        items.push(parsed)
+      }
+    } catch {
+      // Skip malformed lines
+    }
+  }
+
+  // Reverse chronological
+  items.reverse()
+  const limited = items.slice(0, limit)
+
+  return { totalCount: items.length, items: limited }
 }

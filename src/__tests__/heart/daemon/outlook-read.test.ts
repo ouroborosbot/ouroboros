@@ -1355,6 +1355,64 @@ describe("outlook deep readers", () => {
     })
   })
 
+  describe("readChangesView", () => {
+    let agentRoot: string
+
+    afterEach(() => {
+      if (agentRoot) fs.rmSync(agentRoot, { recursive: true, force: true })
+    })
+
+    it("returns empty changes when no prior snapshot exists", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "changes-empty-"))
+      const { readChangesView } = await import("../../../heart/daemon/outlook-read")
+      const view = readChangesView(agentRoot)
+      expect(view.changeCount).toBe(0)
+      expect(view.items).toEqual([])
+      expect(view.snapshotAge).toBeNull()
+    })
+
+    it("detects changes when obligations shift between snapshots", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "changes-drift-"))
+      // Write a prior snapshot
+      const snapshotDir = path.join(agentRoot, "state", "outlook")
+      fs.mkdirSync(snapshotDir, { recursive: true })
+      fs.writeFileSync(path.join(snapshotDir, "active-work-snapshot.json"), JSON.stringify({
+        obligationSnapshots: [
+          { id: "ob-1", status: "pending", artifact: null, nextAction: null },
+        ],
+        codingSnapshots: [],
+        timestamp: "2026-04-03T09:00:00Z",
+      }), "utf-8")
+
+      // Write current obligation with different status
+      writeJson(path.join(agentRoot, "state", "obligations", "ob-1.json"), {
+        id: "ob-1",
+        status: "in_progress",
+        content: "Deploy v2",
+        origin: { friendId: "ari", channel: "cli", key: "chat" },
+        createdAt: "2026-04-03T08:00:00Z",
+        updatedAt: "2026-04-03T10:00:00Z",
+      })
+
+      const { readChangesView } = await import("../../../heart/daemon/outlook-read")
+      const view = readChangesView(agentRoot)
+      expect(view.changeCount).toBeGreaterThan(0)
+      expect(view.items.some((c) => c.kind === "obligation_status_changed")).toBe(true)
+      expect(view.snapshotAge).toBeTruthy()
+    })
+
+    it("handles malformed snapshot gracefully", async () => {
+      agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "changes-malformed-"))
+      const snapshotDir = path.join(agentRoot, "state", "outlook")
+      fs.mkdirSync(snapshotDir, { recursive: true })
+      fs.writeFileSync(path.join(snapshotDir, "active-work-snapshot.json"), "not json", "utf-8")
+
+      const { readChangesView } = await import("../../../heart/daemon/outlook-read")
+      const view = readChangesView(agentRoot)
+      expect(view.changeCount).toBe(0)
+    })
+  })
+
   describe("readObligationDetailView", () => {
     let agentRoot: string
 

@@ -6,12 +6,14 @@ import { emitNervesEvent } from "../../nerves/runtime"
 import {
   readAttentionView,
   readBridgeInventory,
+  readChangesView,
   readCodingDeep,
   readDaemonHealthDeep,
   readFriendView,
   readHabitView,
   readDeskPrefs,
   readLogView,
+  readMemoryDecisionView,
   readMemoryView,
   readNeedsMeView,
   readObligationDetailView,
@@ -19,6 +21,7 @@ import {
   readOutlookAgentState,
   readOutlookContinuity,
   readOutlookMachineState,
+  readSelfFixView,
   readSessionInventory,
   readSessionTranscript,
 } from "./outlook-read"
@@ -30,10 +33,13 @@ import type {
   OutlookAttentionView,
   OutlookBridgeInventory,
   OutlookCodingDeep,
+  OutlookChangesView,
   OutlookContinuityView,
   OutlookDaemonHealthDeep,
+  OutlookMemoryDecisionView,
   OutlookObligationDetailView,
   OutlookOrientationView,
+  OutlookSelfFixView,
   OutlookFriendView,
   OutlookHabitView,
   OutlookLogView,
@@ -64,6 +70,9 @@ export interface StartOutlookHttpServerOptions {
   readAgentContinuity?: (agentName: string) => OutlookContinuityView
   readAgentOrientation?: (agentName: string) => OutlookOrientationView
   readAgentObligations?: (agentName: string) => OutlookObligationDetailView
+  readAgentChanges?: (agentName: string) => OutlookChangesView
+  readAgentSelfFix?: (agentName: string) => OutlookSelfFixView
+  readAgentMemoryDecisions?: (agentName: string) => OutlookMemoryDecisionView
   readAgentHabits?: (agentName: string) => OutlookHabitView
   readDaemonHealth?: () => OutlookDaemonHealthDeep | null
   readLogs?: () => OutlookLogView
@@ -245,6 +254,9 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     readAgentContinuity: options.readAgentContinuity ?? ((agentName: string) => readOutlookContinuity(agentRoot(agentName), agentName)),
     readAgentOrientation: options.readAgentOrientation ?? ((agentName: string) => readOrientationView(agentRoot(agentName), agentName)),
     readAgentObligations: options.readAgentObligations ?? ((agentName: string) => readObligationDetailView(agentRoot(agentName))),
+    readAgentChanges: options.readAgentChanges ?? ((agentName: string) => readChangesView(agentRoot(agentName))),
+    readAgentSelfFix: options.readAgentSelfFix ?? ((agentName: string) => readSelfFixView(agentRoot(agentName))),
+    readAgentMemoryDecisions: options.readAgentMemoryDecisions ?? ((agentName: string) => readMemoryDecisionView(agentRoot(agentName))),
     readAgentHabits: options.readAgentHabits ?? ((agentName: string) => readHabitView(agentRoot(agentName))),
     readDaemonHealth: options.readDaemonHealth ?? (() => readDaemonHealthDeep(options.healthPath)),
     readLogs: options.readLogs ?? (() => readLogView(options.logPath ?? null)),
@@ -384,6 +396,21 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
 
       if (surface === "obligations") {
         writeJson(response, 200, hooks.readAgentObligations(agent))
+        return
+      }
+
+      if (surface === "changes") {
+        writeJson(response, 200, hooks.readAgentChanges(agent))
+        return
+      }
+
+      if (surface === "self-fix") {
+        writeJson(response, 200, hooks.readAgentSelfFix(agent))
+        return
+      }
+
+      if (surface === "memory-decisions") {
+        writeJson(response, 200, hooks.readAgentMemoryDecisions(agent))
         return
       }
 

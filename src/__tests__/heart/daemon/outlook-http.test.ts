@@ -623,4 +623,75 @@ describe("outlook http", () => {
 
     await server.stop()
   })
+
+  it("serves /api/agents/:agent/changes endpoint", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const mockChanges = {
+      changeCount: 1,
+      items: [{ kind: "obligation_status_changed", id: "ob-1", from: "pending", to: "in_progress", summary: "obligation pending -> in_progress" }],
+      snapshotAge: "2026-04-03T09:00:00Z",
+      formatted: "obligation pending -> in_progress",
+    }
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentChanges: () => mockChanges,
+    })
+
+    const res = await fetch(`${server.origin}/api/agents/slugger/changes`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(mockChanges)
+
+    await server.stop()
+  })
+
+  it("serves /api/agents/:agent/self-fix endpoint", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const mockSelfFix = { active: false, currentStep: null, steps: [] }
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentSelfFix: () => mockSelfFix,
+    })
+
+    const res = await fetch(`${server.origin}/api/agents/slugger/self-fix`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(mockSelfFix)
+
+    await server.stop()
+  })
+
+  it("serves /api/agents/:agent/memory-decisions endpoint", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const mockDecisions = {
+      totalCount: 1,
+      items: [{ kind: "diary_write", decision: "saved", reason: "important", excerpt: "hello", timestamp: "2026-04-03T10:00:00Z" }],
+    }
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      readAgentMemoryDecisions: () => mockDecisions,
+    })
+
+    const res = await fetch(`${server.origin}/api/agents/slugger/memory-decisions`)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(mockDecisions)
+
+    await server.stop()
+  })
 })
