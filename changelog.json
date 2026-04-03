@@ -2,7 +2,7 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.183",
+      "version": "0.1.0-alpha.184",
       "changes": [
         "feat(continuity): wake packets, episodes, cares, intentions, peer presence, and temporal self",
         "feat(continuity): 9 new modules — episodes, cares, agent-relationships, intentions, presence, tempo, temporal-view, wake-packet, obligation enrichment",
@@ -12,6 +12,15 @@
         "feat(prompt): wake packet prompt section with token budget and truncation priority",
         "feat(coding): coding context receives compact wake packet, coding completion emits episodes",
         "feat(outlook): expose continuity data (presence, cares, episodes) to outlook surfaces"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.183",
+      "changes": [
+        "fix(cli): status/hints moved BELOW input box (between bottom separator and end)",
+        "fix(cli): Ctrl-C double-press requires 2s window (not any two presses ever)",
+        "feat(cli): /help command with all keyboard shortcuts",
+        "docs: CLI keyboard shortcuts documentation"
       ]
     },
     {
