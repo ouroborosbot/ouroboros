@@ -4,6 +4,7 @@
     {
       "version": "0.1.0-alpha.184",
       "changes": [
+        "fix(hatch): pass model name to adoption specialist from discovered credentials",
         "feat(continuity): wake packets, episodes, cares, intentions, peer presence, and temporal self",
         "feat(continuity): 9 new modules — episodes, cares, agent-relationships, intentions, presence, tempo, temporal-view, wake-packet, obligation enrichment",
         "feat(continuity): 8 new tools — query_episodes, capture_episode, query_presence, query_cares, care_manage, query_relationships, intention_capture, intention_manage",
