@@ -35,6 +35,7 @@ function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
     createdAt: "2026-03-02T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
     schemaVersion: 1,
+    kind: "human",
     ...overrides,
   }
 }
