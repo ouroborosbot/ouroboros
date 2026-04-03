@@ -21,6 +21,8 @@ const mockDerivePresence = vi.fn()
 const mockWritePresence = vi.fn()
 const mockEmitEpisode = vi.fn()
 const mockReadPendingObligations = vi.fn()
+const mockReadRecentEpisodes = vi.fn()
+const mockReadActiveCares = vi.fn()
 
 vi.mock("../../heart/tempo", async () => {
   const actual = await vi.importActual<typeof import("../../heart/tempo")>("../../heart/tempo")
@@ -61,6 +63,15 @@ vi.mock("../../mind/episodes", async () => {
   return {
     ...actual,
     emitEpisode: (...args: any[]) => mockEmitEpisode(...args),
+    readRecentEpisodes: (...args: any[]) => mockReadRecentEpisodes(...args),
+  }
+})
+
+vi.mock("../../heart/cares", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/cares")>("../../heart/cares")
+  return {
+    ...actual,
+    readActiveCares: (...args: any[]) => mockReadActiveCares(...args),
   }
 })
 
@@ -232,6 +243,8 @@ describe("pipeline continuity integration", () => {
     vi.spyOn(pending, "getInnerDialogPendingDir").mockReturnValue("/tmp/inner-pending")
 
     // Default continuity mock returns
+    mockReadRecentEpisodes.mockReturnValue([])
+    mockReadActiveCares.mockReturnValue([])
     mockReadPendingObligations.mockReturnValue([])
     mockDeriveTempo.mockReturnValue({
       mode: "brief",
@@ -280,6 +293,8 @@ describe("pipeline continuity integration", () => {
     mockDerivePresence.mockReset()
     mockWritePresence.mockReset()
     mockEmitEpisode.mockReset()
+    mockReadRecentEpisodes.mockReset()
+    mockReadActiveCares.mockReset()
     mockReadPendingObligations.mockReset()
   })
 
@@ -329,6 +344,27 @@ describe("pipeline continuity integration", () => {
       // runAgent is called with (messages, callbacks, channel, signal, options)
       const options = runAgentSpy.mock.calls[0][4] as RunAgentOptions
       expect(options.wakePacket).toBe("**Next:** review PR #42")
+    })
+
+    it("derives tempo with episode salience and care risk data", async () => {
+      mockReadRecentEpisodes.mockReturnValue([
+        { id: "ep-1", kind: "turning_point", salience: "high", summary: "breakthrough", whyItMattered: "changed approach", timestamp: new Date().toISOString(), relatedEntities: [] },
+        { id: "ep-2", kind: "coding_milestone", salience: "low", summary: "minor fix", whyItMattered: "", timestamp: new Date().toISOString(), relatedEntities: [] },
+      ])
+      mockReadActiveCares.mockReturnValue([
+        { id: "c-1", label: "deploy", currentRisk: "might fail", status: "active", salience: "high", kind: "project", steward: "mine", relatedFriendIds: [], relatedAgentIds: [], relatedObligationIds: [], relatedEpisodeIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      ])
+
+      const input = makeInput()
+      const { handleInboundTurn } = await import("../../senses/pipeline")
+      await handleInboundTurn(input)
+      expect(mockDeriveTempo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          highSalienceEpisodes: 1,
+          activeCareCount: 1,
+          atRiskCareCount: 1,
+        }),
+      )
     })
 
     it("gracefully handles continuity pipeline errors", async () => {
