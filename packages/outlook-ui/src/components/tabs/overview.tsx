@@ -41,10 +41,20 @@ const URGENCY_WHY: Record<string, string> = {
 const STALE_URGENCIES = new Set(["stale-delegation"])
 const ACTION_URGENCIES = new Set(["owed-reply", "blocking-obligation", "broken-return", "return-ready", "overdue-habit"])
 
+interface ContinuityView {
+  presence: {
+    self: { agentName: string; availability: string; lane?: string; tempo?: string; updatedAt?: string } | null
+    peers: Array<{ agentName: string; availability: string; lane?: string; updatedAt?: string }>
+  }
+  cares: { activeCount: number; items: Array<{ id: string; label: string; status: string; salience: string }> }
+  episodes: { recentCount: number; items: Array<{ id: string; kind: string; summary: string; timestamp: string }> }
+}
+
 export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>; deskPrefs?: Record<string, unknown> | null }) {
   const nav = useNavigate()
   const [needsMe, setNeedsMe] = useState<{ items: NeedsMeItem[] } | null>(null)
   const [codingDeep, setCodingDeep] = useState<{ items: Array<Record<string, unknown>> } | null>(null)
+  const [continuity, setContinuity] = useState<ContinuityView | null>(null)
   const agent = view.agent as Record<string, unknown>
   const work = view.work as Record<string, unknown>
   const inner = view.inner as Record<string, unknown>
@@ -64,6 +74,7 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
   useEffect(() => {
     fetchJson<{ items: NeedsMeItem[] }>(`/agents/${encodeURIComponent(agent.agentName as string)}/needs-me`).then(setNeedsMe)
     fetchJson<{ items: Array<Record<string, unknown>> }>(`/agents/${encodeURIComponent(agent.agentName as string)}/coding`).then(setCodingDeep)
+    fetchJson<ContinuityView>(`/agents/${encodeURIComponent(agent.agentName as string)}/continuity`).then(setContinuity).catch(() => {})
   }, [agent.agentName])
 
   return (
@@ -203,6 +214,84 @@ export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>
           </div>
         )}
       </div>
+
+      {/* Continuity — presence, cares, episodes */}
+      {continuity && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Self presence */}
+          <div className="rounded-xl bg-ouro-void/50 p-4 ring-1 ring-ouro-moss/20">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ouro-glow">Presence</p>
+            {continuity.presence.self ? (
+              <div className="mt-2 space-y-1">
+                <p className="text-sm font-medium text-ouro-bone">{continuity.presence.self.availability}</p>
+                {continuity.presence.self.lane && (
+                  <p className="text-xs text-ouro-shadow">Lane: {continuity.presence.self.lane}</p>
+                )}
+                {continuity.presence.self.tempo && (
+                  <p className="text-xs text-ouro-shadow">Tempo: {continuity.presence.self.tempo}</p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ouro-shadow">No presence data</p>
+            )}
+            {continuity.presence.peers.length > 0 && (
+              <div className="mt-2 border-t border-ouro-moss/20 pt-2">
+                <p className="text-[10px] uppercase tracking-wider text-ouro-shadow">Peers</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {continuity.presence.peers.map((p) => (
+                    <Badge key={p.agentName} color={p.availability === "active" ? "lime" : "zinc"}>
+                      {p.agentName}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Active cares */}
+          <div className="rounded-xl bg-ouro-void/50 p-4 ring-1 ring-ouro-moss/20">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ouro-glow">
+              Cares ({continuity.cares.activeCount})
+            </p>
+            {continuity.cares.items.length > 0 ? (
+              <div className="mt-2 space-y-1.5">
+                {continuity.cares.items.slice(0, 5).map((c) => (
+                  <div key={c.id} className="flex items-center gap-2">
+                    <Badge color={c.salience === "high" ? "red" : c.salience === "medium" ? "yellow" : "zinc"}>
+                      {c.salience}
+                    </Badge>
+                    <p className="truncate text-sm text-ouro-bone">{c.label}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ouro-shadow">No active cares</p>
+            )}
+          </div>
+
+          {/* Recent episodes */}
+          <div className="rounded-xl bg-ouro-void/50 p-4 ring-1 ring-ouro-moss/20">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ouro-glow">
+              Episodes ({continuity.episodes.recentCount})
+            </p>
+            {continuity.episodes.items.length > 0 ? (
+              <div className="mt-2 space-y-1.5">
+                {continuity.episodes.items.slice(0, 5).map((ep) => (
+                  <div key={ep.id} className="flex items-start gap-2">
+                    <Badge color="zinc">{ep.kind}</Badge>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ouro-bone">{ep.summary}</p>
+                      <p className="text-xs text-ouro-shadow">{relTime(ep.timestamp)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ouro-shadow">No recent episodes</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Meters */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
