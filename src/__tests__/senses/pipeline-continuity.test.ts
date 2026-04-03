@@ -467,20 +467,29 @@ describe("pipeline continuity integration", () => {
       const beforeObligations = [
         { id: "ob-1", content: "review PR", status: "pending", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-01T10:00:00Z" },
       ]
-      // After turn: obligation fulfilled (different status)
+      // After turn: obligation status changed
       const afterObligations = [
         { id: "ob-1", content: "review PR", status: "fulfilled", createdAt: "2026-04-01T10:00:00Z", updatedAt: "2026-04-02T10:00:00Z" },
       ]
 
-      let callCount = 0
-      mockReadPendingObligations.mockImplementation(() => {
-        callCount++
-        // readPendingObligations is called at: (1) pre-turn snapshot (line 461), (2) post-turn check (line 673)
-        // Inner dialog call (line 222) is skipped because readInnerDialogRawData returns null
-        return callCount <= 1 ? beforeObligations : afterObligations
-      })
+      // readPendingObligations is called at multiple points in the pipeline:
+      //   1. Inner dialog (line 222) — may or may not execute depending on readInnerDialogRawData
+      //   2. Pre-turn snapshot (line 461) — always executes
+      //   3. Post-turn check (line 673) — always executes
+      // Use a stack: all calls return beforeObligations except the very last call which returns afterObligations.
+      // We achieve this by defaulting to beforeObligations and tracking when the post-turn code runs.
+      // The post-turn code is after runAgent, so we use the runAgent mock to switch the return value.
+      mockReadPendingObligations.mockReturnValue(beforeObligations)
 
-      const input = makeInput()
+      const originalRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
+      const runAgentWrapper = async (...args: any[]) => {
+        const result = await originalRunAgent(...args)
+        // After runAgent completes, switch the mock to return the post-turn state
+        mockReadPendingObligations.mockReturnValue(afterObligations)
+        return result
+      }
+
+      const input = makeInput({ runAgent: runAgentWrapper as any })
       const { handleInboundTurn } = await import("../../senses/pipeline")
       await handleInboundTurn(input)
 

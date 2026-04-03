@@ -340,6 +340,33 @@ describe("continuity tools", () => {
         expect.objectContaining({ label: "untitled", kind: "project", salience: "medium" }),
       )
     })
+
+    it("passes why and salience fields when updating a care", async () => {
+      const mockCare = { id: "c-1", label: "updated", status: "active" }
+      mockUpdateCare.mockReturnValue(mockCare)
+
+      const tool = findTool("care_manage")
+      await tool.handler({ action: "update", id: "c-1", label: "renamed", why: "reprioritized", salience: "high" })
+      expect(mockUpdateCare).toHaveBeenCalledWith(
+        "/mock/agent-root",
+        "c-1",
+        expect.objectContaining({ label: "renamed", why: "reprioritized", salience: "high" }),
+      )
+    })
+  })
+
+  describe("intention_capture edge cases", () => {
+    it("passes nudgeAfter when provided", async () => {
+      const mockIntention = { id: "int-2", content: "follow up", status: "open" }
+      mockCaptureIntention.mockReturnValue(mockIntention)
+
+      const tool = findTool("intention_capture")
+      await tool.handler({ content: "follow up", nudgeAfter: "2026-04-10T00:00:00Z" })
+      expect(mockCaptureIntention).toHaveBeenCalledWith(
+        "/mock/agent-root",
+        expect.objectContaining({ content: "follow up", nudgeAfter: "2026-04-10T00:00:00Z" }),
+      )
+    })
   })
 
   describe("intention_manage", () => {
