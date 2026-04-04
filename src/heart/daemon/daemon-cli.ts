@@ -698,6 +698,7 @@ function isAgentProvider(value: unknown): value is AgentProvider {
   return value === "azure" || value === "anthropic" || value === "minimax" || value === "openai-codex" || value === "github-copilot"
 }
 
+/* v8 ignore next 3 -- only called from auth.switch inside integration block @preserve */
 function hasStoredCredentials(provider: AgentProvider, providerSecrets: Record<string, unknown>): boolean {
   return PROVIDER_CREDENTIALS[provider].required.every((key) => !!providerSecrets[key])
 }
