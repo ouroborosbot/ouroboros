@@ -1,6 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import { PROVIDER_CREDENTIALS, type AgentProvider } from "../identity"
+import { emitNervesEvent } from "../../nerves/runtime"
 
 export interface ConfigCheckResult {
   ok: boolean
@@ -121,6 +122,13 @@ export function checkAgentConfig(
       fix: `Run 'ouro auth ${agentName}' to set up ${provider} credentials, or add the missing fields to providers.${provider} in ${secretsJsonPath}.`,
     }
   }
+
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.agent_config_valid",
+    message: "agent config validation passed",
+    meta: { agent: agentName, provider },
+  })
 
   return { ok: true }
 }
