@@ -107,6 +107,8 @@ describe("cooldown recovery", () => {
 
   it("stops recovery after maxCooldownRetries exhausted", async () => {
     now.mockImplementation(stableTime())
+    // Default spawn for any unexpected startAgent calls (e.g., from async timer callbacks)
+    spawn.mockReturnValue(new MockChild())
 
     const manager = new DaemonProcessManager({
       agents,
