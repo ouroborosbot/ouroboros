@@ -170,6 +170,12 @@ export class DaemonProcessManager {
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     })
 
+    /* v8 ignore next 7 -- defensive: spawn should always return a ChildProcess @preserve */
+    if (!child) {
+      state.snapshot.status = "crashed"
+      emitNervesEvent({ level: "error", component: "daemon", event: "daemon.agent_spawn_failed", message: "spawn returned null", meta: { agent } })
+      return
+    }
     state.process = child
     state.snapshot.status = "running"
     state.snapshot.pid = child.pid ?? null
