@@ -66,6 +66,7 @@ const processManager = new DaemonProcessManager({
     autoStart: true,
   })),
   existsSync: fs.existsSync,
+  /* v8 ignore next 4 -- wiring: delegates to checkAgentConfig which has full unit tests @preserve */
   configCheck: (agent) => {
     const bundlesRoot = getAgentBundlesRoot()
     const secretsRoot = path.join(os.homedir(), ".agentsecrets")
