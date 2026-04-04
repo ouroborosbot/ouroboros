@@ -11,6 +11,8 @@ import type { Channel, ChannelCapabilities, IdentityProvider, ResolvedContext } 
 import type { FriendStore } from "../mind/friends/store"
 import type { TrustGateInput, TrustGateResult } from "./trust-gate"
 import type { PendingMessage } from "../mind/pending"
+import * as fs from "fs"
+import * as path from "path"
 import { emitNervesEvent } from "../nerves/runtime"
 import { parseSlashCommand, getSharedCommandRegistry } from "./commands"
 import { resolveMustResolveBeforeHandoff } from "./continuity"
@@ -34,7 +36,9 @@ import { runHealthInventory } from "../heart/provider-ping"
 import { writeAgentProviderSelection, loadAgentSecrets } from "../heart/daemon/auth-flow"
 import { deriveTempo } from "../heart/tempo"
 import { buildTemporalView } from "../heart/temporal-view"
-import { buildWakePacket, renderWakePacket } from "../heart/wake-packet"
+import { buildStartOfTurnPacket, renderStartOfTurnPacket } from "../heart/start-of-turn-packet"
+import { preTurnPull, postTurnPush, drainSyncWrites, runWithSyncContext } from "../heart/sync"
+import { getSyncConfig } from "../heart/config"
 import { derivePresence, writePresence } from "../heart/presence"
 import { readRecentEpisodes, emitEpisode } from "../mind/episodes"
 import { readActiveCares } from "../heart/cares"
@@ -268,6 +272,7 @@ function readInnerWorkState(): ActiveWorkFrame["inner"] {
 let _lastSessionKey: string | null = null
 
 export async function handleInboundTurn(input: InboundTurnInput): Promise<InboundTurnResult> {
+  return runWithSyncContext(async () => {
   // Reset session-scoped state when the session changes
   const sessionKey = `${input.channel}/${input.sessionKey ?? "session"}`
   if (sessionKey !== _lastSessionKey) {
@@ -441,6 +446,39 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     key: input.sessionKey ?? "session",
     sessionPath: session.sessionPath,
   }
+
+  // Step 3b: Pre-turn sync pull (opt-in) — MUST happen before any continuity state reads
+  // so that obligations, episodes, cares, etc. reflect the latest remote state.
+  let syncFailure: string | undefined
+  let syncConfig: import("../heart/config").SyncConfig = { enabled: false, remote: "origin" }
+  try { syncConfig = getSyncConfig() } catch { /* config not available */ }
+
+  // Wrap the turn body in try/finally so drainSyncWrites always runs — even on
+  // error or early-return failover paths. This prevents writes from leaking into
+  // the next turn's accumulator.
+  try {
+  /* v8 ignore start -- sync-enabled branches tested in sync.test.ts, pipeline tests mock at module boundary @preserve */
+  if (syncConfig.enabled) {
+    const pullResult = preTurnPull(getAgentRoot(), syncConfig)
+    if (!pullResult.ok) {
+      syncFailure = pullResult.error
+    }
+    // Check for pending-sync from a prior failed push
+    if (!syncFailure) {
+      const pendingSyncPath = path.join(getAgentRoot(), "state", "pending-sync.json")
+      try {
+        if (fs.existsSync(pendingSyncPath)) {
+          const pendingSync = JSON.parse(fs.readFileSync(pendingSyncPath, "utf-8"))
+          syncFailure = `prior sync push failed: ${pendingSync.error ?? "unknown"}`
+          fs.unlinkSync(pendingSyncPath)
+        }
+      } catch {
+        // Ignore read errors for pending-sync
+      }
+    }
+  }
+  /* v8 ignore stop */
+
   const activeBridges = createBridgeManager().findBridgesForSession({
     friendId: currentSession.friendId,
     channel: currentSession.channel,
@@ -563,8 +601,8 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     sessionMessages.push(msg)
   }
 
-  // Step 4b: Continuity pipeline — derive tempo, build wake packet, snapshot obligations
-  let renderedWakePacket: string | undefined
+  // Step 4b: Continuity pipeline — derive tempo, build start-of-turn packet, snapshot obligations
+  let renderedStartOfTurnPacket: string | undefined
   const preTurnObligationIds = new Set(pendingObligations.map((ob) => `${ob.id}:${ob.status}`))
   try {
     const agentRoot = getAgentRoot()
@@ -591,14 +629,18 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
         activeCares,
       },
     })
-    const wakePacket = buildWakePacket(temporalView, {
+    const startOfTurnPacket = buildStartOfTurnPacket(temporalView, {
       canonicalObligations: {
         primary: activeWorkFrame.primaryObligation,
         all: activeWorkFrame.pendingObligations,
       },
     })
-    renderedWakePacket = renderWakePacket(wakePacket)
-    if (!renderedWakePacket) renderedWakePacket = undefined
+    /* v8 ignore next 3 -- syncFailure propagation tested in sync.test.ts @preserve */
+    if (syncFailure) {
+      startOfTurnPacket.syncFailure = syncFailure
+    }
+    renderedStartOfTurnPacket = renderStartOfTurnPacket(startOfTurnPacket)
+    if (!renderedStartOfTurnPacket) renderedStartOfTurnPacket = undefined
 
     // Update self-presence
     const presence = derivePresence(agentRoot, agentName, {
@@ -614,7 +656,7 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
       level: "warn",
       component: "senses",
       event: "senses.continuity_error",
-      message: "continuity pipeline failed, continuing without wake packet",
+      message: "continuity pipeline failed, continuing without start-of-turn packet",
       meta: { error: continuityError instanceof Error ? continuityError.message : String(continuityError) },
     })
   }
@@ -626,7 +668,7 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     bridgeContext,
     activeWorkFrame,
     delegationDecision,
-    wakePacket: renderedWakePacket,
+    startOfTurnPacket: renderedStartOfTurnPacket,
     pendingMessages: pending.length > 0 ? pending.map((msg) => ({ from: msg.from, content: msg.content })) : undefined,
     currentSessionKey: currentSession.key,
     currentObligation,
@@ -668,8 +710,8 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
         const model = (cfg as Record<string, unknown>).model ?? (cfg as Record<string, unknown>).modelName
         if (typeof model === "string" && model) providerModels[p] = model
       }
-      /* v8 ignore next -- defensive: current provider always in secrets @preserve */
-      const currentModel = providerModels[currentProvider] ?? ""
+      // Use agent.json model (source of truth), not secrets model (may be stale)
+      const currentModel = agentConfig.humanFacing.model
       const failoverContext = buildFailoverContext(
         /* v8 ignore next -- defensive: error always set when errored @preserve */
         result.error?.message ?? "unknown error",
@@ -758,4 +800,15 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     drainedPending: pending,
     ...(input.switchedProvider ? { switchedProvider: input.switchedProvider } : {}),
   }
+  } finally {
+    // Step 6b: Post-turn sync push (opt-in, turn-scoped writes only).
+    // In a finally block so writes are always drained — even on error or early-return
+    // failover paths. This prevents writes from leaking into the next turn.
+    const writtenPaths = drainSyncWrites()
+    /* v8 ignore next 3 -- postTurnPush integration tested in sync.test.ts @preserve */
+    if (syncConfig.enabled && writtenPaths.length > 0) {
+      postTurnPush(getAgentRoot(), syncConfig, writtenPaths)
+    }
+  }
+  }) // end runWithSyncContext
 }
