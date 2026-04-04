@@ -15,8 +15,8 @@ import * as daemonThoughts from "../../heart/daemon/thoughts"
 
 const mockDeriveTempo = vi.fn()
 const mockBuildTemporalView = vi.fn()
-const mockBuildWakePacket = vi.fn()
-const mockRenderWakePacket = vi.fn()
+const mockBuildStartOfTurnPacket = vi.fn()
+const mockRenderStartOfTurnPacket = vi.fn()
 const mockDerivePresence = vi.fn()
 const mockWritePresence = vi.fn()
 const mockEmitEpisode = vi.fn()
@@ -41,12 +41,12 @@ vi.mock("../../heart/temporal-view", async () => {
   }
 })
 
-vi.mock("../../heart/wake-packet", async () => {
-  const actual = await vi.importActual<typeof import("../../heart/wake-packet")>("../../heart/wake-packet")
+vi.mock("../../heart/start-of-turn-packet", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/start-of-turn-packet")>("../../heart/start-of-turn-packet")
   return {
     ...actual,
-    buildWakePacket: (...args: any[]) => mockBuildWakePacket(...args),
-    renderWakePacket: (...args: any[]) => mockRenderWakePacket(...args),
+    buildStartOfTurnPacket: (...args: any[]) => mockBuildStartOfTurnPacket(...args),
+    renderStartOfTurnPacket: (...args: any[]) => mockRenderStartOfTurnPacket(...args),
   }
 })
 
@@ -81,6 +81,29 @@ vi.mock("../../heart/obligations", async () => {
   return {
     ...actual,
     readPendingObligations: (...args: any[]) => mockReadPendingObligations(...args),
+  }
+})
+
+const mockPreTurnPull = vi.fn()
+const mockPostTurnPush = vi.fn()
+const mockDrainSyncWrites = vi.fn().mockReturnValue([])
+const mockGetSyncConfig = vi.fn()
+
+vi.mock("../../heart/sync", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/sync")>("../../heart/sync")
+  return {
+    ...actual,
+    preTurnPull: (...args: any[]) => mockPreTurnPull(...args),
+    postTurnPush: (...args: any[]) => mockPostTurnPush(...args),
+    drainSyncWrites: (...args: any[]) => mockDrainSyncWrites(...args),
+  }
+})
+
+vi.mock("../../heart/config", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config")
+  return {
+    ...actual,
+    getSyncConfig: (...args: any[]) => mockGetSyncConfig(...args),
   }
 })
 
@@ -271,7 +294,7 @@ describe("pipeline continuity integration", () => {
       tempo: "brief",
       assembledAt: new Date().toISOString(),
     })
-    mockBuildWakePacket.mockReturnValue({
+    mockBuildStartOfTurnPacket.mockReturnValue({
       plotLine: "",
       obligations: "",
       cares: "",
@@ -281,7 +304,7 @@ describe("pipeline continuity integration", () => {
       tokenBudget: { min: 150, max: 250 },
       assembledAt: new Date().toISOString(),
     })
-    mockRenderWakePacket.mockReturnValue("**Next:** check inbox")
+    mockRenderStartOfTurnPacket.mockReturnValue("**Next:** check inbox")
     mockDerivePresence.mockReturnValue({
       agentName: "ouroboros",
       availability: "active",
@@ -292,24 +315,32 @@ describe("pipeline continuity integration", () => {
     })
     mockWritePresence.mockReturnValue(undefined)
     mockEmitEpisode.mockReturnValue({ id: "ep-1", timestamp: new Date().toISOString() })
+
+    // Default sync mock returns (disabled by default)
+    mockGetSyncConfig.mockReturnValue({ enabled: false, remote: "origin" })
+    mockPreTurnPull.mockReturnValue({ ok: true })
+    mockPostTurnPush.mockReturnValue({ ok: true })
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     mockDeriveTempo.mockReset()
     mockBuildTemporalView.mockReset()
-    mockBuildWakePacket.mockReset()
-    mockRenderWakePacket.mockReset()
+    mockBuildStartOfTurnPacket.mockReset()
+    mockRenderStartOfTurnPacket.mockReset()
     mockDerivePresence.mockReset()
     mockWritePresence.mockReset()
     mockEmitEpisode.mockReset()
     mockReadRecentEpisodes.mockReset()
     mockReadActiveCares.mockReset()
     mockReadPendingObligations.mockReset()
+    mockGetSyncConfig.mockReset()
+    mockPreTurnPull.mockReset()
+    mockPostTurnPush.mockReset()
     mockListSessionActivity.mockReset()
   })
 
-  describe("wake packet threading", () => {
+  describe("start-of-turn packet threading", () => {
     it("calls deriveTempo during pipeline execution", async () => {
       const input = makeInput()
       await import("../../senses/pipeline").then((m) => m.handleInboundTurn(input))
@@ -326,7 +357,7 @@ describe("pipeline continuity integration", () => {
       )
     })
 
-    it("calls buildWakePacket with temporal view and canonical obligations from activeWorkFrame", async () => {
+    it("calls buildStartOfTurnPacket with temporal view and canonical obligations from activeWorkFrame", async () => {
       const mockView = {
         recentEpisodes: [],
         activeObligations: [],
@@ -350,7 +381,7 @@ describe("pipeline continuity integration", () => {
       const input = makeInput()
       const { handleInboundTurn } = await import("../../senses/pipeline")
       await handleInboundTurn(input)
-      expect(mockBuildWakePacket).toHaveBeenCalledWith(
+      expect(mockBuildStartOfTurnPacket).toHaveBeenCalledWith(
         mockView,
         {
           canonicalObligations: {
@@ -361,8 +392,8 @@ describe("pipeline continuity integration", () => {
       )
     })
 
-    it("passes rendered wake packet to runAgent options", async () => {
-      mockRenderWakePacket.mockReturnValue("**Next:** review PR #42")
+    it("passes rendered start-of-turn packet to runAgent options", async () => {
+      mockRenderStartOfTurnPacket.mockReturnValue("**Next:** review PR #42")
 
       const runAgentSpy = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
       const input = makeInput({ runAgent: runAgentSpy })
@@ -371,7 +402,7 @@ describe("pipeline continuity integration", () => {
 
       // runAgent is called with (messages, callbacks, channel, signal, options)
       const options = runAgentSpy.mock.calls[0][4] as RunAgentOptions
-      expect(options.wakePacket).toBe("**Next:** review PR #42")
+      expect(options.startOfTurnPacket).toBe("**Next:** review PR #42")
     })
 
     it("derives tempo with episode salience and care risk data", async () => {
@@ -574,6 +605,88 @@ describe("pipeline continuity integration", () => {
           salience: "medium",
         }),
       )
+    })
+  })
+
+  describe("sync pull ordering", () => {
+    it("reads obligations AFTER preTurnPull so pulled state is reflected in the turn packet", async () => {
+      // Enable sync
+      mockGetSyncConfig.mockReturnValue({ enabled: true, remote: "origin" })
+
+      // Track the order: preTurnPull should be called BEFORE readPendingObligations
+      const callOrder: string[] = []
+
+      mockPreTurnPull.mockImplementation(() => {
+        callOrder.push("preTurnPull")
+        return { ok: true }
+      })
+
+      // Simulate: pull brings new obligations. After pull, readPendingObligations returns the synced data.
+      // The key invariant: readPendingObligations is called AFTER preTurnPull, not before.
+      mockReadPendingObligations.mockImplementation(() => {
+        callOrder.push("readPendingObligations")
+        return [
+          { id: "ob-pulled", origin: { friendId: "friend-1", channel: "cli", key: "session" }, content: "synced from remote", status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+        ]
+      })
+
+      const runAgentSpy = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
+      const input = makeInput({ runAgent: runAgentSpy })
+      const { handleInboundTurn } = await import("../../senses/pipeline")
+      await handleInboundTurn(input)
+
+      // Verify ordering: pull happens before obligations are read
+      const pullIdx = callOrder.indexOf("preTurnPull")
+      const firstObligationIdx = callOrder.indexOf("readPendingObligations")
+      expect(pullIdx).toBeGreaterThanOrEqual(0)
+      expect(firstObligationIdx).toBeGreaterThan(pullIdx)
+
+      // Verify the pulled obligation is visible to buildStartOfTurnPacket (which receives temporal view
+      // built from the post-pull state). The start-of-turn packet builder is called with canonical obligations
+      // that include our synced obligation.
+      expect(mockBuildStartOfTurnPacket).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          canonicalObligations: expect.objectContaining({
+            all: expect.arrayContaining([
+              expect.objectContaining({ id: "ob-pulled" }),
+            ]),
+          }),
+        }),
+      )
+    })
+
+    it("reads episodes and cares AFTER preTurnPull", async () => {
+      mockGetSyncConfig.mockReturnValue({ enabled: true, remote: "origin" })
+
+      const callOrder: string[] = []
+
+      mockPreTurnPull.mockImplementation(() => {
+        callOrder.push("preTurnPull")
+        return { ok: true }
+      })
+
+      mockReadRecentEpisodes.mockImplementation(() => {
+        callOrder.push("readRecentEpisodes")
+        return []
+      })
+
+      mockReadActiveCares.mockImplementation(() => {
+        callOrder.push("readActiveCares")
+        return []
+      })
+
+      const input = makeInput()
+      const { handleInboundTurn } = await import("../../senses/pipeline")
+      await handleInboundTurn(input)
+
+      const pullIdx = callOrder.indexOf("preTurnPull")
+      const episodesIdx = callOrder.indexOf("readRecentEpisodes")
+      const caresIdx = callOrder.indexOf("readActiveCares")
+
+      expect(pullIdx).toBeGreaterThanOrEqual(0)
+      expect(episodesIdx).toBeGreaterThan(pullIdx)
+      expect(caresIdx).toBeGreaterThan(pullIdx)
     })
   })
 })
