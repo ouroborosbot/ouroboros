@@ -228,4 +228,74 @@ describe("cooldown recovery", () => {
     // backoff should be reset to initial
     expect(manager.getAgentSnapshot("slugger")?.backoffMs).toBe(500)
   })
+
+  it("marks agent as crashed after 3 consecutive fast crashes (config failure detection)", async () => {
+    // Fast crash = exits within 5 seconds of starting
+    // After 3 consecutive fast crashes, stop retrying (likely config issue)
+    let currentTime = 1_000
+    now.mockImplementation(() => currentTime)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      maxRestartsPerHour: 100, // high limit so we hit fast-crash detection first
+    })
+
+    // 3 consecutive fast crashes (each runs for 100ms)
+    for (let i = 0; i < 3; i++) {
+      const child = new MockChild()
+      spawn.mockReturnValueOnce(child)
+      await manager.startAgent("slugger")
+      currentTime += 100 // 100ms run = fast crash
+      child.emit("exit", 1, null)
+
+      if (i < 2) {
+        // First two: should schedule restart
+        expect(manager.getAgentSnapshot("slugger")?.status).toBe("starting")
+        const timer = timers[timers.length - 1]
+        timer.cb() // fire restart timer
+      }
+    }
+
+    // After 3rd fast crash: should be marked crashed, no more restarts
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
+  })
+
+  it("resets fast-crash counter after a stable run", async () => {
+    let currentTime = 1_000
+    now.mockImplementation(() => currentTime)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      maxRestartsPerHour: 100,
+    })
+
+    // 2 fast crashes
+    for (let i = 0; i < 2; i++) {
+      const child = new MockChild()
+      spawn.mockReturnValueOnce(child)
+      await manager.startAgent("slugger")
+      currentTime += 100
+      child.emit("exit", 1, null)
+      const timer = timers[timers.length - 1]
+      timer.cb()
+    }
+
+    // Then a stable run (10 seconds)
+    const stableChild = new MockChild()
+    spawn.mockReturnValueOnce(stableChild)
+    await manager.startAgent("slugger")
+    currentTime += 10_000 // 10s = stable
+    stableChild.emit("exit", 1, null)
+
+    // Should still be restarting (fast-crash counter reset by stable run)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("starting")
+  })
 })

@@ -2,6 +2,12 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.195",
+      "changes": [
+        "fix(daemon): detect fast-crash config failures \u2014 stop retrying after 3 crashes within 5s of startup"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.190",
       "changes": [
         "feat(coding): coding-lane identity packet",
