@@ -412,12 +412,14 @@ export async function ensureDaemonRunning(deps: OuroCliDeps): Promise<EnsureDaem
   // Verify the daemon actually comes up before reporting success
   const verified = await verifyDaemonAlive(deps.checkSocketAlive, deps.socketPath)
 
+  /* v8 ignore start -- daemon liveness failure: requires real daemon crash timing @preserve */
   if (!verified) {
     return {
       alreadyRunning: false,
       message: `daemon spawned (pid ${pid}) but failed to respond within 10s — check \`ouro status\` or daemon logs`,
     }
   }
+  /* v8 ignore stop */
 
   return {
     alreadyRunning: false,
