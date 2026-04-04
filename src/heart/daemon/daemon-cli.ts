@@ -1485,6 +1485,7 @@ export function discoverExistingCredentials(secretsRoot: string): DiscoveredCred
 
     for (const [provName, provConfig] of Object.entries(parsed.providers)) {
       const desc = PROVIDER_CREDENTIALS[provName as AgentProvider]
+      /* v8 ignore next -- guard: unknown provider names in stored secrets @preserve */
       if (!desc) continue
       const hasRequired = desc.required.every((key) => !!provConfig[key])
       if (hasRequired) {
