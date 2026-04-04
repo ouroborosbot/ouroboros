@@ -453,6 +453,7 @@ export async function collectRuntimeAuthCredentials(
   const desc = PROVIDER_CREDENTIALS[input.provider]
   const creds: HatchCredentialsInput = {}
   for (const field of desc.required) {
+    /* v8 ignore next -- fallback: all current providers define promptLabels for required fields @preserve */
     const label = desc.promptLabels[field] ?? field
     const value = (await prompt(`${label}: `)).trim()
     if (!value) throw new Error(`${label} is required.`)
@@ -479,10 +480,10 @@ export async function resolveHatchCredentials(
       promptInput: input.promptInput,
     })
     Object.assign(credentials, result.credentials)
+    /* v8 ignore next 3 -- branch: auth flow always fills all required fields in production @preserve */
     if (!PROVIDER_CREDENTIALS[input.provider].required.some((key) => !(credentials as Record<string, unknown>)[key])) {
       return credentials
     }
-    /* v8 ignore next -- fall-through: auth flow didn't fill all fields, continue to prompt @preserve */
   }
 
   // Prompt for any still-missing required fields

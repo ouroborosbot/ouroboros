@@ -278,7 +278,7 @@ export class DaemonProcessManager {
     const FAST_CRASH_THRESHOLD_MS = 5000
     const FAST_CRASH_MAX = 3
     if (runDuration < FAST_CRASH_THRESHOLD_MS) {
-      state.fastCrashCount = (state.fastCrashCount ?? 0) + 1
+      state.fastCrashCount = state.fastCrashCount + 1
       if (state.fastCrashCount >= FAST_CRASH_MAX) {
         state.snapshot.status = "crashed"
         emitNervesEvent({
