@@ -1428,14 +1428,10 @@ function defaultEnsureDaemonBootPersistence(socketPath: string): void {
   }
 
   const homeDir = os.homedir()
-  const launchdDeps: LaunchdDeps = {
-    exec: (cmd) => { execSync(cmd, { stdio: "ignore" }) },
-    writeFile: (filePath, content) => fs.writeFileSync(filePath, content, "utf-8"),
-    removeFile: (filePath) => fs.rmSync(filePath, { force: true }),
-    existsFile: (filePath) => fs.existsSync(filePath),
-    mkdirp: (dir) => fs.mkdirSync(dir, { recursive: true }),
+  const writeDeps = {
+    writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content, "utf-8"),
+    mkdirp: (dir: string) => fs.mkdirSync(dir, { recursive: true }),
     homeDir,
-    userUid: process.getuid?.() ?? 0,
   }
 
   const entryPath = path.join(getRepoRoot(), "dist", "heart", "daemon", "daemon-entry.js")
@@ -1458,7 +1454,7 @@ function defaultEnsureDaemonBootPersistence(socketPath: string): void {
   // start a SECOND daemon via launchd's RunAtLoad, causing a race where
   // killOrphanProcesses kills the first daemon and both end up dead.
   // The plist on disk is sufficient: launchd picks it up on login.
-  writeLaunchAgentPlist(launchdDeps, {
+  writeLaunchAgentPlist(writeDeps, {
     nodePath: process.execPath,
     entryPath,
     socketPath,
