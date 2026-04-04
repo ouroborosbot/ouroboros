@@ -9,13 +9,14 @@
         "fix(daemon): EPIPE suppression in uncaughtException handler",
         "fix(daemon): 5-second force-exit timeouts on all shutdown paths",
         "feat: human-facing and agent-facing provider configs",
-        "fix(auth): always refresh codex OAuth token, responses API verification"
+        "fix(auth): always refresh codex OAuth token, responses API verification",
+        "feat: Outlook visibility \u2014 orientation, obligations, changes, self-fix, memory decisions, route migration to /"
       ]
     },
     {
       "version": "0.1.0-alpha.192",
       "changes": [
-        "refactor: canonical obligations — ActiveWorkFrame as single source of truth for prompt sections",
+        "refactor: canonical obligations \u2014 ActiveWorkFrame as single source of truth for prompt sections",
         "feat(mcp): dynamic server add/remove \u2014 agents can manage MCP servers without daemon restart"
       ]
     },
