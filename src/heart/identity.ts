@@ -16,7 +16,7 @@ export const PROVIDER_CREDENTIALS: Record<AgentProvider, {
   "openai-codex":   { required: ["oauthAccessToken"],                  envVars: { OPENAI_API_KEY: "oauthAccessToken" },                                                                                     promptLabels: { oauthAccessToken: "OpenAI Codex OAuth token" } },
   azure:            { required: ["apiKey", "endpoint", "deployment"],   envVars: { AZURE_OPENAI_API_KEY: "apiKey", AZURE_OPENAI_KEY: "apiKey", AZURE_OPENAI_ENDPOINT: "endpoint", AZURE_OPENAI_DEPLOYMENT: "deployment" }, promptLabels: { apiKey: "Azure API key", endpoint: "Azure endpoint", deployment: "Azure deployment" } },
   minimax:          { required: ["apiKey"],                             envVars: { MINIMAX_API_KEY: "apiKey" },                                                                                              promptLabels: { apiKey: "MiniMax API key" } },
-  "github-copilot": { required: ["githubToken"],                       envVars: { GH_TOKEN: "githubToken", GITHUB_TOKEN: "githubToken" },                                                                   promptLabels: { githubToken: "GitHub token" } },
+  "github-copilot": { required: ["githubToken", "baseUrl"],             envVars: { GH_TOKEN: "githubToken", GITHUB_TOKEN: "githubToken" },                                                                   promptLabels: { githubToken: "GitHub token" } },
 }
 export type SenseName = "cli" | "teams" | "bluebubbles"
 
