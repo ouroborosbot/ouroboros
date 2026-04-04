@@ -193,6 +193,7 @@ export async function ensureCurrentDaemonRuntime(
       const started = await deps.startDaemonProcess(deps.socketPath)
       const pid = started.pid ?? "unknown"
       const verified = await verifyDaemonStarted(deps)
+      /* v8 ignore next -- daemon liveness failure: requires real daemon crash timing @preserve */
       const suffix = verified ? "" : " — but daemon failed to respond, check logs"
       result = {
         alreadyRunning: false,
