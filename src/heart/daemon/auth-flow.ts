@@ -347,7 +347,7 @@ export async function collectRuntimeAuthCredentials(
   const homeDir = deps.homeDir ?? os.homedir()
 
   if (input.provider === "github-copilot") {
-    let token = process.env.GH_TOKEN?.trim() || ""
+    let token = process.env.GH_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim() || ""
     if (!token) {
       const result = spawnSync("gh", ["auth", "token"], { encoding: "utf8" })
       token = (result.status === 0 && result.stdout ? result.stdout.trim() : "")
@@ -448,55 +448,49 @@ export async function collectRuntimeAuthCredentials(
     return { setupToken }
   }
 
-  if (input.provider === "minimax") {
-    const prompt = ensurePromptInput(input.promptInput, input.provider)
-    const apiKey = (await prompt("MiniMax API key: ")).trim()
-    if (!apiKey) throw new Error("MiniMax API key is required.")
-    return { apiKey }
-  }
-
+  // Generic prompt-for-fields fallback (minimax, azure, any future simple providers)
   const prompt = ensurePromptInput(input.promptInput, input.provider)
-  const apiKey = (await prompt("Azure API key: ")).trim()
-  const endpoint = (await prompt("Azure endpoint: ")).trim()
-  const deployment = (await prompt("Azure deployment: ")).trim()
-  if (!apiKey || !endpoint || !deployment) {
-    throw new Error("Azure API key, endpoint, and deployment are required.")
+  const desc = PROVIDER_CREDENTIALS[input.provider]
+  const creds: HatchCredentialsInput = {}
+  for (const field of desc.required) {
+    const label = desc.promptLabels[field] ?? field
+    const value = (await prompt(`${label}: `)).trim()
+    if (!value) throw new Error(`${label} is required.`)
+    ;(creds as Record<string, string>)[field] = value
   }
-  return { apiKey, endpoint, deployment }
-}
-
-/** Providers that support interactive auth flows (gh auth login, codex login, claude setup-token). */
-const AUTH_FLOW_PROVIDERS: AgentProvider[] = ["github-copilot", "anthropic", "openai-codex"]
-
-function hasMissingRequired(provider: AgentProvider, credentials: HatchCredentialsInput): boolean {
-  const cred = credentials as Record<string, unknown>
-  return PROVIDER_CREDENTIALS[provider].required.some((key) => !cred[key])
+  return creds
 }
 
 export async function resolveHatchCredentials(
   input: HatchCredentialResolutionInput,
 ): Promise<HatchCredentialsInput> {
-  const prompt = input.promptInput
   const credentials: HatchCredentialsInput = { ...(input.credentials ?? {}) }
 
-  // Try interactive auth flow for providers that support it
-  if (input.runAuthFlow && AUTH_FLOW_PROVIDERS.includes(input.provider) && hasMissingRequired(input.provider, credentials)) {
+  // If all required fields are already provided, return as-is
+  const cred = credentials as Record<string, unknown>
+  const missing = PROVIDER_CREDENTIALS[input.provider].required.some((key) => !cred[key])
+  if (!missing) return credentials
+
+  // Try the full auth flow (wraps collectRuntimeAuthCredentials + writes secrets)
+  if (input.runAuthFlow) {
     const result = await input.runAuthFlow({
       agentName: input.agentName,
       provider: input.provider,
-      promptInput: prompt,
+      promptInput: input.promptInput,
     })
     Object.assign(credentials, result.credentials)
+    if (!PROVIDER_CREDENTIALS[input.provider].required.some((key) => !(credentials as Record<string, unknown>)[key])) {
+      return credentials
+    }
   }
 
   // Prompt for any still-missing required fields
-  if (prompt) {
+  if (input.promptInput) {
     const desc = PROVIDER_CREDENTIALS[input.provider]
-    const cred = credentials as Record<string, string>
     for (const field of desc.required) {
-      if (!cred[field]) {
+      if (!(cred as Record<string, string>)[field]) {
         const label = desc.promptLabels[field] ?? field
-        cred[field] = await prompt(`${label}: `)
+        ;(cred as Record<string, string>)[field] = await input.promptInput(`${label}: `)
       }
     }
   }
