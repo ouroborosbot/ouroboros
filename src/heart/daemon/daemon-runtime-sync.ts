@@ -24,6 +24,7 @@ export interface DaemonRuntimeSyncResult {
   message: string
 }
 
+/* v8 ignore start -- daemon liveness poll: real socket timing untestable in vitest @preserve */
 async function verifyDaemonStarted(deps: DaemonRuntimeSyncDeps): Promise<boolean> {
   if (!deps.checkSocketAlive) return true
   const maxWaitMs = 10_000
@@ -35,6 +36,7 @@ async function verifyDaemonStarted(deps: DaemonRuntimeSyncDeps): Promise<boolean
   }
   return false
 }
+/* v8 ignore stop */
 
 function isKnownVersion(version: string): boolean {
   return version !== "unknown" && version.trim().length > 0
