@@ -19,6 +19,8 @@ import { migrateHabitsFromTaskSystem } from "./habit-migration"
 import { createRealOsCronDeps, resolveOuroBinaryPath } from "./os-cron-deps"
 import { LaunchdCronManager } from "./os-cron"
 import { writeDaemonTombstone } from "./daemon-tombstone"
+import * as os from "os"
+import { checkAgentConfig } from "./agent-config-check"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -64,6 +66,11 @@ const processManager = new DaemonProcessManager({
     autoStart: true,
   })),
   existsSync: fs.existsSync,
+  configCheck: (agent) => {
+    const bundlesRoot = getAgentBundlesRoot()
+    const secretsRoot = path.join(os.homedir(), ".agentsecrets")
+    return checkAgentConfig(agent, bundlesRoot, secretsRoot)
+  },
 })
 
 const scheduler = new TaskDrivenScheduler({
