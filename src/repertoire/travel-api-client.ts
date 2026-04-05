@@ -49,8 +49,15 @@ export function setWeatherVaultConfig(itemId: string, field?: string): void {
   if (field) weatherVaultField = field
 }
 
+/** Domain used for aac-mode weather API key retrieval. */
+const WEATHER_AAC_DOMAIN = "api.openweathermap.org"
+
 async function getWeatherApiKey(): Promise<string> {
   const client = getBitwardenClient()
+  // In aac mode, use domain-based lookup; itemId is treated as domain
+  if (client.getMode() === "aac") {
+    return client.getRawSecret(WEATHER_AAC_DOMAIN, "password")
+  }
   return client.getRawSecret(weatherVaultItemId, weatherVaultField)
 }
 

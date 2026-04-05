@@ -20,7 +20,7 @@ import {
   getBitwardenClient,
   resetBitwardenClient,
 } from "../../repertoire/bitwarden-client"
-import type { VaultConfig, VaultItem, VaultItemHandle } from "../../repertoire/bitwarden-client"
+import type { VaultConfig, VaultItem, VaultItemHandle, AacVaultConfig } from "../../repertoire/bitwarden-client"
 
 // Helper to make execFile resolve with stdout
 function mockExecFileSuccess(stdout: string): void {
@@ -37,6 +37,29 @@ function mockExecFileError(errorMessage: string, exitCode = 1): void {
     const cb = typeof _opts === "function" ? _opts : callback
     const err = Object.assign(new Error(errorMessage), { code: exitCode })
     cb(err, "", errorMessage)
+    return {} as any
+  })
+}
+
+/**
+ * Mock execFile per-command: routes aac calls to aacStdout, bw calls to bwStdout.
+ */
+function mockExecFileByCommand(responses: { aac?: string; bw?: string; aacError?: string; bwError?: string }): void {
+  vi.mocked(execFile).mockImplementation((cmd: any, _args: any, _opts: any, callback: any) => {
+    const cb = typeof _opts === "function" ? _opts : callback
+    if (cmd === "aac") {
+      if (responses.aacError) {
+        cb(new Error(responses.aacError), "", responses.aacError)
+      } else {
+        cb(null, responses.aac ?? "", "")
+      }
+    } else {
+      if (responses.bwError) {
+        cb(new Error(responses.bwError), "", responses.bwError)
+      } else {
+        cb(null, responses.bw ?? "", "")
+      }
+    }
     return {} as any
   })
 }
@@ -133,6 +156,448 @@ describe("BitwardenClient", () => {
       // mode: undefined triggers SDK-first attempt
       await client.connect({ accessToken: "key" })
       expect(client.isConnected()).toBe(true)
+    })
+  })
+
+  describe("connectAuto()", () => {
+    it("connects via aac when aac has cached sessions", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com", created: "2026-01-01" }]),
+      })
+
+      await client.connectAuto({ mode: "aac" })
+      expect(client.isConnected()).toBe(true)
+      expect(client.getMode()).toBe("aac")
+    })
+
+    it("throws when aac has no cached sessions", async () => {
+      mockExecFileByCommand({ aac: JSON.stringify([]) })
+
+      await expect(client.connectAuto({ mode: "aac" })).rejects.toThrow(/no cached sessions/)
+    })
+
+    it("throws when aac returns non-array", async () => {
+      mockExecFileByCommand({ aac: JSON.stringify({ status: "ok" }) })
+
+      await expect(client.connectAuto({ mode: "aac" })).rejects.toThrow(/no cached sessions/)
+    })
+
+    it("falls back to bw when aac is not available in auto mode", async () => {
+      mockExecFileByCommand({
+        aacError: "aac: command not found",
+        bw: JSON.stringify({ success: true }),
+      })
+
+      await client.connectAuto({ accessToken: "key" })
+      expect(client.isConnected()).toBe(true)
+      expect(client.getMode()).toBe("cli")
+
+      const fallbackEvents = nervesEvents.filter((e) => e.event === "client.vault_aac_fallback")
+      expect(fallbackEvents.length).toBe(1)
+    })
+
+    it("throws when aac fails in auto mode and no accessToken for bw fallback", async () => {
+      mockExecFileByCommand({ aacError: "aac: command not found" })
+
+      await expect(client.connectAuto()).rejects.toThrow(/no accessToken provided/)
+    })
+
+    it("connects directly to bw when mode is bw", async () => {
+      mockExecFileByCommand({ bw: JSON.stringify({ success: true }) })
+
+      await client.connectAuto({ mode: "bw", accessToken: "key" })
+      expect(client.isConnected()).toBe(true)
+      expect(client.getMode()).toBe("cli")
+    })
+
+    it("throws when mode is bw but no accessToken", async () => {
+      await expect(client.connectAuto({ mode: "bw" })).rejects.toThrow(/accessToken is required/)
+    })
+
+    it("prefers aac over bw in auto mode", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+        bw: JSON.stringify({ success: true }),
+      })
+
+      await client.connectAuto({ accessToken: "key" })
+      expect(client.getMode()).toBe("aac")
+    })
+
+    it("emits nerves events for connect start and end", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+      })
+
+      await client.connectAuto({ mode: "aac" })
+
+      expect(nervesEvents.some((e) => e.event === "client.vault_connect_start")).toBe(true)
+      expect(nervesEvents.some((e) => e.event === "client.vault_connect_end")).toBe(true)
+    })
+
+    it("emits nerves error event on connect failure", async () => {
+      mockExecFileByCommand({ aacError: "fail" })
+
+      await expect(client.connectAuto({ mode: "aac" })).rejects.toThrow()
+
+      expect(nervesEvents.some((e) => e.event === "client.vault_connect_error")).toBe(true)
+    })
+
+    it("handles non-Error thrown during connectAuto", async () => {
+      vi.mocked(execFile).mockImplementation((_cmd: any, _args: any, _opts: any, callback: any) => {
+        const cb = typeof _opts === "function" ? _opts : callback
+        cb("string-error", "", "")
+        return {} as any
+      })
+
+      await expect(client.connectAuto({ mode: "aac" })).rejects.toThrow()
+
+      const errorEvents = nervesEvents.filter((e) => e.event === "client.vault_connect_error")
+      expect(errorEvents.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  describe("getMode()", () => {
+    it("returns null before connect", () => {
+      expect(client.getMode()).toBeNull()
+    })
+
+    it("returns 'cli' after bw connect", async () => {
+      mockExecFileSuccess(JSON.stringify({ success: true }))
+      await client.connect({ accessToken: "key", mode: "cli" })
+      expect(client.getMode()).toBe("cli")
+    })
+
+    it("returns 'aac' after aac connect", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+      })
+      await client.connectAuto({ mode: "aac" })
+      expect(client.getMode()).toBe("aac")
+    })
+
+    it("returns null after disconnect", async () => {
+      mockExecFileSuccess(JSON.stringify({ success: true }))
+      await client.connect({ accessToken: "key", mode: "cli" })
+      await client.disconnect()
+      expect(client.getMode()).toBeNull()
+    })
+  })
+
+  describe("getCredentialByDomain()", () => {
+    beforeEach(async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+      })
+      await client.connectAuto({ mode: "aac" })
+      vi.clearAllMocks()
+      nervesEvents.length = 0
+    })
+
+    it("returns credential for a domain", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          domain: "example.com",
+          credential: {
+            username: "user@example.com",
+            password: "secret123",
+            totp: "123456",
+            uri: "https://example.com",
+            notes: "test notes",
+          },
+        }),
+      })
+
+      const cred = await client.getCredentialByDomain("example.com")
+      expect(cred.username).toBe("user@example.com")
+      expect(cred.password).toBe("secret123")
+      expect(cred.totp).toBe("123456")
+      expect(cred.uri).toBe("https://example.com")
+      expect(cred.notes).toBe("test notes")
+    })
+
+    it("passes correct args to aac CLI", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "u", password: "p" },
+        }),
+      })
+
+      await client.getCredentialByDomain("api.example.com")
+
+      const callArgs = vi.mocked(execFile).mock.calls[0]
+      expect(callArgs[0]).toBe("aac")
+      expect(callArgs[1]).toContain("--domain")
+      expect(callArgs[1]).toContain("api.example.com")
+      expect(callArgs[1]).toContain("--output")
+      expect(callArgs[1]).toContain("json")
+    })
+
+    it("throws when aac returns success: false", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: false,
+          error: "no credential found",
+        }),
+      })
+
+      await expect(client.getCredentialByDomain("missing.com")).rejects.toThrow(/aac lookup failed/)
+    })
+
+    it("throws when aac returns success: false with no error field", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({ success: false }),
+      })
+
+      await expect(client.getCredentialByDomain("missing.com")).rejects.toThrow(/unknown error/)
+    })
+
+    it("throws when not connected", async () => {
+      const dc = new BitwardenClient()
+      await expect(dc.getCredentialByDomain("x.com")).rejects.toThrow(/vault not connected/)
+    })
+
+    it("throws when in bw mode", async () => {
+      const bwClient = new BitwardenClient()
+      mockExecFileSuccess(JSON.stringify({ success: true }))
+      await bwClient.connect({ accessToken: "key", mode: "cli" })
+
+      await expect(bwClient.getCredentialByDomain("x.com")).rejects.toThrow(/requires aac mode/)
+    })
+
+    it("emits nerves events for getCredentialByDomain", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "u" },
+        }),
+      })
+
+      await client.getCredentialByDomain("example.com")
+
+      expect(nervesEvents.some((e) => e.event === "client.request_start")).toBe(true)
+      expect(nervesEvents.some((e) => e.event === "client.request_end")).toBe(true)
+    })
+
+    it("emits error event when getCredentialByDomain fails", async () => {
+      mockExecFileByCommand({ aacError: "connection refused" })
+
+      await expect(client.getCredentialByDomain("fail.com")).rejects.toThrow()
+
+      expect(nervesEvents.some((e) => e.event === "client.error")).toBe(true)
+    })
+  })
+
+  describe("getRawSecretByDomain()", () => {
+    beforeEach(async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+      })
+      await client.connectAuto({ mode: "aac" })
+      vi.clearAllMocks()
+      nervesEvents.length = 0
+    })
+
+    it("returns specific field from domain credential", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "user", password: "secret", totp: "123456" },
+        }),
+      })
+
+      const secret = await client.getRawSecretByDomain("example.com", "password")
+      expect(secret).toBe("secret")
+    })
+
+    it("returns totp field", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { totp: "654321" },
+        }),
+      })
+
+      const totp = await client.getRawSecretByDomain("example.com", "totp")
+      expect(totp).toBe("654321")
+    })
+
+    it("throws when field is not found on credential", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "user" },
+        }),
+      })
+
+      await expect(client.getRawSecretByDomain("example.com", "password")).rejects.toThrow(
+        /field "password" not found for domain "example.com"/,
+      )
+    })
+
+    it("throws when not connected", async () => {
+      const dc = new BitwardenClient()
+      await expect(dc.getRawSecretByDomain("x.com", "password")).rejects.toThrow(/vault not connected/)
+    })
+
+    it("throws when in bw mode", async () => {
+      const bwClient = new BitwardenClient()
+      mockExecFileSuccess(JSON.stringify({ success: true }))
+      await bwClient.connect({ accessToken: "key", mode: "cli" })
+
+      await expect(bwClient.getRawSecretByDomain("x.com", "password")).rejects.toThrow(/requires aac mode/)
+    })
+
+    it("emits nerves events for getRawSecretByDomain", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { password: "s" },
+        }),
+      })
+
+      await client.getRawSecretByDomain("example.com", "password")
+
+      expect(nervesEvents.some((e) => e.event === "client.request_start")).toBe(true)
+      expect(nervesEvents.some((e) => e.event === "client.request_end")).toBe(true)
+    })
+  })
+
+  describe("getRawSecret() in aac mode", () => {
+    beforeEach(async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+      })
+      await client.connectAuto({ mode: "aac" })
+      vi.clearAllMocks()
+      nervesEvents.length = 0
+    })
+
+    it("delegates to getRawSecretByDomain when in aac mode", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { password: "domain-secret" },
+        }),
+      })
+
+      // In aac mode, itemId is treated as domain
+      const secret = await client.getRawSecret("api.example.com", "password")
+      expect(secret).toBe("domain-secret")
+    })
+
+    it("emits nerves events when delegating to aac", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { password: "s" },
+        }),
+      })
+
+      await client.getRawSecret("example.com", "password")
+
+      expect(nervesEvents.some((e) => e.event === "client.request_start")).toBe(true)
+      expect(nervesEvents.some((e) => e.event === "client.request_end")).toBe(true)
+    })
+  })
+
+  describe("pair()", () => {
+    beforeEach(async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify([{ domain: "example.com" }]),
+      })
+      await client.connectAuto({ mode: "aac" })
+      vi.clearAllMocks()
+      nervesEvents.length = 0
+    })
+
+    it("pairs with a domain using a token", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "user", password: "pass" },
+        }),
+      })
+
+      const cred = await client.pair("new-site.com", "abc123")
+      expect(cred.username).toBe("user")
+      expect(cred.password).toBe("pass")
+    })
+
+    it("passes correct args including --token", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "u" },
+        }),
+      })
+
+      await client.pair("new-site.com", "token-xyz")
+
+      const callArgs = vi.mocked(execFile).mock.calls[0]
+      expect(callArgs[0]).toBe("aac")
+      expect(callArgs[1]).toContain("--domain")
+      expect(callArgs[1]).toContain("new-site.com")
+      expect(callArgs[1]).toContain("--token")
+      expect(callArgs[1]).toContain("token-xyz")
+      expect(callArgs[1]).toContain("--output")
+      expect(callArgs[1]).toContain("json")
+    })
+
+    it("throws when pairing fails", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: false,
+          error: "invalid token",
+        }),
+      })
+
+      await expect(client.pair("site.com", "bad-token")).rejects.toThrow(/pairing failed/)
+    })
+
+    it("throws when pairing fails with no error field", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({ success: false }),
+      })
+
+      await expect(client.pair("site.com", "bad-token")).rejects.toThrow(/unknown error/)
+    })
+
+    it("throws when not connected", async () => {
+      const dc = new BitwardenClient()
+      await expect(dc.pair("x.com", "t")).rejects.toThrow(/vault not connected/)
+    })
+
+    it("throws when in bw mode", async () => {
+      const bwClient = new BitwardenClient()
+      mockExecFileSuccess(JSON.stringify({ success: true }))
+      await bwClient.connect({ accessToken: "key", mode: "cli" })
+
+      await expect(bwClient.pair("x.com", "t")).rejects.toThrow(/requires aac mode/)
+    })
+
+    it("emits nerves events for pair", async () => {
+      mockExecFileByCommand({
+        aac: JSON.stringify({
+          success: true,
+          credential: { username: "u" },
+        }),
+      })
+
+      await client.pair("site.com", "token")
+
+      expect(nervesEvents.some((e) => e.event === "client.request_start")).toBe(true)
+      expect(nervesEvents.some((e) => e.event === "client.request_end")).toBe(true)
+    })
+
+    it("emits error event when pair fails", async () => {
+      mockExecFileByCommand({ aacError: "timeout" })
+
+      await expect(client.pair("site.com", "t")).rejects.toThrow()
+
+      expect(nervesEvents.some((e) => e.event === "client.error")).toBe(true)
     })
   })
 

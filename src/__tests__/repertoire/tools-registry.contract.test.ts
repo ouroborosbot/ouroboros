@@ -147,18 +147,19 @@ describe("tool registry contract", () => {
     expect(names).toContain("update_config");
     expect(names).toContain("propose_config");
 
-    // Added in travel agent infrastructure: 4 vault tools
+    // Added in travel agent infrastructure: 5 vault tools
     expect(names).toContain("vault_get");
     expect(names).toContain("vault_store");
     expect(names).toContain("vault_list");
     expect(names).toContain("vault_delete");
+    expect(names).toContain("vault_pair");
 
     // Added in travel agent infrastructure: 3 travel tools
     expect(names).toContain("weather_lookup");
     expect(names).toContain("travel_advisory");
     expect(names).toContain("geocode_search");
 
-    // Exact count: 44 tools total
-    expect(names).toHaveLength(44);
+    // Exact count: 45 tools total
+    expect(names).toHaveLength(45);
   });
 });

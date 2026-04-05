@@ -7,11 +7,13 @@ vi.stubGlobal("fetch", mockFetch)
 // Mock bitwarden client
 const mockGetRawSecret = vi.fn()
 const mockIsConnected = vi.fn().mockReturnValue(true)
+const mockGetMode = vi.fn().mockReturnValue("cli")
 
 vi.mock("../../repertoire/bitwarden-client", () => ({
   getBitwardenClient: vi.fn(() => ({
     getRawSecret: mockGetRawSecret,
     isConnected: mockIsConnected,
+    getMode: mockGetMode,
   })),
 }))
 
@@ -210,6 +212,38 @@ describe("getWeather", () => {
     await expect(getWeather(0, 0)).rejects.toThrow()
 
     expect(nervesEvents.some((e) => e.event === "client.error")).toBe(true)
+  })
+
+  it("uses aac domain-based lookup when in aac mode", async () => {
+    mockGetMode.mockReturnValue("aac")
+    mockFetchResponse({
+      main: { temp: 25, feels_like: 23, humidity: 40 },
+      weather: [{ description: "sunny" }],
+      wind: { speed: 2 },
+      name: "Tokyo",
+      sys: { country: "JP" },
+    })
+
+    await getWeather(35.6, 139.7)
+
+    // In aac mode, getRawSecret is called with domain and "password" field
+    expect(mockGetRawSecret).toHaveBeenCalledWith("api.openweathermap.org", "password")
+    mockGetMode.mockReturnValue("cli")
+  })
+
+  it("uses bw item-based lookup when in cli mode", async () => {
+    mockGetMode.mockReturnValue("cli")
+    mockFetchResponse({
+      main: { temp: 25, feels_like: 23, humidity: 40 },
+      weather: [{ description: "sunny" }],
+      wind: { speed: 2 },
+      name: "Tokyo",
+      sys: { country: "JP" },
+    })
+
+    await getWeather(35.6, 139.7)
+
+    expect(mockGetRawSecret).toHaveBeenCalledWith("openweathermap-api", "apiKey")
   })
 })
 
