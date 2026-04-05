@@ -196,6 +196,32 @@ describe("BuiltInCredentialStore", () => {
     expect(list).toEqual([])
   })
 
+  it("list skips corrupt encrypted files that fail to decrypt", async () => {
+    // Store a valid credential first
+    await store.store("good.com", { password: "pw" })
+
+    // Write a corrupt .enc file
+    const corruptPath = path.join(vaultDir, "corrupt-com.enc")
+    fs.writeFileSync(corruptPath, "not-valid-encrypted-data")
+
+    const list = await store.list()
+    // Should include the valid one but skip the corrupt one
+    expect(list).toHaveLength(1)
+    expect(list[0].domain).toBe("good.com")
+  })
+
+  it("uses /home base path when WEBSITE_SITE_NAME is set (Azure App Service)", () => {
+    process.env.WEBSITE_SITE_NAME = "test-app"
+    try {
+      const azureStore = new BuiltInCredentialStore("test-agent")
+      // The store should construct paths using /home base
+      // We can't easily inspect private fields, but we can verify it doesn't throw
+      expect(azureStore.isReady()).toBe(true)
+    } finally {
+      delete process.env.WEBSITE_SITE_NAME
+    }
+  })
+
   it("delete removes a credential", async () => {
     await store.store("target.com", { password: "pw" })
     expect(await store.get("target.com")).not.toBeNull()

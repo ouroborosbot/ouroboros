@@ -214,7 +214,12 @@ export class BuiltInCredentialStore implements CredentialStore {
 
     for (const file of files) {
       const slug = file.replace(/\.enc$/, "")
-      const stored = this.readEncryptedBySlug(slug)
+      let stored: StoredCredential | null = null
+      try {
+        stored = this.readEncryptedBySlug(slug)
+      } catch {
+        // Skip corrupt/unreadable files
+      }
       if (stored) {
         results.push({
           domain: stored.domain,
