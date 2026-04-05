@@ -389,6 +389,14 @@ describe("AacCredentialStore", () => {
     await expect(store.getRawSecret("test.com", "password")).rejects.toThrow("denied")
   })
 
+  it("getRawSecret throws with 'unknown error' fallback when aac response has no error field", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, JSON.stringify({ success: false }))
+    })
+
+    await expect(store.getRawSecret("test.com", "password")).rejects.toThrow("unknown error")
+  })
+
   it("getRawSecret throws on aac CLI error", async () => {
     mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
       cb(new Error("aac binary not found"))
@@ -422,6 +430,43 @@ describe("AacCredentialStore", () => {
       expect.objectContaining({ timeout: 10_000 }),
       expect.any(Function),
     )
+  })
+
+  it("list returns empty array when aac returns non-array response", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, JSON.stringify({ not: "an array" }))
+    })
+
+    const list = await store.list()
+    expect(list).toEqual([])
+  })
+
+  it("list handles items with missing optional fields", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, JSON.stringify([
+        { domain: "a.com" },
+        { domain: "b.com", username: "ub", notes: "note", createdAt: "2026-01-01" },
+      ]))
+    })
+
+    const list = await store.list()
+    expect(list).toHaveLength(2)
+    expect(list[0].username).toBeUndefined()
+    expect(list[0].notes).toBeUndefined()
+    expect(list[0].createdAt).toMatch(/^\d{4}-/)  // ISO date fallback
+    expect(list[1].username).toBe("ub")
+    expect(list[1].notes).toBe("note")
+    expect(list[1].createdAt).toBe("2026-01-01")
+  })
+
+  it("list handles items with missing domain", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, JSON.stringify([{ username: "u" }]))
+    })
+
+    const list = await store.list()
+    expect(list).toHaveLength(1)
+    expect(list[0].domain).toBe("")
   })
 
   it("list returns empty on aac error", async () => {
