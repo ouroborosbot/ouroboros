@@ -273,6 +273,25 @@ describe("BuiltInCredentialStore", () => {
     expect(delEvents.length).toBeGreaterThanOrEqual(2)
   })
 
+  it("new instance reads existing vault.key from disk", async () => {
+    // First store creates the key
+    await store.store("first.com", { password: "p1" })
+    const key1 = fs.readFileSync(path.join(keyDir, "vault.key"))
+
+    // Create a new store instance pointing to same dirs
+    const store2 = new BuiltInCredentialStore("test-agent", vaultDir, keyDir)
+    // This store2 has no cached masterKey, so it must read from disk
+    await store2.store("second.com", { password: "p2" })
+    const key2 = fs.readFileSync(path.join(keyDir, "vault.key"))
+
+    // Same key should be used
+    expect(Buffer.compare(key1, key2)).toBe(0)
+
+    // And store2 can decrypt what store1 wrote
+    const meta = await store2.get("first.com")
+    expect(meta!.domain).toBe("first.com")
+  })
+
   it("emits error event on getRawSecret failure", async () => {
     await store.getRawSecret("nope.com", "password").catch(() => {})
 
@@ -418,10 +437,38 @@ describe("AacCredentialStore", () => {
     await expect(store.delete("test.com")).rejects.toThrow("not supported")
   })
 
-  it("isReady checks aac availability via connections list", () => {
-    // isReady is synchronous and returns based on last known state
-    // Fresh instance has not checked yet
-    expect(typeof store.isReady()).toBe("boolean")
+  it("isReady returns false for fresh instance", () => {
+    expect(store.isReady()).toBe(false)
+  })
+
+  it("checkReady returns true when aac has sessions", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, JSON.stringify([{ domain: "a.com" }]))
+    })
+
+    const result = await store.checkReady()
+    expect(result).toBe(true)
+    expect(store.isReady()).toBe(true)
+  })
+
+  it("checkReady returns false when aac has no sessions", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(null, JSON.stringify([]))
+    })
+
+    const result = await store.checkReady()
+    expect(result).toBe(false)
+    expect(store.isReady()).toBe(false)
+  })
+
+  it("checkReady returns false on aac error", async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+      cb(new Error("aac not installed"))
+    })
+
+    const result = await store.checkReady()
+    expect(result).toBe(false)
+    expect(store.isReady()).toBe(false)
   })
 
   it("emits nerves events for get", async () => {
