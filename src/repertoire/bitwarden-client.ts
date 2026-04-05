@@ -1,8 +1,10 @@
 /**
  * Bitwarden vault client for credential management.
  *
- * SDK-first approach: attempts dynamic import of @bitwarden/sdk-napi,
- * falls back to `bw` CLI with --session flag.
+ * Three access modes, tried in order:
+ *   1. `aac` — Bitwarden Agent Access CLI (no master password, session-cached)
+ *   2. `sdk` — @bitwarden/sdk-napi dynamic import
+ *   3. `bw`  — traditional `bw` CLI with --session flag
  *
  * Raw secrets are NEVER returned to callers except via getRawSecret(),
  * which is reserved for internal use by the credential gateway (apiRequest vaultKey).
@@ -27,10 +29,25 @@ export interface VaultItemHandle {
   type: number
 }
 
+/** Credential returned by the `aac` CLI. */
+export interface AacCredential {
+  username?: string
+  password?: string
+  totp?: string
+  uri?: string
+  notes?: string
+}
+
 export interface VaultConfig {
   serverUrl?: string // Self-hosted Vaultwarden URL, or omit for cloud
   accessToken: string // SDK service account token or session key for CLI
   mode?: "sdk" | "cli" // Auto-detected if omitted: try SDK first, fall back to CLI
+}
+
+/** Config for aac-only or auto-detect connect. */
+export interface AacVaultConfig {
+  mode?: "aac" | "bw" // Auto-detected if omitted: try aac first, fall back to bw
+  accessToken?: string // Required for bw mode, ignored for aac
 }
 
 interface RawVaultItem {
@@ -49,7 +66,11 @@ interface RawVaultItem {
 export class BitwardenClient {
   private sessionKey: string | null = null
   private connected = false
-  private clientMode: "sdk" | "cli" | null = null
+  private clientMode: "sdk" | "cli" | "aac" | null = null
+
+  getMode(): "sdk" | "cli" | "aac" | null {
+    return this.clientMode
+  }
 
   async connect(config: VaultConfig): Promise<void> {
     emitNervesEvent({
@@ -96,6 +117,64 @@ export class BitwardenClient {
     }
   }
 
+  /**
+   * Connect with aac-first auto-detection. Tries `aac connections list` first;
+   * if aac is available and has cached sessions, uses aac mode. Otherwise falls
+   * back to `bw` CLI mode (requires accessToken).
+   */
+  async connectAuto(config: AacVaultConfig = {}): Promise<void> {
+    emitNervesEvent({
+      event: "client.vault_connect_start",
+      component: "clients",
+      message: "connecting to Bitwarden vault (aac auto-detect)",
+      meta: { mode: config.mode ?? "auto" },
+    })
+
+    try {
+      if (config.mode === "bw") {
+        if (!config.accessToken) {
+          throw new Error("accessToken is required for bw mode")
+        }
+        await this.connectCli({ accessToken: config.accessToken })
+      } else if (config.mode === "aac") {
+        await this.connectAac()
+      } else {
+        // Auto-detect: try aac first, fall back to bw
+        try {
+          await this.connectAac()
+        } catch {
+          emitNervesEvent({
+            event: "client.vault_aac_fallback",
+            component: "clients",
+            message: "aac not available, falling back to bw CLI",
+            meta: {},
+          })
+          if (!config.accessToken) {
+            throw new Error("aac not available and no accessToken provided for bw fallback")
+          }
+          await this.connectCli({ accessToken: config.accessToken })
+        }
+      }
+
+      emitNervesEvent({
+        event: "client.vault_connect_end",
+        component: "clients",
+        message: "connected to Bitwarden vault",
+        meta: { mode: this.clientMode },
+      })
+    } catch (err) {
+      emitNervesEvent({
+        level: "error",
+        event: "client.vault_connect_error",
+        component: "clients",
+        message: "failed to connect to Bitwarden vault",
+        /* v8 ignore next -- defensive: callers always throw Error instances @preserve */
+        meta: { reason: err instanceof Error ? err.message : String(err) },
+      })
+      throw err
+    }
+  }
+
   async disconnect(): Promise<void> {
     this.sessionKey = null
     this.connected = false
@@ -118,6 +197,57 @@ export class BitwardenClient {
     return this.withNervesEvents("getItem", { id }, async () => {
       const raw = await this.fetchRawItem(id)
       return this.stripSecrets(raw)
+    })
+  }
+
+  /**
+   * Retrieve a credential by domain via aac CLI.
+   * Only available in aac mode.
+   */
+  async getCredentialByDomain(domain: string): Promise<AacCredential> {
+    this.requireConnected()
+    this.requireAacMode()
+    return this.withNervesEvents("getCredentialByDomain", { domain }, async () => {
+      const stdout = await this.execAac(["--domain", domain, "--output", "json"])
+      const parsed = JSON.parse(stdout)
+      if (!parsed.success) {
+        throw new Error(`aac lookup failed for domain "${domain}": ${parsed.error ?? "unknown error"}`)
+      }
+      return parsed.credential as AacCredential
+    })
+  }
+
+  /**
+   * Get a specific field from a domain credential via aac CLI.
+   * Convenience wrapper around getCredentialByDomain().
+   */
+  async getRawSecretByDomain(domain: string, field: string): Promise<string> {
+    this.requireConnected()
+    this.requireAacMode()
+    return this.withNervesEvents("getRawSecretByDomain", { domain, field }, async () => {
+      const cred = await this.getCredentialByDomain(domain)
+      const value = cred[field as keyof AacCredential]
+      if (value === undefined) {
+        throw new Error(`field "${field}" not found for domain "${domain}"`)
+      }
+      return value
+    })
+  }
+
+  /**
+   * Pair with a Bitwarden Agent Access session using a one-time token.
+   * The human runs `aac listen` and provides the token to the agent.
+   */
+  async pair(domain: string, token: string): Promise<AacCredential> {
+    this.requireConnected()
+    this.requireAacMode()
+    return this.withNervesEvents("pair", { domain }, async () => {
+      const stdout = await this.execAac(["--domain", domain, "--token", token, "--output", "json"])
+      const parsed = JSON.parse(stdout)
+      if (!parsed.success) {
+        throw new Error(`aac pairing failed for domain "${domain}": ${parsed.error ?? "unknown error"}`)
+      }
+      return parsed.credential as AacCredential
     })
   }
 
@@ -168,9 +298,17 @@ export class BitwardenClient {
   /**
    * Internal: used by credential gateway (PR 5) to get raw secret for HTTP injection.
    * NOT exposed via tools -- only called by apiRequest() internally.
+   *
+   * In aac mode, `itemId` is treated as a domain and `fieldName` maps to
+   * the aac credential field (username, password, totp, uri, notes).
    */
   async getRawSecret(itemId: string, fieldName: string): Promise<string> {
     this.requireConnected()
+
+    if (this.clientMode === "aac") {
+      return this.getRawSecretByDomain(itemId, fieldName)
+    }
+
     return this.withNervesEvents("getRawSecret", { itemId, fieldName }, async () => {
       const raw = await this.fetchRawItem(itemId)
 
@@ -194,6 +332,12 @@ export class BitwardenClient {
   private requireConnected(): void {
     if (!this.connected) {
       throw new Error("vault not connected -- call connect() first")
+    }
+  }
+
+  private requireAacMode(): void {
+    if (this.clientMode !== "aac") {
+      throw new Error("operation requires aac mode -- connect with connectAuto({ mode: \"aac\" })")
     }
   }
 
@@ -254,6 +398,18 @@ export class BitwardenClient {
     this.clientMode = "cli"
   }
 
+  private async connectAac(): Promise<void> {
+    // Verify aac CLI is installed and has cached sessions
+    const stdout = await this.execAac(["connections", "list"])
+    const parsed = JSON.parse(stdout)
+    // aac connections list returns an array; at least one session means we're good
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error("aac has no cached sessions -- run `aac listen` to pair first")
+    }
+    this.connected = true
+    this.clientMode = "aac"
+  }
+
   private async fetchRawItem(id: string): Promise<RawVaultItem> {
     const stdout = await this.execCli(["get", "item", id])
     const parsed = this.parseCliResponse(stdout)
@@ -292,6 +448,18 @@ export class BitwardenClient {
       execFileCb("bw", fullArgs, { timeout: 30_000 }, (err, stdout, _stderr) => {
         if (err) {
           reject(new Error(`bw CLI error: ${err.message}`))
+          return
+        }
+        resolve(stdout)
+      })
+    })
+  }
+
+  private execAac(args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFileCb("aac", args, { timeout: 30_000 }, (err, stdout, _stderr) => {
+        if (err) {
+          reject(new Error(`aac CLI error: ${err.message}`))
           return
         }
         resolve(stdout)

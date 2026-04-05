@@ -9,14 +9,18 @@ export const vaultToolDefinitions: ToolDefinition[] = [
       function: {
         name: "vault_get",
         description:
-          "Retrieve a credential from the Bitwarden vault by ID or name. Returns metadata and fields but never raw passwords.",
+          "Retrieve a credential from the Bitwarden vault by ID, name, or domain. In aac mode, use `domain` for domain-based lookup. In bw mode, use `id` or `name`.",
         parameters: {
           type: "object",
           properties: {
-            id: { type: "string", description: "Vault item ID (preferred)" },
+            id: { type: "string", description: "Vault item ID (bw mode, preferred)" },
             name: {
               type: "string",
-              description: "Search by name (less precise, uses first match)",
+              description: "Search by name (bw mode, less precise, uses first match)",
+            },
+            domain: {
+              type: "string",
+              description: "Domain for credential lookup (aac mode, e.g. 'api.openweathermap.org')",
             },
           },
         },
@@ -33,6 +37,17 @@ export const vaultToolDefinitions: ToolDefinition[] = [
       try {
         const client = getBitwardenClient()
 
+        // aac domain-based lookup
+        if (args.domain) {
+          if (client.getMode() !== "aac") {
+            return "Domain-based lookup requires aac mode. Connect with connectAuto({ mode: \"aac\" }) first."
+          }
+          const cred = await client.getCredentialByDomain(args.domain)
+          // Strip password from display -- credential gateway handles injection
+          const safe = { ...cred, password: cred.password ? "[REDACTED]" : undefined }
+          return JSON.stringify(safe, null, 2)
+        }
+
         if (args.id) {
           const item = await client.getItem(args.id)
           return JSON.stringify(item, null, 2)
@@ -47,13 +62,13 @@ export const vaultToolDefinitions: ToolDefinition[] = [
           return JSON.stringify(item, null, 2)
         }
 
-        return "Please provide either an id or name to look up a vault item."
+        return "Please provide either an id, name, or domain to look up a vault item."
       } catch (err) {
         /* v8 ignore next -- defensive: callers throw Error instances @preserve */
         return `Vault error: ${err instanceof Error ? err.message : String(err)}`
       }
     },
-    summaryKeys: ["id", "name"],
+    summaryKeys: ["id", "name", "domain"],
   },
 
   {
@@ -188,5 +203,54 @@ export const vaultToolDefinitions: ToolDefinition[] = [
     },
     confirmationRequired: true,
     summaryKeys: ["id"],
+  },
+
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "vault_pair",
+        description:
+          "Pair with Bitwarden Agent Access for a specific domain. Requires `aac listen` to be running on the human's machine. The human provides a one-time pairing token.",
+        parameters: {
+          type: "object",
+          properties: {
+            domain: {
+              type: "string",
+              description: "Domain to pair for (e.g. 'api.openweathermap.org')",
+            },
+            token: {
+              type: "string",
+              description: "One-time pairing token from `aac listen`",
+            },
+          },
+          required: ["domain", "token"],
+        },
+      },
+    },
+    handler: async (args) => {
+      emitNervesEvent({
+        component: "repertoire",
+        event: "repertoire.vault_tool_call",
+        message: "vault_pair invoked",
+        meta: { tool: "vault_pair", domain: args.domain },
+      })
+
+      try {
+        const client = getBitwardenClient()
+        if (client.getMode() !== "aac") {
+          return "vault_pair requires aac mode. Connect with connectAuto({ mode: \"aac\" }) first."
+        }
+        const cred = await client.pair(args.domain, args.token)
+        // Strip password from display
+        const safe = { ...cred, password: cred.password ? "[REDACTED]" : undefined }
+        return `Paired successfully for domain "${args.domain}".\n${JSON.stringify(safe, null, 2)}`
+      } catch (err) {
+        /* v8 ignore next -- defensive: callers throw Error instances @preserve */
+        return `Vault pair failed: ${err instanceof Error ? err.message : String(err)}`
+      }
+    },
+    confirmationRequired: true,
+    summaryKeys: ["domain"],
   },
 ]

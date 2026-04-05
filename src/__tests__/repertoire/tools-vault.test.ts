@@ -6,6 +6,9 @@ const mockCreateItem = vi.fn()
 const mockListItems = vi.fn()
 const mockDeleteItem = vi.fn()
 const mockIsConnected = vi.fn().mockReturnValue(true)
+const mockGetMode = vi.fn().mockReturnValue("cli")
+const mockGetCredentialByDomain = vi.fn()
+const mockPair = vi.fn()
 
 vi.mock("../../repertoire/bitwarden-client", () => ({
   getBitwardenClient: vi.fn(() => ({
@@ -14,6 +17,9 @@ vi.mock("../../repertoire/bitwarden-client", () => ({
     listItems: mockListItems,
     deleteItem: mockDeleteItem,
     isConnected: mockIsConnected,
+    getMode: mockGetMode,
+    getCredentialByDomain: mockGetCredentialByDomain,
+    pair: mockPair,
   })),
 }))
 
@@ -34,16 +40,17 @@ function findTool(name: string) {
 }
 
 describe("vaultToolDefinitions", () => {
-  it("exports an array of 4 tool definitions", () => {
-    expect(vaultToolDefinitions).toHaveLength(4)
+  it("exports an array of 5 tool definitions", () => {
+    expect(vaultToolDefinitions).toHaveLength(5)
   })
 
-  it("contains vault_get, vault_store, vault_list, vault_delete", () => {
+  it("contains vault_get, vault_store, vault_list, vault_delete, vault_pair", () => {
     const names = vaultToolDefinitions.map((d) => d.tool.function.name)
     expect(names).toContain("vault_get")
     expect(names).toContain("vault_store")
     expect(names).toContain("vault_list")
     expect(names).toContain("vault_delete")
+    expect(names).toContain("vault_pair")
   })
 
   it("vault_store has confirmationRequired true", () => {
@@ -52,6 +59,10 @@ describe("vaultToolDefinitions", () => {
 
   it("vault_delete has confirmationRequired true", () => {
     expect(findTool("vault_delete").confirmationRequired).toBe(true)
+  })
+
+  it("vault_pair has confirmationRequired true", () => {
+    expect(findTool("vault_pair").confirmationRequired).toBe(true)
   })
 
   it("vault_get does not have confirmationRequired", () => {
@@ -76,6 +87,7 @@ describe("vault_get handler", () => {
     vi.clearAllMocks()
     nervesEvents.length = 0
     mockIsConnected.mockReturnValue(true)
+    mockGetMode.mockReturnValue("cli")
   })
 
   it("with id calls client.getItem(id)", async () => {
@@ -110,11 +122,12 @@ describe("vault_get handler", () => {
     expect(result).toContain("found-1")
   })
 
-  it("with neither id nor name returns error message", async () => {
+  it("with neither id, name, nor domain returns error message", async () => {
     const result = await handler({})
 
     expect(result).toContain("id")
     expect(result).toContain("name")
+    expect(result).toContain("domain")
     expect(mockGetItem).not.toHaveBeenCalled()
   })
 
@@ -140,6 +153,56 @@ describe("vault_get handler", () => {
     const result = await handler({ id: "x" })
 
     expect(result).toContain("vault")
+  })
+
+  describe("domain-based lookup (aac mode)", () => {
+    beforeEach(() => {
+      mockGetMode.mockReturnValue("aac")
+    })
+
+    it("with domain calls client.getCredentialByDomain(domain)", async () => {
+      mockGetCredentialByDomain.mockResolvedValue({
+        username: "user@example.com",
+        password: "secret",
+        uri: "https://example.com",
+      })
+
+      const result = await handler({ domain: "example.com" })
+
+      expect(mockGetCredentialByDomain).toHaveBeenCalledWith("example.com")
+      expect(result).toContain("user@example.com")
+      // Password should be redacted
+      expect(result).toContain("[REDACTED]")
+      expect(result).not.toContain("secret")
+    })
+
+    it("with domain shows credential without password when password is absent", async () => {
+      mockGetCredentialByDomain.mockResolvedValue({
+        username: "user@example.com",
+        uri: "https://example.com",
+      })
+
+      const result = await handler({ domain: "example.com" })
+      expect(result).toContain("user@example.com")
+      expect(result).not.toContain("[REDACTED]")
+    })
+
+    it("with domain returns error when not in aac mode", async () => {
+      mockGetMode.mockReturnValue("cli")
+
+      const result = await handler({ domain: "example.com" })
+
+      expect(result).toContain("aac mode")
+      expect(mockGetCredentialByDomain).not.toHaveBeenCalled()
+    })
+
+    it("with domain returns error when credential lookup fails", async () => {
+      mockGetCredentialByDomain.mockRejectedValue(new Error("aac lookup failed"))
+
+      const result = await handler({ domain: "fail.com" })
+
+      expect(result).toContain("aac lookup failed")
+    })
   })
 })
 
@@ -273,5 +336,68 @@ describe("vault_delete handler", () => {
     const result = await handler({ id: "x" })
 
     expect(result).toContain("failed")
+  })
+})
+
+describe("vault_pair handler", () => {
+  const handler = findTool("vault_pair").handler
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    nervesEvents.length = 0
+    mockGetMode.mockReturnValue("aac")
+  })
+
+  it("calls client.pair(domain, token) and returns redacted credential", async () => {
+    mockPair.mockResolvedValue({
+      username: "user@site.com",
+      password: "secret123",
+      uri: "https://site.com",
+    })
+
+    const result = await handler({ domain: "site.com", token: "abc123" })
+
+    expect(mockPair).toHaveBeenCalledWith("site.com", "abc123")
+    expect(result).toContain("Paired successfully")
+    expect(result).toContain("site.com")
+    expect(result).toContain("[REDACTED]")
+    expect(result).not.toContain("secret123")
+  })
+
+  it("shows credential without password when password is absent", async () => {
+    mockPair.mockResolvedValue({
+      username: "user@site.com",
+    })
+
+    const result = await handler({ domain: "site.com", token: "abc123" })
+
+    expect(result).toContain("Paired successfully")
+    expect(result).not.toContain("[REDACTED]")
+  })
+
+  it("returns error when not in aac mode", async () => {
+    mockGetMode.mockReturnValue("cli")
+
+    const result = await handler({ domain: "site.com", token: "abc123" })
+
+    expect(result).toContain("aac mode")
+    expect(mockPair).not.toHaveBeenCalled()
+  })
+
+  it("returns error when pair fails", async () => {
+    mockPair.mockRejectedValue(new Error("invalid token"))
+
+    const result = await handler({ domain: "site.com", token: "bad" })
+
+    expect(result).toContain("Vault pair failed")
+    expect(result).toContain("invalid token")
+  })
+
+  it("emits nerves events", async () => {
+    mockPair.mockResolvedValue({ username: "u" })
+
+    await handler({ domain: "site.com", token: "t" })
+
+    expect(nervesEvents.some((e) => e.event === "repertoire.vault_tool_call")).toBe(true)
   })
 })

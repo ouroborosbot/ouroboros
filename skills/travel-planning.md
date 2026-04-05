@@ -105,8 +105,9 @@ Track and reference these travel preferences:
 - `weather_lookup` - Current weather by city or coordinates
 - `travel_advisory` - US State Dept advisory by country code
 - `geocode_search` - Location/POI search with coordinates
-- `vault_get` - Retrieve credentials (payment, loyalty)
+- `vault_get` - Retrieve credentials (payment, loyalty). Supports domain-based lookup in aac mode.
 - `vault_store` - Store new credentials (family trust required)
+- `vault_pair` - Pair with Bitwarden Agent Access for a domain (family trust, confirmation required)
 
 ### MCP Tools (when configured)
 - Browser tools via `@playwright/mcp` - see `browser-navigation` skill
@@ -135,9 +136,34 @@ harness-internal secret injection (e.g., API keys injected into tool requests vi
 `getRawSecret()`). The MCP server is for the agent to interactively browse and manage
 vault items on behalf of the user.
 
+### Bitwarden Agent Access (aac) Setup
+
+The harness supports the Bitwarden Agent Access (`aac`) CLI as the primary credential
+access method. Unlike the traditional `bw` CLI, `aac` requires no master password and
+uses session-cached pairing tokens.
+
+**First-time setup for a travel site (e.g., airline, hotel, weather API):**
+
+1. Human runs `aac listen` on their machine to start the pairing listener.
+2. Human provides the one-time pairing token to the agent.
+3. Agent calls `vault_pair` with the domain and token:
+   ```
+   vault_pair domain="api.openweathermap.org" token="<TOKEN>"
+   ```
+4. Subsequent requests to that domain use cached sessions automatically.
+
+**When aac is available**, credential lookups use domain-based access:
+- `vault_get domain="api.openweathermap.org"` retrieves the credential
+- Weather API keys are fetched via `aac --domain api.openweathermap.org` automatically
+- No vault item IDs or names needed -- just the domain
+
+**Fallback**: If `aac` is not installed, the harness falls back to `bw` CLI with
+session-key authentication. In this mode, use `vault_get` with `id` or `name` parameters.
+
 ### Human Confirmation Required For
 - Any booking or payment
 - Entering personal information
 - Agreeing to terms of service
 - Creating financial obligations
 - Sharing credentials with third parties
+- Initial Bitwarden Agent Access pairing (`vault_pair`)
