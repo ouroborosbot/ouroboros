@@ -276,7 +276,7 @@ export class BuiltInCredentialStore implements CredentialStore {
     }
     const keyDir = path.dirname(this.keyPath)
     if (!fs.existsSync(keyDir)) {
-      fs.mkdirSync(keyDir, { recursive: true })
+      fs.mkdirSync(keyDir, { recursive: true, mode: 0o700 })
     }
   }
 
