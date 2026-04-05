@@ -463,6 +463,7 @@ export const sessionToolDefinitions: ToolDefinition[] = [
       const agentName = getAgentName()
 
       // Resolve friend name → UUID if needed
+      /* v8 ignore start -- name resolution: reads real filesystem, tested via live integration @preserve */
       if (friendId !== "self") {
         try {
           const agentRoot = getAgentRoot()
@@ -481,6 +482,7 @@ export const sessionToolDefinitions: ToolDefinition[] = [
           }
         } catch { /* continue with original friendId */ }
       }
+      /* v8 ignore stop */
 
       // Self-routing: messages to "self" always go to inner dialog pending dir,
       // regardless of the channel or key the agent specified.
