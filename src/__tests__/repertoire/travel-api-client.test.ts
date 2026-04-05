@@ -4,16 +4,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
-// Mock bitwarden client
+// Mock credential store
 const mockGetRawSecret = vi.fn()
-const mockIsConnected = vi.fn().mockReturnValue(true)
-const mockGetMode = vi.fn().mockReturnValue("cli")
 
-vi.mock("../../repertoire/bitwarden-client", () => ({
-  getBitwardenClient: vi.fn(() => ({
+vi.mock("../../repertoire/credential-access", () => ({
+  getCredentialStore: vi.fn(() => ({
+    get: vi.fn(),
     getRawSecret: mockGetRawSecret,
-    isConnected: mockIsConnected,
-    getMode: mockGetMode,
+    store: vi.fn(),
+    list: vi.fn(),
+    delete: vi.fn(),
+    isReady: vi.fn(() => true),
   })),
 }))
 
@@ -35,7 +36,6 @@ import {
   parseAdvisoryLevel,
   parseCountryName,
   parseAdvisoryText,
-  setWeatherVaultConfig,
 } from "../../repertoire/travel-api-client"
 
 function mockFetchResponse(data: unknown, ok = true, status = 200): void {
@@ -119,7 +119,7 @@ describe("getWeather", () => {
     expect(result.description).toBe("unknown")
   })
 
-  it("fetches API key from vault via getRawSecret", async () => {
+  it("fetches API key from credential store via getRawSecret", async () => {
     mockFetchResponse({
       main: { temp: 20, feels_like: 18, humidity: 50 },
       weather: [{ description: "rain" }],
@@ -130,47 +130,13 @@ describe("getWeather", () => {
 
     await getWeather(48.8, 2.3)
 
-    expect(mockGetRawSecret).toHaveBeenCalledWith("openweathermap-api", "apiKey")
+    expect(mockGetRawSecret).toHaveBeenCalledWith("api.openweathermap.org", "password")
     // Verify API key appears in URL
     const fetchUrl = mockFetch.mock.calls[0][0] as string
     expect(fetchUrl).toContain("appid=test-api-key")
     // Verify it's NOT in Authorization header
     const fetchOpts = mockFetch.mock.calls[0][1]
     expect(fetchOpts?.headers?.Authorization).toBeUndefined()
-  })
-
-  it("uses custom vault item ID when configured via setWeatherVaultConfig", async () => {
-    setWeatherVaultConfig("custom-weather-item", "secret")
-    mockFetchResponse({
-      main: { temp: 20, feels_like: 18, humidity: 50 },
-      weather: [{ description: "rain" }],
-      wind: { speed: 3 },
-      name: "Paris",
-      sys: { country: "FR" },
-    })
-
-    await getWeather(48.8, 2.3)
-
-    expect(mockGetRawSecret).toHaveBeenCalledWith("custom-weather-item", "secret")
-    // Reset to default for other tests
-    setWeatherVaultConfig("openweathermap-api", "apiKey")
-  })
-
-  it("keeps existing vault field when setWeatherVaultConfig called without field arg", async () => {
-    setWeatherVaultConfig("custom-item-only")
-    mockFetchResponse({
-      main: { temp: 20, feels_like: 18, humidity: 50 },
-      weather: [{ description: "sunny" }],
-      wind: { speed: 1 },
-      name: "Rome",
-      sys: { country: "IT" },
-    })
-
-    await getWeather(41.9, 12.5)
-
-    expect(mockGetRawSecret).toHaveBeenCalledWith("custom-item-only", "apiKey")
-    // Reset to default for other tests
-    setWeatherVaultConfig("openweathermap-api", "apiKey")
   })
 
   it("handles HTTP error gracefully", async () => {
@@ -185,10 +151,10 @@ describe("getWeather", () => {
     await expect(getWeather(0, 0)).rejects.toThrow(/Network error/)
   })
 
-  it("handles vault locked error", async () => {
-    mockGetRawSecret.mockRejectedValue(new Error("vault not connected"))
+  it("handles credential store error", async () => {
+    mockGetRawSecret.mockRejectedValue(new Error("no credential found"))
 
-    await expect(getWeather(0, 0)).rejects.toThrow(/vault/)
+    await expect(getWeather(0, 0)).rejects.toThrow(/credential/)
   })
 
   it("emits nerves events for start and end", async () => {
@@ -214,37 +180,6 @@ describe("getWeather", () => {
     expect(nervesEvents.some((e) => e.event === "client.error")).toBe(true)
   })
 
-  it("uses aac domain-based lookup when in aac mode", async () => {
-    mockGetMode.mockReturnValue("aac")
-    mockFetchResponse({
-      main: { temp: 25, feels_like: 23, humidity: 40 },
-      weather: [{ description: "sunny" }],
-      wind: { speed: 2 },
-      name: "Tokyo",
-      sys: { country: "JP" },
-    })
-
-    await getWeather(35.6, 139.7)
-
-    // In aac mode, getRawSecret is called with domain and "password" field
-    expect(mockGetRawSecret).toHaveBeenCalledWith("api.openweathermap.org", "password")
-    mockGetMode.mockReturnValue("cli")
-  })
-
-  it("uses bw item-based lookup when in cli mode", async () => {
-    mockGetMode.mockReturnValue("cli")
-    mockFetchResponse({
-      main: { temp: 25, feels_like: 23, humidity: 40 },
-      weather: [{ description: "sunny" }],
-      wind: { speed: 2 },
-      name: "Tokyo",
-      sys: { country: "JP" },
-    })
-
-    await getWeather(35.6, 139.7)
-
-    expect(mockGetRawSecret).toHaveBeenCalledWith("openweathermap-api", "apiKey")
-  })
 })
 
 describe("getWeatherByCity", () => {
