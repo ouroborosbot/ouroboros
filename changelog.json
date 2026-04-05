@@ -4,7 +4,8 @@
     {
       "version": "0.1.0-alpha.226",
       "changes": [
-        "fix(daemon): set agent name before senseTurn so MCP messages resolve identity — setAgentName() is now called at the top of the senseTurn handler, before any downstream code that depends on agent identity (loadAgentConfig, getAgentSecretsPath, etc.)"
+        "fix(daemon): set agent name before senseTurn so MCP messages resolve identity — setAgentName() is now called at the top of the senseTurn handler, before any downstream code that depends on agent identity (loadAgentConfig, getAgentSecretsPath, etc.)",
+        "fix: direct filesystem name resolution in sendProactiveBlueBubblesMessageToSession — bypass store.get()/listAll() with raw fs reads on friends directory when store lookup fails"
       ]
     },
     {
