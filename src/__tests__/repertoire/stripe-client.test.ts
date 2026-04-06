@@ -24,16 +24,16 @@ const mockCardsUpdate = vi.fn()
 const mockCardsList = vi.fn()
 
 vi.mock("stripe", () => ({
-  default: class Stripe {
-    issuing = {
+  default: () => ({
+    issuing: {
       cards: {
         create: mockCardsCreate,
         retrieve: mockCardsRetrieve,
         update: mockCardsUpdate,
         list: mockCardsList,
       },
-    }
-  },
+    },
+  }),
 }))
 
 import {
@@ -231,20 +231,20 @@ describe("StripeClient", () => {
 
     it("never includes card number in nerves events even when retrieved", async () => {
       mockCardsRetrieve.mockResolvedValue({
-        id: "ic_test_123",
+        id: "ic_test_999",
         last4: "4242",
         number: "4242424242424242",
-        cvc: "123",
+        cvc: "987",
         exp_month: 12,
         exp_year: 2027,
       })
 
-      await client.getCardDetails("ic_test_123")
+      await client.getCardDetails("ic_test_999")
 
       for (const event of nervesEvents) {
         const eventStr = JSON.stringify(event)
         expect(eventStr).not.toContain("4242424242424242")
-        expect(eventStr).not.toContain("123") // CVC should also be absent from events
+        expect(eventStr).not.toContain("987") // CVC should also be absent from events
       }
     })
   })
