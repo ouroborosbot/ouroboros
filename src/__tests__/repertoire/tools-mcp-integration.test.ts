@@ -55,7 +55,7 @@ vi.mock("../../repertoire/tasks", () => ({
 }))
 
 import type { McpManager } from "../../repertoire/mcp-manager"
-import { getToolsForChannel } from "../../repertoire/tools"
+import { getToolsForChannel, execTool, isConfirmationRequired, summarizeArgs, resetMcpDefinitions } from "../../repertoire/tools"
 
 function makeMockMcpManager(
   allTools: Array<{ server: string; tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> }>,
@@ -70,6 +70,7 @@ describe("getToolsForChannel with mcpManager", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     nervesEvents.length = 0
+    resetMcpDefinitions()
   })
 
   it("without mcpManager: returns same tools as before (no MCP tools)", () => {
@@ -124,5 +125,69 @@ describe("getToolsForChannel with mcpManager", () => {
     const names = result.map((t) => t.function.name)
     expect(names).toContain("browser_navigate")
     expect(names).toContain("duffel_search")
+  })
+})
+
+describe("execTool with MCP tools", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    nervesEvents.length = 0
+    resetMcpDefinitions()
+  })
+
+  it("MCP tool name found in mcpDefinitions: handler is called, result returned", async () => {
+    const mgr = makeMockMcpManager([{
+      server: "browser",
+      tools: [{ name: "navigate", description: "Nav", inputSchema: { type: "object" } }],
+    }])
+    // Populate mcpDefinitions by calling getToolsForChannel
+    getToolsForChannel(undefined, undefined, undefined, undefined, mgr)
+
+    const result = await execTool("browser_navigate", { url: "https://example.com" })
+    expect(result).toBe("ok")
+    expect(mgr.callTool).toHaveBeenCalledWith("browser", "navigate", { url: "https://example.com" })
+  })
+
+  it("MCP tool name NOT found anywhere: returns unknown", async () => {
+    const result = await execTool("nonexistent_tool_xyz", {})
+    expect(result).toBe("unknown: nonexistent_tool_xyz")
+  })
+
+  it("MCP tool handler error: error propagated through handler (returns error string)", async () => {
+    const mgr = {
+      listAllTools: () => [{
+        server: "broken",
+        tools: [{ name: "fail", description: "Fails", inputSchema: { type: "object" } }],
+      }],
+      callTool: vi.fn().mockRejectedValue(new Error("connection lost")),
+    } as unknown as McpManager
+
+    getToolsForChannel(undefined, undefined, undefined, undefined, mgr)
+
+    // The MCP handler catches errors and returns error string (no throw)
+    const result = await execTool("broken_fail", {})
+    expect(result).toContain("[mcp error]")
+    expect(result).toContain("connection lost")
+  })
+
+  it("isConfirmationRequired returns false for MCP tools", () => {
+    const mgr = makeMockMcpManager([{
+      server: "browser",
+      tools: [{ name: "navigate", description: "Nav", inputSchema: { type: "object" } }],
+    }])
+    getToolsForChannel(undefined, undefined, undefined, undefined, mgr)
+
+    expect(isConfirmationRequired("browser_navigate")).toBe(false)
+  })
+
+  it("summarizeArgs works for MCP tools (falls back to generic summary)", () => {
+    const mgr = makeMockMcpManager([{
+      server: "browser",
+      tools: [{ name: "navigate", description: "Nav", inputSchema: { type: "object" } }],
+    }])
+    getToolsForChannel(undefined, undefined, undefined, undefined, mgr)
+
+    const summary = summarizeArgs("browser_navigate", { url: "https://example.com" })
+    expect(summary).toContain("url=https://example.com")
   })
 })
