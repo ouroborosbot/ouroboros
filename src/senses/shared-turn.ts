@@ -96,7 +96,7 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
   }
   const resolver = new FriendResolver(friendStore, resolverParams)
 
-  // Initialize MCP manager so browser tools appear in the system prompt
+  // Initialize MCP manager so MCP tools appear as first-class tools in the agent's tool list
   const mcpManager = await getSharedMcpManager() ?? undefined
 
   // Session path and loading
@@ -105,7 +105,7 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
   let sessionState = existing?.state
   const sessionMessages: ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: await buildSystem(channel, { mcpManager }, undefined) }]
+    : [{ role: "system", content: await buildSystem(channel, {}, undefined) }]
 
   // Pending dir
   const pendingDir = getPendingDir(agentName, friendId, channel, sessionKey)

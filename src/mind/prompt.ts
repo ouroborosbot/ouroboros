@@ -10,7 +10,6 @@ import { isTrustedLevel, type Channel, type ChannelCapabilities, type ResolvedCo
 import { describeTrustContext } from "./friends/trust-explanation";
 import { getChannelCapabilities, isRemoteChannel, channelToFacing } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
-import type { McpManager } from "../repertoire/mcp-manager";
 import { backfillBundleMeta, getPackageVersion, getChangelogPath } from "./bundle-manifest";
 import type { BundleMeta } from "./bundle-manifest";
 import { getFirstImpressions } from "./first-impressions";
@@ -531,7 +530,6 @@ export interface BuildSystemOptions {
   delegationDecision?: DelegationDecision;
   providerCapabilities?: ReadonlySet<import("../heart/core").ProviderCapability>;
   supportedReasoningEfforts?: readonly string[];
-  mcpManager?: McpManager;
   pendingMessages?: Array<{ from: string; content: string }>;
   /** Rendered start-of-turn packet for continuity-aware prompt. */
   startOfTurnPacket?: string;
