@@ -532,6 +532,7 @@ export function getCredentialStore(): CredentialStore {
     agentName = "default"
   }
 
+  /* v8 ignore next -- false branch only reachable when BitwardenCredentialStore was created above @preserve */
   if (!_store) {
     _store = new BuiltInCredentialStore(agentName!)
   }
