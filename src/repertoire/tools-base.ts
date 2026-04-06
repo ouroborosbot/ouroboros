@@ -70,6 +70,8 @@ export interface ToolDefinition {
   confirmationAlwaysRequired?: boolean;
   requiredCapability?: import("../heart/core").ProviderCapability;
   summaryKeys?: string[];
+  /** For first-class MCP tools: the server this tool belongs to. */
+  mcpServer?: string;
 }
 
 // Tracks which file paths have been read via read_file in this session.
