@@ -105,31 +105,52 @@ export const TRAVEL_ADVISORY_RSS_URL = "https://travel.state.gov/_res/rss/TAsTWs
  * This table handles the ~30 codes where they diverge.
  */
 const ISO_FIPS_DIVERGENCE: Record<string, string> = {
+  AG: "Antigua and Barbuda", // FIPS: AC
   AT: "Austria",       // FIPS: AU
   AU: "Australia",     // FIPS: AS
   BD: "Bangladesh",    // FIPS: BG
+  BH: "Bahrain",       // FIPS: BA
   BN: "Brunei",        // FIPS: BX
   BO: "Bolivia",       // FIPS: BL
+  BS: "Bahamas",       // FIPS: BF
+  BW: "Botswana",      // FIPS: BC
+  CD: "Congo (Kinshasa)", // FIPS: CG
   CH: "Switzerland",   // FIPS: SZ
+  CI: "Cote d'Ivoire", // FIPS: IV
+  CL: "Chile",         // FIPS: CI
+  CN: "China",         // FIPS: CH
   CZ: "Czechia",       // FIPS: EZ
   DE: "Germany",       // FIPS: GM
+  DK: "Denmark",       // FIPS: DA
+  DO: "Dominican Republic", // FIPS: DR
+  DZ: "Algeria",       // FIPS: AG
   ES: "Spain",         // FIPS: SP
   FI: "Finland",       // FIPS: FI → same, but title might say "Finland"
   GQ: "Equatorial Guinea", // FIPS: EK
   HR: "Croatia",       // FIPS: HR → same
   IE: "Ireland",       // FIPS: EI
+  IL: "Israel",        // FIPS: IS
+  JP: "Japan",         // FIPS: JA
   KP: "North Korea",   // FIPS: KN
   KR: "South Korea",   // FIPS: KS
   LT: "Lithuania",     // FIPS: LH
+  MA: "Morocco",       // FIPS: MO
   MM: "Burma",         // FIPS: BM (State Dept uses "Burma (Myanmar)")
+  NG: "Nigeria",       // FIPS: NI
   NO: "Norway",        // FIPS: NO → same
   PH: "Philippines",   // FIPS: RP
+  PT: "Portugal",      // FIPS: PO
   RO: "Romania",       // FIPS: RO → same
   SE: "Sweden",        // FIPS: SW
+  SG: "Singapore",     // FIPS: SN
   TL: "Timor-Leste",   // FIPS: TT
+  TR: "Turkey",        // FIPS: TU
   TW: "Taiwan",        // FIPS: TW → same
+  UA: "Ukraine",       // FIPS: UP
   VA: "Holy See",      // FIPS: VT
+  VN: "Vietnam",       // FIPS: VM
   YE: "Yemen",         // FIPS: YM
+  ZA: "South Africa",  // FIPS: SF
 }
 
 /**
