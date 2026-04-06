@@ -130,17 +130,23 @@ export function getToolsForChannel(
   return filterByCapability(result, providerCapabilities);
 }
 
+// Look up a tool definition from the combined registry (native + MCP).
+function findDefinition(toolName: string): ToolDefinition | undefined {
+  return allDefinitions.find((d) => d.tool.function.name === toolName)
+    ?? mcpDefinitions.find((d) => d.tool.function.name === toolName)
+}
+
 // Check whether a tool requires user confirmation before execution.
 // Reads from ToolDefinition.confirmationRequired instead of a separate Set.
 export function isConfirmationRequired(toolName: string): boolean {
-  const def = allDefinitions.find((d) => d.tool.function.name === toolName);
+  const def = findDefinition(toolName);
   return def?.confirmationRequired === true;
 }
 
 // Check whether a tool's confirmation is non-bypassable (cannot be skipped by skipConfirmation).
 // Used for T2 config proposals that must always require operator approval.
 export function isConfirmationAlwaysRequired(toolName: string): boolean {
-  const def = allDefinitions.find((d) => d.tool.function.name === toolName);
+  const def = findDefinition(toolName);
   return def?.confirmationAlwaysRequired === true;
 }
 
@@ -156,8 +162,8 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
     meta: { name, ...(name === "shell" && args.command ? { command: args.command } : {}) },
   });
 
-  // Look up from combined registry
-  const def = allDefinitions.find((d) => d.tool.function.name === name);
+  // Look up from combined registry (native + MCP)
+  const def = findDefinition(name);
   if (!def) {
     emitNervesEvent({
       level: "error",
@@ -229,7 +235,7 @@ function summarizeUnknownArgs(args: Record<string, string>): string {
 }
 
 export function summarizeArgs(name: string, args: Record<string, string>): string {
-  const def = allDefinitions.find((d) => d.tool.function.name === name);
+  const def = findDefinition(name);
   if (def && def.summaryKeys !== undefined) {
     return summarizeKeyValues(args, def.summaryKeys);
   }
