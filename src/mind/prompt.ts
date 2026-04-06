@@ -206,22 +206,8 @@ my bones give me the \`ouro\` cli. always pass \`--agent ${agentName}\`:
 provider/model changes via \`ouro config model\` or \`ouro auth switch\` take effect on the next turn automatically — no restart needed.`
 }
 
-export function mcpToolsSection(mcpManager?: McpManager): string {
-  if (!mcpManager) return "";
-  const allTools = mcpManager.listAllTools();
-  if (allTools.length === 0) return "";
-
-  const lines: string[] = [
-    `## mcp tools (use ouro mcp call <server> <tool> --args '{...}')`,
-  ];
-  for (const entry of allTools) {
-    lines.push(`### ${entry.server}`);
-    for (const tool of entry.tools) {
-      lines.push(`- ${tool.name}: ${tool.description}`);
-    }
-  }
-  return lines.join("\n");
-}
+// mcpToolsSection removed — MCP tools are now first-class citizens in the tool registry
+// and appear in the model's active tool list directly. No system prompt section needed.
 
 function readBundleMeta(): BundleMeta | null {
   try {
@@ -1132,7 +1118,6 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     // Group 3: my tools & capabilities
     "# my tools & capabilities",
     toolsSection(channel, options, context),
-    mcpToolsSection(options?.mcpManager),
     reasoningEffortSection(options),
     skillsSection(),
     toolContractsSection(options),
