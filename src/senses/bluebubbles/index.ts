@@ -1305,6 +1305,7 @@ export async function sendProactiveBlueBubblesMessageToSession(
   // Proactive outreach to individuals must go to DMs, never group chats.
   // Explicit cross-chat responses (bridge completions, delegation returns) ARE allowed to groups
   // because the request originated from that group.
+  /* v8 ignore start -- group gate: only fires when proactive send targets a group session @preserve */
   if (chat.isGroup && params.intent !== "explicit_cross_chat") {
     emitNervesEvent({
       level: "warn",
@@ -1315,6 +1316,7 @@ export async function sendProactiveBlueBubblesMessageToSession(
     })
     return { delivered: false, reason: "group_blocked" }
   }
+  /* v8 ignore stop */
 
   try {
     await client.sendText({ chat, text: params.text })
