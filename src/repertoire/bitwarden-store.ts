@@ -69,24 +69,45 @@ export class BitwardenCredentialStore implements CredentialStore {
   }
 
   /**
-   * Configure the bw CLI to point at the vault server, then log in.
-   * Caches the session token for subsequent operations.
+   * Ensure the bw CLI is authenticated and unlocked.
+   * Handles three states: logged out → login, locked → unlock, already unlocked → no-op.
    */
   async login(): Promise<void> {
-    // Configure server URL
-    await execBw(["config", "server", this.serverUrl])
-
-    // Log in and extract session token
-    const loginOutput = await execBw(["login", this.email, this.masterPassword, "--raw"])
-
-    // bw login --raw returns just the session token string
-    // But with --output json it returns { access_token: "..." }
-    // Try JSON parse first, fall back to raw string
+    // Check current status
+    let status: { status?: string; serverUrl?: string; userEmail?: string } = {}
     try {
-      const parsed = JSON.parse(loginOutput)
-      this.sessionToken = parsed.access_token ?? loginOutput.trim()
+      const raw = await execBw(["status"])
+      status = JSON.parse(raw)
     } catch {
-      this.sessionToken = loginOutput.trim()
+      // CLI not configured or broken — proceed with full setup
+    }
+
+    // Configure server URL if needed (only works when logged out)
+    if (status.status === "unauthenticated" || !status.serverUrl) {
+      try {
+        await execBw(["config", "server", this.serverUrl])
+      } catch {
+        // "Logout required" means already logged in — that's fine, skip config
+      }
+    }
+
+    if (status.status === "locked") {
+      // Already logged in, just needs unlock
+      const unlockOutput = await execBw(["unlock", this.masterPassword, "--raw"])
+      this.sessionToken = unlockOutput.trim()
+    } else if (status.status === "unauthenticated" || !status.status) {
+      // Not logged in — full login
+      const loginOutput = await execBw(["login", this.email, this.masterPassword, "--raw"])
+      try {
+        const parsed = JSON.parse(loginOutput)
+        this.sessionToken = parsed.access_token ?? loginOutput.trim()
+      } catch {
+        this.sessionToken = loginOutput.trim()
+      }
+    } else {
+      // Status is "unlocked" — already good, just need the session token
+      const unlockOutput = await execBw(["unlock", this.masterPassword, "--raw"])
+      this.sessionToken = unlockOutput.trim()
     }
   }
 
