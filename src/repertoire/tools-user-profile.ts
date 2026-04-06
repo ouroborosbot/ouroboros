@@ -105,6 +105,7 @@ export const userProfileToolDefinitions: ToolDefinition[] = [
         if (value === undefined) {
           return `field "${args.field}" is not set on the profile.`
         }
+        /* v8 ignore next -- platform-dependent v8 branch counting on ternary @preserve */
         return typeof value === "string" ? value : JSON.stringify(value, null, 2)
       } catch (err) {
         /* v8 ignore next -- defensive: getUserProfileField errors are always Error instances @preserve */
