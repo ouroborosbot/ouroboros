@@ -508,6 +508,7 @@ export function getCredentialStore(): CredentialStore {
     const vaultConfig = identity.resolveVaultConfig?.(agentName, config?.vault)
     const secretsPath = identity.getAgentSecretsPath?.(agentName)
     let vaultSecrets: { masterPassword?: string } | undefined
+    /* v8 ignore next 8 -- requires real agent secrets.json on disk @preserve */
     if (secretsPath) {
       try {
         const fs = require("fs")
@@ -522,6 +523,7 @@ export function getCredentialStore(): CredentialStore {
     const email = vaultConfig?.email
     const masterPassword = vaultSecrets?.masterPassword
 
+    /* v8 ignore next 4 -- requires real vault config + bw CLI @preserve */
     if (serverUrl && email && masterPassword) {
       const { BitwardenCredentialStore } = require("./bitwarden-store")
       _store = new BitwardenCredentialStore(serverUrl, email, masterPassword)

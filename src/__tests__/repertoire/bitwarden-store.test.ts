@@ -110,6 +110,29 @@ describe("BitwardenCredentialStore", () => {
       expect(store.isReady()).toBe(true)
     })
 
+    it("unlocks when status is locked (skips login, runs unlock)", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "locked", serverUrl: "https://vault.ouro.bot" }), "")
+        } else if (args[0] === "unlock") {
+          cb(null, "unlocked-session-token", "")
+        } else {
+          cb(null, "", "")
+        }
+      })
+
+      await store.login()
+
+      // Should call status, then unlock (no config server, no login)
+      expect(calls[0]).toEqual(["status"])
+      expect(calls[1][0]).toBe("unlock")
+      expect(calls[1]).toContain("--raw")
+      // Should NOT have called login
+      expect(calls.find((c) => c[0] === "login")).toBeUndefined()
+    })
+
     it("handles login failure", async () => {
       mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
         if (args[0] === "login") {
