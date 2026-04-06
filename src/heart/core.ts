@@ -5,7 +5,7 @@ import {
   getProviderConfig,
 } from "./config";
 import { loadAgentConfig } from "./identity";
-import { execTool, summarizeArgs, buildToolResultSummary, settleTool, observeTool, ponderTool, restTool, getToolsForChannel, isConfirmationRequired, isConfirmationAlwaysRequired } from "../repertoire/tools";
+import { execTool, summarizeArgs, buildToolResultSummary, settleTool, observeTool, ponderTool, restTool, getToolsForChannel } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities, channelToFacing, type Facing } from "../mind/friends/channel";
 import { surfaceToolDef } from "../repertoire/tools";
@@ -212,7 +212,6 @@ export interface ChannelCallbacks {
   onToolEnd(name: string, summary: string, success: boolean): void;
   onError(error: Error, severity: "transient" | "terminal"): void;
   onKick?(): void;
-  onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">;
   // Clear any buffered text accumulated during streaming. Called before emitting
   // the settle answer so streamed noise (e.g. refusal text) is discarded.
   onClearText?(): void;
@@ -220,7 +219,6 @@ export interface ChannelCallbacks {
 
 export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
-  skipConfirmation?: boolean;
   toolContext?: ToolContext;
   traceId?: string;
   bridgeContext?: string;
@@ -1075,23 +1073,6 @@ export async function runAgent(
             providerRuntime.appendToolOutput(tc.id, rejection);
             continue;
           }
-          // Confirmation check for mutate tools.
-          // confirmationAlwaysRequired tools cannot be bypassed by skipConfirmation.
-          const needsConfirmation = isConfirmationRequired(tc.name) && (!options?.skipConfirmation || isConfirmationAlwaysRequired(tc.name));
-          if (needsConfirmation) {
-            let decision: "confirmed" | "denied" = "denied";
-            if (callbacks.onConfirmAction) {
-              decision = await callbacks.onConfirmAction(tc.name, args);
-            }
-            if (decision !== "confirmed") {
-              const cancelled = "Action cancelled by user.";
-              callbacks.onToolStart(tc.name, args);
-              callbacks.onToolEnd(tc.name, argSummary, false);
-              messages.push({ role: "tool", tool_call_id: tc.id, content: cancelled });
-              providerRuntime.appendToolOutput(tc.id, cancelled);
-              continue;
-            }
-          }
           callbacks.onToolStart(tc.name, args);
           let toolResult: string;
           let success: boolean;
@@ -1127,19 +1108,49 @@ export async function runAgent(
         callbacks.onError(new Error("context trimmed, retrying..."), "transient");
         continue;
       }
-      // Transient errors: retry with exponential backoff
-      if (isTransientError(e) && retryCount < MAX_RETRIES) {
+      // Transient errors: retry with exponential backoff.
+      // Two-layer detection: generic isTransientError (HTTP codes, network patterns)
+      // PLUS provider-specific classifyError (catches SDK-wrapped errors that
+      // generic detection might miss).
+      const errorForClassification = e instanceof Error ? e : /* v8 ignore next -- defensive @preserve */ new Error(String(e))
+      let providerClassification: ProviderErrorClassification
+      try {
+        providerClassification = providerRuntime.classifyError(errorForClassification)
+      } catch {
+        /* v8 ignore next -- defensive: classifyError should not throw @preserve */
+        providerClassification = "unknown"
+      }
+      const retryableByClassification = providerClassification === "rate-limit"
+        || providerClassification === "server-error"
+        || providerClassification === "network-error"
+      const retryableByGeneric = isTransientError(e)
+      const shouldRetry = (retryableByGeneric || retryableByClassification) && retryCount < MAX_RETRIES
+
+      emitNervesEvent({
+        level: shouldRetry ? "info" : "warn",
+        event: shouldRetry ? "engine.provider_retry" : "engine.provider_retry_skip",
+        component: "engine",
+        message: shouldRetry
+          ? `provider error is retryable (attempt ${retryCount + 1}/${MAX_RETRIES})`
+          : `provider error is not retryable or retries exhausted`,
+        meta: {
+          provider: providerRuntime.id,
+          model: providerRuntime.model,
+          retryCount,
+          maxRetries: MAX_RETRIES,
+          retryableByGeneric,
+          retryableByClassification,
+          providerClassification,
+          errorMessage: errorForClassification.message.slice(0, 200),
+          httpStatus: (e as HttpError).status ?? null,
+        },
+      })
+
+      if (shouldRetry) {
         retryCount++;
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
-        let classification: string
-        try {
-          classification = providerRuntime.classifyError(e instanceof Error ? e : /* v8 ignore next -- defensive: errors are always Error instances @preserve */ new Error(String(e)))
-        } catch {
-          /* v8 ignore next -- defensive: classifyError should not throw @preserve */
-          classification = classifyTransientError(e)
-        }
         /* v8 ignore next -- defensive: all classifications have labels @preserve */
-        const cause = TRANSIENT_RETRY_LABELS[classification] ?? classification
+        const cause = TRANSIENT_RETRY_LABELS[providerClassification] ?? providerClassification
         callbacks.onError(new Error(`${cause}, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
         // Wait with abort support
         const aborted = await new Promise<boolean>((resolve) => {
@@ -1158,13 +1169,8 @@ export async function runAgent(
         providerRuntime.resetTurnState(messages);
         continue;
       }
-      terminalError = e instanceof Error ? e : new Error(String(e));
-      try {
-        terminalErrorClassification = providerRuntime.classifyError(terminalError);
-      } catch {
-        /* v8 ignore next -- defensive: classifyError should not throw @preserve */
-        terminalErrorClassification = "unknown";
-      }
+      terminalError = errorForClassification;
+      terminalErrorClassification = providerClassification;
 
       /* v8 ignore start — auth-failure guidance: tested via provider error classification tests @preserve */
       if (terminalErrorClassification === "auth-failure") {
