@@ -112,6 +112,7 @@ export class BitwardenCredentialStore implements CredentialStore {
         await this.loginAttempt()
         return
       } catch (err) {
+        /* v8 ignore next -- defensive: loginAttempt always throws Error instances @preserve */
         lastError = err instanceof Error ? err : new Error(String(err))
 
         // Don't retry non-transient errors (auth failures, bw not installed)
