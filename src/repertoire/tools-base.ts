@@ -78,6 +78,8 @@ export interface ToolDefinition {
 // edit_file requires a file to be read first (must-read-first guard).
 export const editFileReadTracker = new Set<string>();
 
+import { emitNervesEvent } from "../nerves/runtime";
+
 // Combined base tool definitions — assembled from category modules.
 // Order preserved: files, shell, memory, bridge, session, continuity, config, coding.
 export const baseToolDefinitions: ToolDefinition[] = [
@@ -97,4 +99,11 @@ export const baseToolDefinitions: ToolDefinition[] = [
 // Convenience array of just the tool schemas (no handler/integration metadata).
 // Used by consumers that need the OpenAI function-tool format.
 export const tools: OpenAI.ChatCompletionFunctionTool[] = baseToolDefinitions.map((d) => d.tool);
+
+emitNervesEvent({
+  event: "repertoire.tools_registered",
+  component: "repertoire",
+  message: "base tool definitions assembled",
+  meta: { count: baseToolDefinitions.length },
+});
 
