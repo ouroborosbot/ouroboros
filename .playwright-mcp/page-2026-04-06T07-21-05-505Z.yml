@@ -1,0 +1,856 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#site-content"
+    - text: Skip to content
+    - img [ref=e3]
+  - alert
+  - generic [ref=e14]:
+    - heading "Airbnb homepage" [level=1] [ref=e15]
+    - banner [ref=e19]:
+      - link "Airbnb homepage" [ref=e20] [cursor=pointer]:
+        - /url: /
+        - img [ref=e22]
+      - search [ref=e24]:
+        - generic [ref=e26]:
+          - tablist [ref=e28]:
+            - tab "Homes" [selected] [ref=e29] [cursor=pointer]:
+              - generic [ref=e35]: Homes
+            - tab "Experiences, new" [ref=e36] [cursor=pointer]:
+              - generic [ref=e42]: Experiences, new
+            - tab "Services, new" [ref=e43] [cursor=pointer]:
+              - generic [ref=e49]: Services, new
+          - generic [ref=e50]:
+            - generic [ref=e54]:
+              - button [ref=e61] [cursor=pointer]
+              - button [ref=e67] [cursor=pointer]
+              - button [ref=e73] [cursor=pointer]
+            - button "Search" [ref=e78] [cursor=pointer]:
+              - img [ref=e81]
+      - navigation "Profile" [ref=e85]:
+        - generic [ref=e86]:
+          - link "Become a host" [ref=e87] [cursor=pointer]:
+            - /url: "#guest-header-become-a-host-menu"
+            - generic [ref=e88]: Become a host
+          - link "Choose a language and currency" [ref=e90] [cursor=pointer]:
+            - /url: "#simple-header-locale-menu-combined"
+            - img [ref=e92]
+        - generic [ref=e95]:
+          - link "Main navigation menu" [ref=e96] [cursor=pointer]:
+            - /url: "#guest-header-dropdownmenu"
+            - img [ref=e98]
+          - link "Close":
+            - /url: "#"
+    - main [ref=e102]:
+      - generic [ref=e103]:
+        - group "Popular homes in Vancouver" [ref=e108]:
+          - link "Popular homes in Vancouver" [ref=e111] [cursor=pointer]:
+            - /url: /s/Vancouver/homes?place_id=ChIJs0-pQ_FzhlQRi_OBm-qWkbs&refinement_paths%5B%5D=%2Fhomes&flexible_trip_lengths%5B%5D=weekend_trip&date_picker_type=FLEXIBLE_DATES&search_type=HOMEPAGE_CAROUSEL_CLICK
+            - generic [ref=e112]:
+              - heading "Popular homes in Vancouver" [level=2] [ref=e113]:
+                - generic [ref=e114]: Popular homes in Vancouver
+              - img [ref=e116]
+          - generic [ref=e119]: 6 of 9 items showing
+          - generic [ref=e122]:
+            - button "Previous" [disabled] [ref=e123]:
+              - generic [ref=e124]:
+                - generic [ref=e125]: _
+                - img [ref=e126]
+            - button "Next" [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]:
+                - generic [ref=e130]: _
+                - img [ref=e131]
+          - generic [ref=e137]:
+            - group "Apartment in Vancouver" [ref=e139]:
+              - link "Apartment in Vancouver" [ref=e140] [cursor=pointer]:
+                - /url: /rooms/1623356025658679126?check_in=2026-04-17&check_out=2026-04-19&photo_id=2520733007&source_impression_id=p3_1775460065_P3T6Zal0Sd_Jq98-&previous_page_section_name=1000
+              - generic [ref=e141]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: Apartment in Vancouver" [ref=e143] [cursor=pointer]':
+                    - img [ref=e145]
+                - generic [ref=e147]:
+                  - generic [ref=e149]: Apartment in Vancouver
+                  - generic [ref=e150]:
+                    - generic [ref=e154]:
+                      - generic [ref=e157]: $443
+                      - generic [ref=e159]: for 2 nights
+                      - generic [ref=e160]: $443 for 2 nights
+                    - generic [ref=e161]:
+                      - generic [ref=e162]: ","
+                      - generic [ref=e163]: ·
+                    - generic [ref=e164]:
+                      - generic [ref=e165]: 5.0 out of 5 average rating
+                      - img [ref=e167]
+                      - generic [ref=e169]: "5.0"
+            - group "Apartment in Vancouver" [ref=e171]:
+              - link "Apartment in Vancouver" [ref=e172] [cursor=pointer]:
+                - /url: /rooms/1607448718228062112?check_in=2026-04-17&check_out=2026-04-19&photo_id=2493763295&source_impression_id=p3_1775460065_P3tSaVJFFxzFobM2&previous_page_section_name=1000
+              - generic [ref=e173]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Apartment in Vancouver" [ref=e175] [cursor=pointer]':
+                        - img [ref=e177]
+                - generic [ref=e179]:
+                  - generic [ref=e181]: Apartment in Vancouver
+                  - generic [ref=e182]:
+                    - generic [ref=e186]:
+                      - generic [ref=e189]: $504
+                      - generic [ref=e191]: for 2 nights
+                      - generic [ref=e192]: $504 for 2 nights
+                    - generic [ref=e193]:
+                      - generic [ref=e194]: ","
+                      - generic [ref=e195]: ·
+                    - generic [ref=e196]:
+                      - generic [ref=e197]: 5.0 out of 5 average rating
+                      - img [ref=e199]
+                      - generic [ref=e201]: "5.0"
+            - group "Home in West Vancouver" [ref=e203]:
+              - link "Home in West Vancouver" [ref=e204] [cursor=pointer]:
+                - /url: /rooms/1458180758155324907?check_in=2026-04-17&check_out=2026-04-19&photo_id=2469483744&source_impression_id=p3_1775460065_P3YjDxvvwNFf2na6&previous_page_section_name=1000
+              - generic [ref=e205]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Home in West Vancouver" [ref=e207] [cursor=pointer]':
+                        - img [ref=e209]
+                - generic [ref=e211]:
+                  - generic [ref=e213]: Home in West Vancouver
+                  - generic [ref=e214]:
+                    - generic [ref=e218]:
+                      - generic [ref=e221]: $704
+                      - generic [ref=e223]: for 2 nights
+                      - generic [ref=e224]: $704 for 2 nights
+                    - generic [ref=e225]:
+                      - generic [ref=e226]: ","
+                      - generic [ref=e227]: ·
+                    - generic [ref=e228]:
+                      - generic [ref=e229]: 5.0 out of 5 average rating
+                      - img [ref=e231]
+                      - generic [ref=e233]: "5.0"
+            - group "Apartment in Vancouver" [ref=e235]:
+              - link "Apartment in Vancouver" [ref=e236] [cursor=pointer]:
+                - /url: /rooms/1609694362436455716?check_in=2026-10-30&check_out=2026-11-01&photo_id=2497562321&source_impression_id=p3_1775460065_P356nxc9COL37n7b&previous_page_section_name=1000
+              - generic [ref=e237]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Apartment in Vancouver" [ref=e239] [cursor=pointer]':
+                        - img [ref=e241]
+                - generic [ref=e243]:
+                  - generic [ref=e245]: Apartment in Vancouver
+                  - generic [ref=e246]:
+                    - generic [ref=e250]:
+                      - generic [ref=e253]: $265
+                      - generic [ref=e255]: for 2 nights
+                      - generic [ref=e256]: $265 for 2 nights
+                    - generic [ref=e257]:
+                      - generic [ref=e258]: ","
+                      - generic [ref=e259]: ·
+                    - generic [ref=e260]:
+                      - generic [ref=e261]: 5.0 out of 5 average rating
+                      - img [ref=e263]
+                      - generic [ref=e265]: "5.0"
+            - group "Room in Vancouver" [ref=e267]:
+              - link "Room in Vancouver" [ref=e268] [cursor=pointer]:
+                - /url: /rooms/866732382682457010?check_in=2026-04-17&check_out=2026-04-19&photo_id=1663494065&source_impression_id=p3_1775460065_P3F5ctJ60lGMouu6&previous_page_section_name=1000
+              - generic [ref=e269]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Room in Vancouver" [ref=e271] [cursor=pointer]':
+                        - img [ref=e273]
+                - generic [ref=e275]:
+                  - generic [ref=e277]: Room in Vancouver
+                  - generic [ref=e278]:
+                    - generic [ref=e282]:
+                      - generic [ref=e285]: $259
+                      - generic [ref=e287]: for 2 nights
+                      - generic [ref=e288]: $259 for 2 nights
+                    - generic [ref=e289]:
+                      - generic [ref=e290]: ","
+                      - generic [ref=e291]: ·
+                    - generic [ref=e292]:
+                      - generic [ref=e293]: 4.98 out of 5 average rating
+                      - img [ref=e295]
+                      - generic [ref=e297]: "4.98"
+            - group "Apartment in Vancouver" [ref=e299]:
+              - link "Apartment in Vancouver" [ref=e300] [cursor=pointer]:
+                - /url: /rooms/946345810121295068?check_in=2026-05-15&check_out=2026-05-17&photo_id=2566391499&source_impression_id=p3_1775460065_P316W39dBYzhVG6o&previous_page_section_name=1000
+              - generic [ref=e301]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: Apartment in Vancouver" [ref=e303] [cursor=pointer]':
+                    - img [ref=e305]
+                - generic [ref=e307]:
+                  - generic [ref=e309]: Apartment in Vancouver
+                  - generic [ref=e310]:
+                    - generic [ref=e314]:
+                      - generic [ref=e317]: $744
+                      - generic [ref=e319]: for 2 nights
+                      - generic [ref=e320]: $744 for 2 nights
+                    - generic [ref=e321]:
+                      - generic [ref=e322]: ","
+                      - generic [ref=e323]: ·
+                    - generic [ref=e324]:
+                      - generic [ref=e325]: 5.0 out of 5 average rating
+                      - img [ref=e327]
+                      - generic [ref=e329]: "5.0"
+            - group [ref=e331]:
+              - link [ref=e332] [cursor=pointer]:
+                - /url: /rooms/32646786?check_in=2026-10-16&check_out=2026-10-18&photo_id=1688779871&source_impression_id=p3_1775460065_P3aEjvKIGleCXMlF&previous_page_section_name=1000
+              - generic [ref=e333]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - button [ref=e335] [cursor=pointer]:
+                        - img [ref=e337]
+                - generic [ref=e339]:
+                  - generic [ref=e341]: Guest suite in Vancouver
+                  - generic [ref=e342]:
+                    - generic [ref=e346]:
+                      - generic [ref=e349]: $253
+                      - generic [ref=e351]: for 2 nights
+                      - generic [ref=e352]: $253 for 2 nights
+                    - generic [ref=e353]:
+                      - generic [ref=e354]: ","
+                      - generic [ref=e355]: ·
+                    - generic [ref=e356]:
+                      - generic [ref=e357]: 4.86 out of 5 average rating
+                      - img [ref=e359]
+                      - generic [ref=e361]: "4.86"
+            - group [ref=e363]:
+              - link [ref=e364] [cursor=pointer]:
+                - /url: /rooms/911057811247223067?check_in=2026-04-10&check_out=2026-04-12&photo_id=1767414479&source_impression_id=p3_1775460065_P3LXdsttxSnMc3Ls&previous_page_section_name=1000
+              - generic [ref=e365]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - button [ref=e367] [cursor=pointer]:
+                        - img [ref=e369]
+                - generic [ref=e371]:
+                  - generic [ref=e373]: Condo in Vancouver
+                  - generic [ref=e374]:
+                    - generic [ref=e378]:
+                      - generic [ref=e381]: $338
+                      - generic [ref=e383]: for 2 nights
+                      - generic [ref=e384]: $338 for 2 nights
+                    - generic [ref=e385]:
+                      - generic [ref=e386]: ","
+                      - generic [ref=e387]: ·
+                    - generic [ref=e388]:
+                      - generic [ref=e389]: 4.96 out of 5 average rating
+                      - img [ref=e391]
+                      - generic [ref=e393]: "4.96"
+            - link [ref=e396] [cursor=pointer]:
+              - /url: /s/Vancouver/homes?place_id=ChIJs0-pQ_FzhlQRi_OBm-qWkbs&refinement_paths%5B%5D=%2Fhomes&flexible_trip_lengths%5B%5D=weekend_trip&date_picker_type=FLEXIBLE_DATES&search_type=HOMEPAGE_CAROUSEL_CLICK
+              - generic [ref=e402]: See all
+        - group "Featured hotels in Los Angeles A collection of independent and handpicked hotels" [ref=e407]:
+          - link "Featured hotels in Los Angeles A collection of independent and handpicked hotels" [ref=e410] [cursor=pointer]:
+            - /url: /s/Los-Angeles/homes?place_id=ChIJE9on3F3HwoAR9AhGJW_fL-I&refinement_paths%5B%5D=%2Fhomes&flexible_trip_lengths%5B%5D=weekend_trip&date_picker_type=FLEXIBLE_DATES&kg_and_tags%5B%5D=Tag%3A9613&search_type=HOMEPAGE_CAROUSEL_CLICK
+            - generic [ref=e411]:
+              - heading "Featured hotels in Los Angeles" [level=2] [ref=e412]:
+                - generic [ref=e413]: Featured hotels in Los Angeles
+              - generic [ref=e414]: A collection of independent and handpicked hotels
+              - img [ref=e416]
+          - generic [ref=e419]: 6 of 9 items showing
+          - generic [ref=e422]:
+            - button "Previous" [disabled] [ref=e423]:
+              - generic [ref=e424]:
+                - generic [ref=e425]: _
+                - img [ref=e426]
+            - button "Next" [ref=e428] [cursor=pointer]:
+              - generic [ref=e429]:
+                - generic [ref=e430]: _
+                - img [ref=e431]
+          - generic [ref=e437]:
+            - group "Inn at Venice Beach" [ref=e439]:
+              - link "Inn at Venice Beach" [ref=e440] [cursor=pointer]:
+                - /url: /rooms/1118169635195232605?check_in=2026-04-17&check_out=2026-04-19&photo_id=2389447873&source_impression_id=p3_1775460065_P3gQi_wjwkr4ZSQv&previous_page_section_name=1000
+              - generic [ref=e441]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: Inn at Venice Beach" [ref=e443] [cursor=pointer]':
+                    - img [ref=e445]
+                - generic [ref=e447]:
+                  - generic [ref=e449]: Inn at Venice Beach
+                  - generic [ref=e450]:
+                    - generic [ref=e454]:
+                      - generic "$568 for 2 nights" [ref=e455]:
+                        - generic [ref=e456]: From
+                        - generic [ref=e457]: $568
+                        - generic [ref=e458]: for 2 nights
+                      - generic [ref=e459]: $568 for 2 nights
+                    - generic [ref=e460]:
+                      - generic [ref=e461]: ","
+                      - generic [ref=e462]: ·
+                    - generic [ref=e463]:
+                      - generic [ref=e464]: 4.78 out of 5 average rating
+                      - img [ref=e466]
+                      - generic [ref=e468]: "4.78"
+            - group "The Hills Inn Eagle Rock" [ref=e470]:
+              - link "The Hills Inn Eagle Rock" [ref=e471] [cursor=pointer]:
+                - /url: /rooms/1359953543393280768?check_in=2026-04-10&check_out=2026-04-12&photo_id=2412668227&source_impression_id=p3_1775460065_P3iNORkA3yZMjWyk&previous_page_section_name=1000
+              - generic [ref=e472]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: The Hills Inn Eagle Rock" [ref=e474] [cursor=pointer]':
+                    - img [ref=e476]
+                - generic [ref=e478]:
+                  - generic [ref=e480]: The Hills Inn Eagle Rock
+                  - generic [ref=e481]:
+                    - generic [ref=e485]:
+                      - generic "$340 for 2 nights" [ref=e486]:
+                        - generic [ref=e487]: From
+                        - generic [ref=e488]: $340
+                        - generic [ref=e489]: for 2 nights
+                      - generic [ref=e490]: $340 for 2 nights
+                    - generic [ref=e491]:
+                      - generic [ref=e492]: ","
+                      - generic [ref=e493]: ·
+                    - generic [ref=e494]:
+                      - generic [ref=e495]: 4.75 out of 5 average rating
+                      - img [ref=e497]
+                      - generic [ref=e499]: "4.75"
+            - group "Le Parc at Melrose" [ref=e501]:
+              - link "Le Parc at Melrose" [ref=e502] [cursor=pointer]:
+                - /url: /rooms/1087045234450663419?check_in=2026-04-10&check_out=2026-04-12&photo_id=2389422162&source_impression_id=p3_1775460065_P37XBF5twnHWUL2v&previous_page_section_name=1000
+              - generic [ref=e503]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: Le Parc at Melrose" [ref=e505] [cursor=pointer]':
+                    - img [ref=e507]
+                - generic [ref=e509]:
+                  - generic [ref=e511]: Le Parc at Melrose
+                  - generic [ref=e512]:
+                    - generic [ref=e516]:
+                      - generic "$664 for 2 nights" [ref=e517]:
+                        - generic [ref=e518]: From
+                        - generic [ref=e519]: $664
+                        - generic [ref=e520]: for 2 nights
+                      - generic [ref=e521]: $664 for 2 nights
+                    - generic [ref=e522]:
+                      - generic [ref=e523]: ","
+                      - generic [ref=e524]: ·
+                    - generic [ref=e525]:
+                      - generic [ref=e526]: 4.78 out of 5 average rating
+                      - img [ref=e528]
+                      - generic [ref=e530]: "4.78"
+            - group "Ayres Suites Diamond Bar" [ref=e532]:
+              - link "Ayres Suites Diamond Bar" [ref=e533] [cursor=pointer]:
+                - /url: /rooms/1558991855911224611?check_in=2026-04-24&check_out=2026-04-26&photo_id=2427966375&source_impression_id=p3_1775460065_P3_Es0chnlQUKcbn&previous_page_section_name=1000
+              - generic [ref=e534]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: Ayres Suites Diamond Bar" [ref=e536] [cursor=pointer]':
+                    - img [ref=e538]
+                - generic [ref=e540]:
+                  - generic [ref=e542]: Ayres Suites Diamond Bar
+                  - generic [ref=e543]:
+                    - generic [ref=e547]:
+                      - generic "$298 for 2 nights" [ref=e548]:
+                        - generic [ref=e549]: From
+                        - generic [ref=e550]: $298
+                        - generic [ref=e551]: for 2 nights
+                      - generic [ref=e552]: $298 for 2 nights
+                    - generic [ref=e553]:
+                      - generic [ref=e554]: ","
+                      - generic [ref=e555]: ·
+                    - generic [ref=e556]:
+                      - generic [ref=e557]: 5.0 out of 5 average rating
+                      - img [ref=e559]
+                      - generic [ref=e561]: "5.0"
+            - group "Mondrian Los Angeles" [ref=e563]:
+              - link "Mondrian Los Angeles" [ref=e564] [cursor=pointer]:
+                - /url: /rooms/1486261653124954368?check_in=2026-04-10&check_out=2026-04-12&photo_id=2390102993&source_impression_id=p3_1775460065_P33lBsUy7alvTSro&previous_page_section_name=1000
+              - generic [ref=e565]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: Mondrian Los Angeles" [ref=e567] [cursor=pointer]':
+                    - img [ref=e569]
+                - generic [ref=e571]:
+                  - generic [ref=e573]: Mondrian Los Angeles
+                  - generic [ref=e574]:
+                    - generic [ref=e578]:
+                      - generic "$894 for 2 nights" [ref=e579]:
+                        - generic [ref=e580]: From
+                        - generic [ref=e581]: $894
+                        - generic [ref=e582]: for 2 nights
+                      - generic [ref=e583]: $894 for 2 nights
+                    - generic [ref=e584]:
+                      - generic [ref=e585]: ","
+                      - generic [ref=e586]: ·
+                    - generic [ref=e587]:
+                      - generic [ref=e588]: 5.0 out of 5 average rating
+                      - img [ref=e590]
+                      - generic [ref=e592]: "5.0"
+            - group "The Huntley Hotel Santa Monica Beach" [ref=e594]:
+              - link "The Huntley Hotel Santa Monica Beach" [ref=e595] [cursor=pointer]:
+                - /url: /rooms/1065914930138541635?check_in=2026-04-10&check_out=2026-04-12&photo_id=2390095543&source_impression_id=p3_1775460065_P3Z6Msnk84Lq-HlM&previous_page_section_name=1000
+              - generic [ref=e596]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - 'button "Add to wishlist: The Huntley Hotel Santa Monica Beach" [ref=e598] [cursor=pointer]':
+                    - img [ref=e600]
+                - generic [ref=e602]:
+                  - generic [ref=e604]: The Huntley Hotel Santa Monica Beach
+                  - generic [ref=e605]:
+                    - generic [ref=e609]:
+                      - generic "$870 for 2 nights" [ref=e610]:
+                        - generic [ref=e611]: From
+                        - generic [ref=e612]: $870
+                        - generic [ref=e613]: for 2 nights
+                      - generic [ref=e614]: $870 for 2 nights
+                    - generic [ref=e615]:
+                      - generic [ref=e616]: ","
+                      - generic [ref=e617]: ·
+                    - generic [ref=e618]:
+                      - generic [ref=e619]: 4.91 out of 5 average rating
+                      - img [ref=e621]
+                      - generic [ref=e623]: "4.91"
+            - group [ref=e625]:
+              - link [ref=e626] [cursor=pointer]:
+                - /url: /rooms/1077513687676546697?check_in=2026-04-10&check_out=2026-04-12&photo_id=2389423095&source_impression_id=p3_1775460065_P3cMtsKJlWhKe_9e&previous_page_section_name=1000
+              - generic [ref=e627]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - button [ref=e629] [cursor=pointer]:
+                    - img [ref=e631]
+                - generic [ref=e633]:
+                  - generic [ref=e635]: Montrose at Beverly Hills
+                  - generic [ref=e636]:
+                    - generic [ref=e640]:
+                      - generic [ref=e641]:
+                        - generic [ref=e642]: From
+                        - generic [ref=e643]: $759
+                        - generic [ref=e644]: for 2 nights
+                      - generic [ref=e645]: $759 for 2 nights
+                    - generic [ref=e646]:
+                      - generic [ref=e647]: ","
+                      - generic [ref=e648]: ·
+                    - generic [ref=e649]:
+                      - generic [ref=e650]: 4.85 out of 5 average rating
+                      - img [ref=e652]
+                      - generic [ref=e654]: "4.85"
+            - group [ref=e656]:
+              - link [ref=e657] [cursor=pointer]:
+                - /url: /rooms/1084863830327850426?check_in=2026-04-10&check_out=2026-04-12&photo_id=2389423419&source_impression_id=p3_1775460065_P3A-rnMe_1jvP309&previous_page_section_name=1000
+              - generic [ref=e658]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - button [ref=e660] [cursor=pointer]:
+                    - img [ref=e662]
+                - generic [ref=e664]:
+                  - generic [ref=e666]: Chamberlain West Hollywood
+                  - generic [ref=e667]:
+                    - generic [ref=e671]:
+                      - generic [ref=e672]:
+                        - generic [ref=e673]: From
+                        - generic [ref=e674]: $738
+                        - generic [ref=e675]: for 2 nights
+                      - generic [ref=e676]: $738 for 2 nights
+                    - generic [ref=e677]:
+                      - generic [ref=e678]: ","
+                      - generic [ref=e679]: ·
+                    - generic [ref=e680]:
+                      - generic [ref=e681]: 4.79 out of 5 average rating
+                      - img [ref=e683]
+                      - generic [ref=e685]: "4.79"
+            - link [ref=e688] [cursor=pointer]:
+              - /url: /s/Los-Angeles/homes?place_id=ChIJE9on3F3HwoAR9AhGJW_fL-I&refinement_paths%5B%5D=%2Fhomes&flexible_trip_lengths%5B%5D=weekend_trip&date_picker_type=FLEXIBLE_DATES&kg_and_tags%5B%5D=Tag%3A9613&search_type=HOMEPAGE_CAROUSEL_CLICK
+              - generic [ref=e694]: See all
+        - group "Available in Portland this weekend" [ref=e699]:
+          - link "Available in Portland this weekend" [ref=e702] [cursor=pointer]:
+            - /url: /s/Portland/homes?place_id=ChIJJ3SpfQsLlVQRkYXR9ua5Nhw&refinement_paths%5B%5D=%2Fhomes&date_picker_type=CALENDAR&checkin=2026-04-10&checkout=2026-04-12&search_type=HOMEPAGE_CAROUSEL_CLICK
+            - generic [ref=e703]:
+              - heading "Available in Portland this weekend" [level=2] [ref=e704]:
+                - generic [ref=e705]: Available in Portland this weekend
+              - img [ref=e707]
+          - generic [ref=e710]: 6 of 9 items showing
+          - generic [ref=e713]:
+            - button "Previous" [disabled] [ref=e714]:
+              - generic [ref=e715]:
+                - generic [ref=e716]: _
+                - img [ref=e717]
+            - button "Next" [ref=e719] [cursor=pointer]:
+              - generic [ref=e720]:
+                - generic [ref=e721]: _
+                - img [ref=e722]
+          - generic [ref=e728]:
+            - group "Guest suite in Vancouver" [ref=e730]:
+              - link "Guest suite in Vancouver" [ref=e731] [cursor=pointer]:
+                - /url: /rooms/23826822?check_in=2026-04-10&check_out=2026-04-12&photo_id=643276192&source_impression_id=p3_1775460065_P36WGnzI1g3zH4aK&previous_page_section_name=1000
+              - generic [ref=e732]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Guest suite in Vancouver" [ref=e734] [cursor=pointer]':
+                        - img [ref=e736]
+                - generic [ref=e738]:
+                  - generic [ref=e740]: Guest suite in Vancouver
+                  - generic [ref=e741]:
+                    - generic [ref=e745]:
+                      - generic [ref=e748]: $188
+                      - generic [ref=e750]: for 2 nights
+                      - generic [ref=e751]: $188 for 2 nights
+                    - generic [ref=e752]:
+                      - generic [ref=e753]: ","
+                      - generic [ref=e754]: ·
+                    - generic [ref=e755]:
+                      - generic [ref=e756]: 4.89 out of 5 average rating
+                      - img [ref=e758]
+                      - generic [ref=e760]: "4.89"
+            - group "Room in Portland" [ref=e762]:
+              - link "Room in Portland" [ref=e763] [cursor=pointer]:
+                - /url: /rooms/3480082?check_in=2026-04-10&check_out=2026-04-12&photo_id=1646124521&source_impression_id=p3_1775460065_P3oVH_hAmPDlwb5L&previous_page_section_name=1000
+              - generic [ref=e764]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Room in Portland" [ref=e766] [cursor=pointer]':
+                        - img [ref=e768]
+                - generic [ref=e770]:
+                  - generic [ref=e772]: Room in Portland
+                  - generic [ref=e773]:
+                    - generic [ref=e777]:
+                      - generic [ref=e780]: $149
+                      - generic [ref=e782]: for 2 nights
+                      - generic [ref=e783]: $149 for 2 nights
+                    - generic [ref=e784]:
+                      - generic [ref=e785]: ","
+                      - generic [ref=e786]: ·
+                    - generic [ref=e787]:
+                      - generic [ref=e788]: 4.99 out of 5 average rating
+                      - img [ref=e790]
+                      - generic [ref=e792]: "4.99"
+            - group "Guesthouse in Portland" [ref=e794]:
+              - link "Guesthouse in Portland" [ref=e795] [cursor=pointer]:
+                - /url: /rooms/1441424431134098159?check_in=2026-04-10&check_out=2026-04-12&photo_id=2211469265&source_impression_id=p3_1775460065_P3kYfMlzsd-7BMOB&previous_page_section_name=1000
+              - generic [ref=e796]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Guesthouse in Portland" [ref=e798] [cursor=pointer]':
+                        - img [ref=e800]
+                - generic [ref=e802]:
+                  - generic [ref=e804]: Guesthouse in Portland
+                  - generic [ref=e805]:
+                    - generic [ref=e809]:
+                      - generic [ref=e812]: $309
+                      - generic [ref=e814]: for 2 nights
+                      - generic [ref=e815]: $309 for 2 nights
+                    - generic [ref=e816]:
+                      - generic [ref=e817]: ","
+                      - generic [ref=e818]: ·
+                    - generic [ref=e819]:
+                      - generic [ref=e820]: 4.98 out of 5 average rating
+                      - img [ref=e822]
+                      - generic [ref=e824]: "4.98"
+            - group "Apartment in Portland" [ref=e826]:
+              - link "Apartment in Portland" [ref=e827] [cursor=pointer]:
+                - /url: /rooms/26272298?check_in=2026-04-10&check_out=2026-04-12&photo_id=1575451639&source_impression_id=p3_1775460065_P3ogCtOfoPR3zyOA&previous_page_section_name=1000
+              - generic [ref=e828]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Apartment in Portland" [ref=e830] [cursor=pointer]':
+                        - img [ref=e832]
+                - generic [ref=e834]:
+                  - generic [ref=e836]: Apartment in Portland
+                  - generic [ref=e837]:
+                    - generic [ref=e841]:
+                      - generic [ref=e844]: $304
+                      - generic [ref=e846]: for 2 nights
+                      - generic [ref=e847]: $304 for 2 nights
+                    - generic [ref=e848]:
+                      - generic [ref=e849]: ","
+                      - generic [ref=e850]: ·
+                    - generic [ref=e851]:
+                      - generic [ref=e852]: 4.92 out of 5 average rating
+                      - img [ref=e854]
+                      - generic [ref=e856]: "4.92"
+            - group "Home in Portland" [ref=e858]:
+              - link "Home in Portland" [ref=e859] [cursor=pointer]:
+                - /url: /rooms/1387124722230148754?check_in=2026-04-10&check_out=2026-04-12&photo_id=2134585203&source_impression_id=p3_1775460065_P3HlMGEyMrNAph5b&previous_page_section_name=1000
+              - generic [ref=e860]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Home in Portland" [ref=e862] [cursor=pointer]':
+                        - img [ref=e864]
+                - generic [ref=e866]:
+                  - generic [ref=e868]: Home in Portland
+                  - generic [ref=e869]:
+                    - generic [ref=e873]:
+                      - generic [ref=e876]: $537
+                      - generic [ref=e878]: for 2 nights
+                      - generic [ref=e879]: $537 for 2 nights
+                    - generic [ref=e880]:
+                      - generic [ref=e881]: ","
+                      - generic [ref=e882]: ·
+                    - generic [ref=e883]:
+                      - generic [ref=e884]: 4.98 out of 5 average rating
+                      - img [ref=e886]
+                      - generic [ref=e888]: "4.98"
+            - group "Apartment in Portland" [ref=e890]:
+              - link "Apartment in Portland" [ref=e891] [cursor=pointer]:
+                - /url: /rooms/21096045?check_in=2026-04-10&check_out=2026-04-12&photo_id=1746255029&source_impression_id=p3_1775460065_P3d8yWaHxcZ7TyUB&previous_page_section_name=1000
+              - generic [ref=e892]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - 'button "Add to wishlist: Apartment in Portland" [ref=e894] [cursor=pointer]':
+                        - img [ref=e896]
+                - generic [ref=e898]:
+                  - generic [ref=e900]: Apartment in Portland
+                  - generic [ref=e901]:
+                    - generic [ref=e905]:
+                      - generic [ref=e908]: $206
+                      - generic [ref=e910]: for 2 nights
+                      - generic [ref=e911]: $206 for 2 nights
+                    - generic [ref=e912]:
+                      - generic [ref=e913]: ","
+                      - generic [ref=e914]: ·
+                    - generic [ref=e915]:
+                      - generic [ref=e916]: 4.85 out of 5 average rating
+                      - img [ref=e918]
+                      - generic [ref=e920]: "4.85"
+            - group [ref=e922]:
+              - link [ref=e923] [cursor=pointer]:
+                - /url: /rooms/33169341?check_in=2026-04-10&check_out=2026-04-12&photo_id=801549254&source_impression_id=p3_1775460065_P3AVERswFEiu-twO&previous_page_section_name=1000
+              - generic [ref=e924]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - button [ref=e926] [cursor=pointer]:
+                        - img [ref=e928]
+                - generic [ref=e930]:
+                  - generic [ref=e932]: Guest suite in Portland
+                  - generic [ref=e933]:
+                    - generic [ref=e937]:
+                      - generic [ref=e940]: $201
+                      - generic [ref=e942]: for 2 nights
+                      - generic [ref=e943]: $201 for 2 nights
+                    - generic [ref=e944]:
+                      - generic [ref=e945]: ","
+                      - generic [ref=e946]: ·
+                    - generic [ref=e947]:
+                      - generic [ref=e948]: 4.95 out of 5 average rating
+                      - img [ref=e950]
+                      - generic [ref=e952]: "4.95"
+            - group [ref=e954]:
+              - link [ref=e955] [cursor=pointer]:
+                - /url: /rooms/39224415?check_in=2026-04-10&check_out=2026-04-12&photo_id=1428859669&source_impression_id=p3_1775460065_P3wof2qmdLUC06nE&previous_page_section_name=1000
+              - generic [ref=e956]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Guest favorite
+                          - generic: Guest favorite
+                      - button [ref=e958] [cursor=pointer]:
+                        - img [ref=e960]
+                - generic [ref=e962]:
+                  - generic [ref=e964]: Apartment in Portland
+                  - generic [ref=e965]:
+                    - generic [ref=e969]:
+                      - generic [ref=e972]: $298
+                      - generic [ref=e974]: for 2 nights
+                      - generic [ref=e975]: $298 for 2 nights
+                    - generic [ref=e976]:
+                      - generic [ref=e977]: ","
+                      - generic [ref=e978]: ·
+                    - generic [ref=e979]:
+                      - generic [ref=e980]: 4.82 out of 5 average rating
+                      - img [ref=e982]
+                      - generic [ref=e984]: "4.82"
+            - link [ref=e987] [cursor=pointer]:
+              - /url: /s/Portland/homes?place_id=ChIJJ3SpfQsLlVQRkYXR9ua5Nhw&refinement_paths%5B%5D=%2Fhomes&date_picker_type=CALENDAR&checkin=2026-04-10&checkout=2026-04-12&search_type=HOMEPAGE_CAROUSEL_CLICK
+              - generic [ref=e993]: See all
