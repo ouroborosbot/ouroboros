@@ -312,6 +312,25 @@ describe("updateUserProfileFields", () => {
     expect(storedJson.preferences.meal).toBe("vegan")
   })
 
+  it("merges fields without preferences key (uses empty default)", async () => {
+    const existing: UserProfile = {
+      legalName: { first: "John", last: "Doe" },
+      email: "john@example.com",
+      phone: "+1234567890",
+      preferences: { seat: "aisle" },
+    }
+    mockStore.getRawSecret.mockResolvedValue(JSON.stringify(existing))
+    mockStore.store.mockResolvedValue(undefined)
+
+    // Update without providing preferences
+    await updateUserProfileFields("friend-123", { email: "new@example.com" }, mockStore as any)
+
+    const storedJson = JSON.parse(mockStore.store.mock.calls[0][1].password)
+    expect(storedJson.email).toBe("new@example.com")
+    // Existing preferences preserved via ?? {} fallback
+    expect(storedJson.preferences.seat).toBe("aisle")
+  })
+
   it("emits nerves events", async () => {
     mockStore.getRawSecret.mockRejectedValue(new Error("no credential found"))
     mockStore.store.mockResolvedValue(undefined)

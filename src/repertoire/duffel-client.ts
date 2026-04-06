@@ -91,6 +91,7 @@ async function duffelRequest(
       "Content-Type": "application/json",
       "Duffel-Version": "v2",
     },
+    /* v8 ignore next -- all current callers pass a body; undefined branch is defensive @preserve */
     body: body ? JSON.stringify({ data: body }) : undefined,
   })
 

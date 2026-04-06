@@ -118,6 +118,69 @@ describe("commerceSelfTest", () => {
     expect(result.summary.length).toBeGreaterThan(0)
   })
 
+  it("reports Stripe 401 error with key verification link", async () => {
+    mockGetRawSecret.mockResolvedValue("test-key")
+    mockCreateVirtualCard.mockRejectedValue(new Error("401 Invalid API Key"))
+    mockSearchFlights.mockResolvedValue([])
+
+    const result = await commerceSelfTest()
+
+    expect(result.services.stripe.status).toBe("error")
+    expect(result.services.stripe.message).toContain("Stripe key returned 401")
+    expect(result.services.stripe.message).toContain("dashboard.stripe.com")
+  })
+
+  it("reports Duffel key missing with vault link", async () => {
+    mockGetRawSecret.mockResolvedValue("test-key")
+    mockCreateVirtualCard.mockResolvedValue({ cardId: "ic_test", last4: "4242", status: "active" })
+    mockDeactivateCard.mockResolvedValue({ cardId: "ic_test", last4: "4242", status: "canceled" })
+    mockSearchFlights.mockRejectedValue(new Error("no credential found for apiKey"))
+
+    const result = await commerceSelfTest()
+
+    expect(result.services.duffel.status).toBe("error")
+    expect(result.services.duffel.message).toContain("Duffel key missing")
+    expect(result.services.duffel.message).toContain("app.duffel.com")
+  })
+
+  it("reports generic Duffel error for unknown failures", async () => {
+    mockGetRawSecret.mockResolvedValue("test-key")
+    mockCreateVirtualCard.mockResolvedValue({ cardId: "ic_test", last4: "4242", status: "active" })
+    mockDeactivateCard.mockResolvedValue({ cardId: "ic_test", last4: "4242", status: "canceled" })
+    mockSearchFlights.mockRejectedValue(new Error("network timeout"))
+
+    const result = await commerceSelfTest()
+
+    expect(result.services.duffel.status).toBe("error")
+    expect(result.services.duffel.message).toContain("Duffel error: network timeout")
+  })
+
+  it("reports generic Stripe error for unknown failures", async () => {
+    mockGetRawSecret.mockResolvedValue("test-key")
+    mockCreateVirtualCard.mockRejectedValue(new Error("network timeout"))
+    mockSearchFlights.mockResolvedValue([])
+
+    const result = await commerceSelfTest()
+
+    expect(result.services.stripe.status).toBe("error")
+    expect(result.services.stripe.message).toContain("Stripe error: network timeout")
+  })
+
+  it("reports generic LiteAPI error for non-credential failures", async () => {
+    mockGetRawSecret.mockImplementation((domain: string) => {
+      if (domain === "liteapi.travel") return Promise.reject(new Error("vault locked"))
+      return Promise.resolve("test-key")
+    })
+    mockCreateVirtualCard.mockResolvedValue({ cardId: "ic_test", last4: "4242", status: "active" })
+    mockDeactivateCard.mockResolvedValue({ cardId: "ic_test", last4: "4242", status: "canceled" })
+    mockSearchFlights.mockResolvedValue([])
+
+    const result = await commerceSelfTest()
+
+    expect(result.services.liteapi.status).toBe("error")
+    expect(result.services.liteapi.message).toContain("LiteAPI error: vault locked")
+  })
+
   it("handles all services down", async () => {
     mockGetRawSecret.mockRejectedValue(new Error("vault unreachable"))
     mockCreateVirtualCard.mockRejectedValue(new Error("vault unreachable"))

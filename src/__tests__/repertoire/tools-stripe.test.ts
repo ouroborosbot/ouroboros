@@ -31,7 +31,7 @@ vi.mock("../../repertoire/credential-access", () => ({
   }),
 }))
 
-import { stripeToolDefinitions } from "../../repertoire/tools-stripe"
+import { stripeToolDefinitions, resetStripeClient } from "../../repertoire/tools-stripe"
 import type { ToolContext } from "../../repertoire/tools-base"
 
 function findTool(name: string) {
@@ -58,6 +58,29 @@ describe("stripeToolDefinitions", () => {
       expect(def.tool.function.parameters!.type).toBe("object")
       expect(typeof def.handler).toBe("function")
     }
+  })
+})
+
+describe("resetStripeClient", () => {
+  it("resets the singleton without error", () => {
+    expect(() => resetStripeClient()).not.toThrow()
+  })
+})
+
+describe("stripe_create_card — no context", () => {
+  const tool = findTool("stripe_create_card")
+
+  it("returns error when no friend context", async () => {
+    const result = await tool.handler({ type: "single_use", spend_limit: "100", currency: "usd" })
+    expect(result).toContain("no friend context")
+  })
+
+  it("returns error when ctx has no friend", async () => {
+    const result = await tool.handler(
+      { type: "single_use", spend_limit: "100", currency: "usd" },
+      { context: {} } as any,
+    )
+    expect(result).toContain("no friend context")
   })
 })
 
@@ -108,6 +131,33 @@ describe("stripe_create_card handler", () => {
 
     expect(result).toContain("family")
     expect(mockCreateVirtualCard).not.toHaveBeenCalled()
+  })
+
+  it("passes parsed merchant categories to Stripe", async () => {
+    mockCreateVirtualCard.mockResolvedValue({
+      cardId: "ic_mc",
+      last4: "1234",
+      status: "active",
+    })
+
+    const ctx: ToolContext = {
+      context: {
+        friend: { id: "f-1", name: "Ari", trustLevel: "family" },
+      } as any,
+    }
+
+    await tool.handler({
+      type: "single_use",
+      spend_limit: "500",
+      currency: "usd",
+      merchant_categories: "airlines_air_carriers, hotels_motels",
+    }, ctx)
+
+    expect(mockCreateVirtualCard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        merchantCategories: ["airlines_air_carriers", "hotels_motels"],
+      }),
+    )
   })
 
   it("handles Stripe API errors", async () => {
@@ -180,6 +230,24 @@ describe("stripe_deactivate_card handler", () => {
 
     const result = await tool.handler({ card_id: "ic_123" }, ctx)
     expect(result).toContain("family")
+  })
+})
+
+describe("stripe_deactivate_card — no context", () => {
+  const tool = findTool("stripe_deactivate_card")
+
+  it("returns error when no friend context", async () => {
+    const result = await tool.handler({ card_id: "ic_123" })
+    expect(result).toContain("no friend context")
+  })
+})
+
+describe("stripe_list_cards — no context", () => {
+  const tool = findTool("stripe_list_cards")
+
+  it("returns error when no friend context", async () => {
+    const result = await tool.handler({})
+    expect(result).toContain("no friend context")
   })
 })
 

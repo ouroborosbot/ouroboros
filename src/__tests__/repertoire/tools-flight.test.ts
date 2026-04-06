@@ -35,7 +35,7 @@ vi.mock("../../repertoire/credential-access", () => ({
   }),
 }))
 
-import { flightToolDefinitions } from "../../repertoire/tools-flight"
+import { flightToolDefinitions, resetDuffelClient } from "../../repertoire/tools-flight"
 import type { ToolContext } from "../../repertoire/tools-base"
 
 function findTool(name: string) {
@@ -67,6 +67,74 @@ describe("flightToolDefinitions", () => {
     expect(names).toContain("flight_hold")
     expect(names).toContain("flight_book")
     expect(names).toContain("flight_cancel")
+  })
+})
+
+describe("flight_search handler — no context", () => {
+  const tool = findTool("flight_search")
+
+  it("returns error when no friend context is provided", async () => {
+    const result = await tool.handler({ origin: "SFO", destination: "JFK", departure_date: "2026-05-01" })
+    expect(result).toContain("no friend context")
+  })
+
+  it("returns error when ctx has no friend", async () => {
+    const result = await tool.handler(
+      { origin: "SFO", destination: "JFK", departure_date: "2026-05-01" },
+      { context: {} } as any,
+    )
+    expect(result).toContain("no friend context")
+  })
+})
+
+describe("flight_hold handler", () => {
+  const tool = findTool("flight_hold")
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    nervesEvents.length = 0
+  })
+
+  it("returns hold acknowledgment for family trust", async () => {
+    const result = await tool.handler({ offer_id: "off_123" }, familyCtx)
+    const parsed = JSON.parse(result)
+    expect(parsed.status).toBe("hold_requested")
+    expect(parsed.offerId).toBe("off_123")
+  })
+
+  it("requires family trust level", async () => {
+    const result = await tool.handler({ offer_id: "off_123" }, friendCtx)
+    expect(result).toContain("family")
+  })
+
+  it("returns error when no friend context", async () => {
+    const result = await tool.handler({ offer_id: "off_123" })
+    expect(result).toContain("no friend context")
+  })
+})
+
+describe("flight_search — no results", () => {
+  const tool = findTool("flight_search")
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    nervesEvents.length = 0
+  })
+
+  it("returns message when no flights found", async () => {
+    mockSearchFlights.mockResolvedValue([])
+    const result = await tool.handler({
+      origin: "SFO",
+      destination: "XYZ",
+      departure_date: "2026-05-01",
+    }, friendCtx)
+    expect(result).toContain("no flights found")
+  })
+})
+
+describe("resetDuffelClient", () => {
+  it("resets the singleton without error", () => {
+    expect(() => resetDuffelClient()).not.toThrow()
   })
 })
 
@@ -188,6 +256,15 @@ describe("flight_book handler", () => {
   })
 })
 
+describe("flight_book — no context", () => {
+  const tool = findTool("flight_book")
+
+  it("returns error when no friend context", async () => {
+    const result = await tool.handler({ offer_id: "off_123", amount: "350", currency: "usd" })
+    expect(result).toContain("no friend context")
+  })
+})
+
 describe("flight_cancel handler", () => {
   const tool = findTool("flight_cancel")
 
@@ -210,5 +287,10 @@ describe("flight_cancel handler", () => {
   it("requires family trust", async () => {
     const result = await tool.handler({ order_id: "ord_123" }, friendCtx)
     expect(result).toContain("family")
+  })
+
+  it("returns error when no friend context", async () => {
+    const result = await tool.handler({ order_id: "ord_123" })
+    expect(result).toContain("no friend context")
   })
 })

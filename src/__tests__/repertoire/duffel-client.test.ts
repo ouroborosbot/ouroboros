@@ -129,6 +129,96 @@ describe("DuffelClient", () => {
         }),
       ).rejects.toThrow("Invalid API key")
     })
+
+    it("uses fallback error message when errors array is empty", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ errors: [] }),
+      })
+
+      await expect(
+        client.searchFlights({
+          origin: "SFO",
+          destination: "JFK",
+          departureDate: "2026-05-01",
+          passengers: [{ type: "adult" }],
+        }),
+      ).rejects.toThrow("Duffel API error (500)")
+    })
+
+    it("includes return slice when returnDate is provided", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          data: {
+            offers: [{
+              id: "off_rt",
+              total_amount: "700.00",
+              total_currency: "USD",
+              slices: [
+                {
+                  origin: { iata_code: "SFO" },
+                  destination: { iata_code: "JFK" },
+                  duration: "PT5H",
+                  segments: [{ operating_carrier: { name: "United" } }],
+                },
+                {
+                  origin: { iata_code: "JFK" },
+                  destination: { iata_code: "SFO" },
+                  duration: "PT6H",
+                  segments: [{ operating_carrier: { name: "Delta" } }],
+                },
+              ],
+            }],
+          },
+        }),
+      })
+
+      const result = await client.searchFlights({
+        origin: "SFO",
+        destination: "JFK",
+        departureDate: "2026-05-01",
+        returnDate: "2026-05-08",
+        passengers: [{ type: "adult" }],
+      })
+
+      expect(result[0].slices).toHaveLength(2)
+      // Verify the fetch body includes return slice
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(fetchBody.data.slices).toHaveLength(2)
+      expect(fetchBody.data.slices[1].departure_date).toBe("2026-05-08")
+    })
+
+    it("uses 'Unknown' carrier when segments are empty", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          data: {
+            offers: [{
+              id: "off_unk",
+              total_amount: "200.00",
+              total_currency: "USD",
+              slices: [{
+                origin: { iata_code: "LAX" },
+                destination: { iata_code: "ORD" },
+                duration: "PT4H",
+                segments: [],
+              }],
+            }],
+          },
+        }),
+      })
+
+      const result = await client.searchFlights({
+        origin: "LAX",
+        destination: "ORD",
+        departureDate: "2026-06-01",
+        passengers: [{ type: "adult" }],
+      })
+
+      expect(result[0].slices[0].carrier).toBe("Unknown")
+    })
   })
 
   describe("createOrder (booking with payment)", () => {
@@ -220,6 +310,93 @@ describe("DuffelClient", () => {
       const resultStr = JSON.stringify(result)
       expect(resultStr).not.toContain("4000056655665556")
       expect(resultStr).not.toContain("321")
+    })
+
+    it("books a flight with passport data", async () => {
+      mockCreateVirtualCard.mockResolvedValue({
+        cardId: "ic_test",
+        last4: "4242",
+        status: "active",
+      })
+      mockGetCardDetails.mockResolvedValue({
+        cardId: "ic_test",
+        number: "4242424242424242",
+        cvc: "987",
+        expMonth: 12,
+        expYear: 2027,
+      })
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          data: {
+            id: "ord_pp",
+            booking_reference: "PP123",
+            total_amount: "500.00",
+            total_currency: "USD",
+          },
+        }),
+      })
+      mockDeactivateCard.mockResolvedValue({
+        cardId: "ic_test",
+        last4: "4242",
+        status: "canceled",
+      })
+
+      const result = await client.createOrder({
+        offerId: "off_pp",
+        passengers: [{
+          type: "adult",
+          givenName: "Jane",
+          familyName: "Smith",
+          dateOfBirth: "1985-03-20",
+          passportNumber: "P12345",
+          passportCountry: "US",
+          passportExpiry: "2030-01-01",
+        }],
+        amount: 500,
+        currency: "usd",
+      })
+
+      expect(result.orderId).toBe("ord_pp")
+      // Verify passport data was included in the request body
+      const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      const passenger = fetchBody.data.passengers[0]
+      expect(passenger.identity_documents).toBeDefined()
+      expect(passenger.identity_documents[0].unique_identifier).toBe("P12345")
+    })
+
+    it("deactivates card even when deactivation itself fails on booking error", async () => {
+      mockCreateVirtualCard.mockResolvedValue({
+        cardId: "ic_test",
+        last4: "4242",
+        status: "active",
+      })
+      mockGetCardDetails.mockResolvedValue({
+        cardId: "ic_test",
+        number: "4242424242424242",
+        cvc: "987",
+        expMonth: 12,
+        expYear: 2027,
+      })
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ errors: [{ message: "Server error" }] }),
+      })
+      // Deactivation also fails
+      mockDeactivateCard.mockRejectedValue(new Error("deactivation failed"))
+
+      await expect(
+        client.createOrder({
+          offerId: "off_fail",
+          passengers: [{ type: "adult", givenName: "John", familyName: "Doe", dateOfBirth: "1990-01-15" }],
+          amount: 350,
+          currency: "usd",
+        }),
+      ).rejects.toThrow("Server error")
+
+      // Card deactivation was attempted
+      expect(mockDeactivateCard).toHaveBeenCalledWith("ic_test")
     })
 
     it("handles payment declined", async () => {
