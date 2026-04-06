@@ -115,6 +115,7 @@ export class BitwardenCredentialStore implements CredentialStore {
     if (!this.sessionToken) {
       await this.login()
     }
+    /* v8 ignore next -- defensive: login() always sets sessionToken on success @preserve */
     return this.sessionToken ?? undefined
   }
 
