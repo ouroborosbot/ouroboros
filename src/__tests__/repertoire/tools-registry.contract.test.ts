@@ -177,7 +177,7 @@ describe("tool registry contract", () => {
     expect(names).toContain("flight_book");
     expect(names).toContain("flight_cancel");
 
-    // Exact count: 55 tools total (45 + 3 profile + 3 stripe + 4 flight)
-    expect(names).toHaveLength(55);
+    // Exact count: 54 tools total (44 + 3 profile + 3 stripe + 4 flight)
+    expect(names).toHaveLength(54);
   });
 });
