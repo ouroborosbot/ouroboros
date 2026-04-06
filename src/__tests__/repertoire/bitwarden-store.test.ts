@@ -18,7 +18,17 @@ vi.mock("node:child_process", () => ({
 import { BitwardenCredentialStore } from "../../repertoire/bitwarden-store"
 
 function setupExecMock(result: { stdout: string; stderr?: string; error?: Error }) {
-  mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+  mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+    // bw status always succeeds with "unlocked" so ensureSession skips login
+    if (args[0] === "status") {
+      cb(null, JSON.stringify({ status: "unlocked" }), "")
+      return
+    }
+    // bw unlock (from ensureSession when status is "unlocked") returns a session token
+    if (args[0] === "unlock") {
+      cb(null, "mock-session-token", "")
+      return
+    }
     if (result.error) {
       cb(result.error, "", result.stderr ?? "")
     } else {
@@ -43,20 +53,27 @@ describe("BitwardenCredentialStore", () => {
   })
 
   describe("login", () => {
-    it("calls bw config server then bw login", async () => {
+    it("calls bw status, then config server, then bw login", async () => {
       const calls: string[][] = []
       mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
         calls.push(args)
-        cb(null, '{"access_token":"session-token"}', "")
+        // First call is status — return unauthenticated so login proceeds to config + login
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "unauthenticated" }), "")
+        } else {
+          cb(null, '{"access_token":"session-token"}', "")
+        }
       })
 
       await store.login()
 
-      // First call: bw config server <url>
-      expect(calls[0]).toEqual(["config", "server", "https://vault.ouro.bot"])
-      // Second call: bw login
-      expect(calls[1][0]).toBe("login")
-      expect(calls[1][1]).toBe("ouroboros@ouro.bot")
+      // First call: bw status
+      expect(calls[0]).toEqual(["status"])
+      // Second call: bw config server <url>
+      expect(calls[1]).toEqual(["config", "server", "https://vault.ouro.bot"])
+      // Third call: bw login
+      expect(calls[2][0]).toBe("login")
+      expect(calls[2][1]).toBe("ouroboros@ouro.bot")
     })
 
     it("caches the session token", async () => {
