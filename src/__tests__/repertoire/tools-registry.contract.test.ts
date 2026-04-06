@@ -161,7 +161,23 @@ describe("tool registry contract", () => {
     // Added in vault integration: 1 vault tool
     expect(names).toContain("vault_setup");
 
-    // Exact count: 45 tools total (44 + vault_setup)
-    expect(names).toHaveLength(45);
+    // Added in commerce infrastructure: 3 user profile tools
+    expect(names).toContain("user_profile_store");
+    expect(names).toContain("user_profile_get");
+    expect(names).toContain("user_profile_delete");
+
+    // Added in commerce infrastructure: 3 Stripe Issuing tools
+    expect(names).toContain("stripe_create_card");
+    expect(names).toContain("stripe_deactivate_card");
+    expect(names).toContain("stripe_list_cards");
+
+    // Added in commerce infrastructure: 4 Duffel flight tools
+    expect(names).toContain("flight_search");
+    expect(names).toContain("flight_hold");
+    expect(names).toContain("flight_book");
+    expect(names).toContain("flight_cancel");
+
+    // Exact count: 55 tools total (45 + 3 profile + 3 stripe + 4 flight)
+    expect(names).toHaveLength(55);
   });
 });
