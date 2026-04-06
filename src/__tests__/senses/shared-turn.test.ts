@@ -309,7 +309,7 @@ describe("runSenseTurn", () => {
     expect(input.drainPending).toBeDefined()
   })
 
-  it("passes mcpManager to buildSystem when MCP servers are configured", async () => {
+  it("buildSystem is called without mcpManager (now passed via runAgentOptions)", async () => {
     const fakeMcpManager = { listAllTools: vi.fn().mockReturnValue([]) }
     mockGetSharedMcpManager.mockResolvedValue(fakeMcpManager)
     // Ensure fresh session so buildSystem is called
@@ -324,10 +324,10 @@ describe("runSenseTurn", () => {
       userMessage: "hello",
     })
 
-    // buildSystem should receive the mcpManager in options
+    // buildSystem should NOT receive mcpManager — it's now passed via runAgentOptions
     expect(mockBuildSystem).toHaveBeenCalled()
     const buildSystemCall = mockBuildSystem.mock.calls[0]
-    expect(buildSystemCall[1]).toHaveProperty("mcpManager", fakeMcpManager)
+    expect(buildSystemCall[1]).toEqual({})
   })
 
   it("passes mcpManager in runAgentOptions to handleInboundTurn", async () => {
@@ -362,9 +362,9 @@ describe("runSenseTurn", () => {
     })
 
     expect(result.response).toBeDefined()
-    // buildSystem should receive undefined mcpManager
+    // buildSystem should receive empty options (no mcpManager)
     const buildSystemCall = mockBuildSystem.mock.calls[0]
-    expect(buildSystemCall[1].mcpManager).toBeUndefined()
+    expect(buildSystemCall[1]).toEqual({})
   })
 
   it("returns empty response when handleInboundTurn produces no text", async () => {
