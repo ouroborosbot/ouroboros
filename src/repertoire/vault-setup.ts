@@ -165,13 +165,11 @@ export async function createVaultAccount(
     const masterPasswordHash = await deriveMasterPasswordHash(masterKey, masterPassword)
     const stretchedKey = deriveStretchedMasterKey(masterKey)
 
-    // Step 2: Generate protected symmetric key
-    const protectedSymmetricKey = makeProtectedSymmetricKey(stretchedKey)
-
-    // Step 3: Generate RSA keypair, encrypt private key with symmetric key
-    // The symmetric key is 64 bytes (32 enc + 32 mac), same structure as stretched key
+    // Step 2: Generate symmetric key (64 bytes = 32 enc + 32 mac), encrypt with stretched key
     const symKey = crypto.randomBytes(64)
     const protectedSymKey = encryptWithStretchedKey(symKey, stretchedKey)
+
+    // Step 3: Generate RSA keypair, encrypt private key with the symmetric key
     const { publicKeyB64, privateKeyDer } = generateRsaKeypair()
     const encryptedPrivateKey = encryptWithStretchedKey(privateKeyDer, symKey)
 
