@@ -2,7 +2,7 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.234",
+      "version": "0.1.0-alpha.235",
       "changes": [
         "fix: MCP tool double-prefix \u2014 tools already prefixed by server name no longer get a redundant second prefix in the unified registry.",
         "feat: Open-Meteo zero-auth weather \u2014 replaced OpenWeatherMap with Open-Meteo forecast + geocoding API. Weather now works without any API key or credential provisioning.",
