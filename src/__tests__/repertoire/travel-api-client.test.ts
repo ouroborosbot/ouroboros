@@ -430,6 +430,37 @@ describe("isoToCountryName", () => {
     expect(isoToCountryName("US")).toBeUndefined()
     expect(isoToCountryName("AF")).toBeUndefined()
   })
+
+  it("returns correct names for newly added divergent ISO/FIPS codes", () => {
+    // Each of these ISO codes differs from its FIPS counterpart
+    const expected: Record<string, string> = {
+      AG: "Antigua and Barbuda",
+      BH: "Bahrain",
+      BS: "Bahamas",
+      BW: "Botswana",
+      CD: "Congo (Kinshasa)",
+      CI: "Cote d'Ivoire",
+      CL: "Chile",
+      CN: "China",
+      DK: "Denmark",
+      DO: "Dominican Republic",
+      DZ: "Algeria",
+      IL: "Israel",
+      JP: "Japan",
+      MA: "Morocco",
+      NG: "Nigeria",
+      PT: "Portugal",
+      SG: "Singapore",
+      TR: "Turkey",
+      UA: "Ukraine",
+      VN: "Vietnam",
+      ZA: "South Africa",
+    }
+
+    for (const [code, name] of Object.entries(expected)) {
+      expect(isoToCountryName(code), `isoToCountryName("${code}") should be "${name}"`).toBe(name)
+    }
+  })
 })
 
 describe("geocode", () => {
