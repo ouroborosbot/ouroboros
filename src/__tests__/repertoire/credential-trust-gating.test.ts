@@ -90,6 +90,27 @@ describe("credential tool trust gating", () => {
   })
 })
 
+  // --- vault_setup: family only ---
+
+  it("vault_setup + family trust = allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("vault_setup", {}, { readPaths: new Set(), trustLevel: "family" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("vault_setup + friend trust = denied", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("vault_setup", {}, { readPaths: new Set(), trustLevel: "friend" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("vault_setup + stranger trust = denied", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("vault_setup", {}, { readPaths: new Set(), trustLevel: "stranger" })
+    expect(result.allowed).toBe(false)
+  })
+})
+
 describe("credential tools in tool registry", () => {
   it("credentialToolDefinitions are included in baseToolDefinitions", async () => {
     const { baseToolDefinitions } = await import("../../repertoire/tools-base")
@@ -98,6 +119,7 @@ describe("credential tools in tool registry", () => {
     expect(toolNames).toContain("credential_store")
     expect(toolNames).toContain("credential_list")
     expect(toolNames).toContain("credential_delete")
+    expect(toolNames).toContain("vault_setup")
   })
 })
 

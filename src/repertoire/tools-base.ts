@@ -13,6 +13,7 @@ import { continuityToolDefinitions } from "./tools-continuity";
 import { configToolDefinitions } from "./tools-config";
 import { codingToolDefinitions } from "./coding/tools"
 import { credentialToolDefinitions } from "./tools-credential"
+import { vaultToolDefinitions } from "./tools-vault"
 import { travelToolDefinitions } from "./tools-travel";
 // Re-export flow tools for consumers that import them from tools-base
 export { ponderTool, observeTool, settleTool, restTool } from "./tools-flow";
@@ -87,6 +88,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
   ...configToolDefinitions,
   ...codingToolDefinitions,
   ...credentialToolDefinitions,
+  ...vaultToolDefinitions,
   ...travelToolDefinitions,
 ];
 

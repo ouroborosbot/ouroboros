@@ -287,7 +287,7 @@ function checkWriteTrustGuardrails(toolName: string, args: Record<string, string
 // --- credential tool trust gating ---
 
 // Credential write tools: family only
-const CREDENTIAL_FAMILY_TOOLS = new Set(["credential_store", "credential_delete"])
+const CREDENTIAL_FAMILY_TOOLS = new Set(["credential_store", "credential_delete", "vault_setup"])
 // Credential read tools: friend+
 const CREDENTIAL_TRUSTED_TOOLS = new Set(["credential_get", "credential_list"])
 
