@@ -34,22 +34,8 @@ const mockBwStore = {
   login: vi.fn().mockResolvedValue(undefined),
 }
 
-vi.mock("../../repertoire/bitwarden-store", () => ({
-  BitwardenCredentialStore: vi.fn().mockImplementation(() => mockBwStore),
-}))
-
-// Mock identity
-vi.mock("../../heart/identity", () => ({
-  getAgentName: () => "ouroboros",
-  loadAgentConfig: () => ({
-    vault: { email: "ouroboros@ouro.bot", serverUrl: "https://vault.ouro.bot" },
-  }),
-  resolveVaultConfig: (_name: string, _config: unknown) => ({
-    email: "ouroboros@ouro.bot",
-    serverUrl: "https://vault.ouro.bot",
-    masterPassword: "test-password",
-  }),
-  getAgentSecretsPath: (name: string) => `/tmp/.agentsecrets/${name}/secrets.json`,
+vi.mock("../../repertoire/credential-access", () => ({
+  getCredentialStore: () => mockBwStore,
 }))
 
 import { userProfileToolDefinitions } from "../../repertoire/tools-user-profile"
@@ -99,9 +85,7 @@ describe("user_profile_store handler", () => {
   it("stores profile fields for a friend", async () => {
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     const result = await tool.handler(
@@ -115,9 +99,7 @@ describe("user_profile_store handler", () => {
   it("rejects non-family trust level", async () => {
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Stranger",
-        trustLevel: "friend",
+        friend: { id: "friend-123", name: "Stranger", trustLevel: "friend" },
       } as any,
     }
     const result = await tool.handler(
@@ -137,9 +119,7 @@ describe("user_profile_store handler", () => {
   it("handles invalid JSON in fields", async () => {
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     const result = await tool.handler({ fields: "not-json{" }, ctx)
@@ -149,9 +129,7 @@ describe("user_profile_store handler", () => {
   it("emits nerves events", async () => {
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     await tool.handler(
@@ -174,9 +152,7 @@ describe("user_profile_get handler", () => {
     mockGetUserProfileField.mockResolvedValue("ari@example.com")
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     const result = await tool.handler({ field: "email" }, ctx)
@@ -187,9 +163,7 @@ describe("user_profile_get handler", () => {
   it("rejects non-family trust level", async () => {
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Acquaintance",
-        trustLevel: "acquaintance",
+        friend: { id: "friend-123", name: "Acquaintance", trustLevel: "acquaintance" },
       } as any,
     }
     const result = await tool.handler({ field: "email" }, ctx)
@@ -201,9 +175,7 @@ describe("user_profile_get handler", () => {
     mockGetUserProfileField.mockResolvedValue(undefined)
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     const result = await tool.handler({ field: "dateOfBirth" }, ctx)
@@ -214,9 +186,7 @@ describe("user_profile_get handler", () => {
     mockGetUserProfileField.mockResolvedValue("ari@example.com")
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     await tool.handler({ field: "email" }, ctx)
@@ -236,9 +206,7 @@ describe("user_profile_delete handler", () => {
     mockDeleteUserProfile.mockResolvedValue(true)
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     const result = await tool.handler({}, ctx)
@@ -250,9 +218,7 @@ describe("user_profile_delete handler", () => {
     mockDeleteUserProfile.mockResolvedValue(false)
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     const result = await tool.handler({}, ctx)
@@ -262,9 +228,7 @@ describe("user_profile_delete handler", () => {
   it("rejects non-family trust level", async () => {
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Friend",
-        trustLevel: "friend",
+        friend: { id: "friend-123", name: "Friend", trustLevel: "friend" },
       } as any,
     }
     const result = await tool.handler({}, ctx)
@@ -276,9 +240,7 @@ describe("user_profile_delete handler", () => {
     mockDeleteUserProfile.mockResolvedValue(true)
     const ctx: ToolContext = {
       context: {
-        friendId: "friend-123",
-        friendName: "Ari",
-        trustLevel: "family",
+        friend: { id: "friend-123", name: "Ari", trustLevel: "family" },
       } as any,
     }
     await tool.handler({}, ctx)
