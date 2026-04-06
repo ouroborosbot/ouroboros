@@ -91,6 +91,9 @@ export class BitwardenCredentialStore implements CredentialStore {
   }
 
   private async ensureSession(): Promise<string | undefined> {
+    if (!this.sessionToken) {
+      await this.login()
+    }
     return this.sessionToken ?? undefined
   }
 
