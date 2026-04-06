@@ -4,13 +4,14 @@
     {
       "version": "0.1.0-alpha.228",
       "changes": [
-        "refactor(repertoire): credential access layer with encrypted store, vault config types, golden path integration test"
+        "fix: BB session key resolution prefers DM (;-;) over group chat (;+;) — alphabetical sort put group chats first, causing proactive messages to land in group chats instead of personal DMs",
+        "chore: remove temporary debug traces (send-message-debug.log, friends.get_called event)"
       ]
     },
     {
       "version": "0.1.0-alpha.227",
       "changes": [
-        "fix: direct filesystem name resolution in sendProactiveBlueBubblesMessageToSession"
+        "fix: direct filesystem name resolution in sendProactiveBlueBubblesMessageToSession — bypass store.get()/listAll() with raw fs reads on friends directory when store lookup fails"
       ]
     },
     {
