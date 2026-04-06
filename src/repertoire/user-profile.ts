@@ -124,6 +124,7 @@ export async function getUserProfile(
     const raw = await store.getRawSecret(profileKey(friendId), "password")
     const parsed = JSON.parse(raw) as UserProfile
     return parsed
+  /* v8 ignore next 2 -- platform-dependent v8 branch counting on catch @preserve */
   } catch {
     return null
   }
