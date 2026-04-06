@@ -79,13 +79,36 @@ export function deriveMasterPasswordHash(
 }
 
 /**
- * Stretch the master key using HKDF-SHA256 to produce a 64-byte key.
+ * Stretch the master key using HKDF-Expand-only (RFC 5869 §2.3) to produce a 64-byte key.
  * First 32 bytes = encryption key, last 32 bytes = MAC key.
+ *
+ * CRITICAL: Bitwarden uses HKDF-Expand ONLY (no Extract step).
+ * Node.js crypto.hkdfSync() does Extract+Expand which produces DIFFERENT output.
+ * Reference: https://github.com/bitwarden/sdk-internal/blob/main/crates/bitwarden-crypto/src/util.rs
+ * Bitwarden calls Hkdf::<Sha256>::from_prk(masterKey).expand(info, output) — Expand only.
  */
 export function deriveStretchedMasterKey(masterKey: Buffer): Buffer {
-  const encKey = crypto.hkdfSync("sha256", masterKey, Buffer.alloc(0), "enc", 32)
-  const macKey = crypto.hkdfSync("sha256", masterKey, Buffer.alloc(0), "mac", 32)
-  return Buffer.concat([Buffer.from(encKey), Buffer.from(macKey)])
+  const encKey = hkdfExpandOnly(masterKey, "enc", 32)
+  const macKey = hkdfExpandOnly(masterKey, "mac", 32)
+  return Buffer.concat([encKey, macKey])
+}
+
+/**
+ * HKDF-Expand only (RFC 5869 §2.3) — no Extract step.
+ * Matches Bitwarden's Hkdf::from_prk(prk).expand(info).
+ */
+function hkdfExpandOnly(prk: Buffer, info: string, length: number): Buffer {
+  const hashLen = 32 // SHA-256
+  const n = Math.ceil(length / hashLen)
+  let okm = Buffer.alloc(0)
+  let t = Buffer.alloc(0)
+  for (let i = 1; i <= n; i++) {
+    t = crypto.createHmac("sha256", prk)
+      .update(Buffer.concat([t, Buffer.from(info, "utf8"), Buffer.from([i])]))
+      .digest()
+    okm = Buffer.concat([okm, t])
+  }
+  return okm.subarray(0, length)
 }
 
 /**
