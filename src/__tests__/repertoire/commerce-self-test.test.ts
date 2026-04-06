@@ -62,10 +62,9 @@ describe("commerceSelfTest", () => {
   })
 
   it("reports Stripe unhealthy with actionable error", async () => {
-    mockGetRawSecret.mockImplementation((domain: string) => {
-      if (domain === "stripe.com") return Promise.reject(new Error("no credential found"))
-      return Promise.resolve("test-key")
-    })
+    mockGetRawSecret.mockResolvedValue("test-key")
+    // Stripe client creation itself fails (key missing from vault)
+    mockCreateVirtualCard.mockRejectedValue(new Error("no credential found for restrictedKey"))
     mockSearchFlights.mockResolvedValue([])
 
     const result = await commerceSelfTest()
@@ -121,6 +120,8 @@ describe("commerceSelfTest", () => {
 
   it("handles all services down", async () => {
     mockGetRawSecret.mockRejectedValue(new Error("vault unreachable"))
+    mockCreateVirtualCard.mockRejectedValue(new Error("vault unreachable"))
+    mockSearchFlights.mockRejectedValue(new Error("vault unreachable"))
 
     const result = await commerceSelfTest()
 
