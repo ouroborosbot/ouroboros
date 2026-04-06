@@ -159,6 +159,34 @@ describe("createVaultAccount", () => {
     expect(result.error).toContain("Email already taken")
   })
 
+  it("falls back to HTTP status when error response body is not JSON", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      json: async () => { throw new Error("not json") },
+    })
+
+    const result = await createVaultAccount("ouroboros", "https://vault.ouro.bot", "ouroboros@ouro.bot", "test-password")
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe("HTTP 502 Bad Gateway")
+  })
+
+  it("falls back to HTTP status when error response has no message field", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: "Conflict",
+      json: async () => ({ detail: "duplicate" }), // no "message" key
+    })
+
+    const result = await createVaultAccount("ouroboros", "https://vault.ouro.bot", "ouroboros@ouro.bot", "test-password")
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe("HTTP 409 Conflict")
+  })
+
   it("returns failure result on network error", async () => {
     mockFetch.mockRejectedValue(new Error("ECONNREFUSED"))
 
@@ -166,6 +194,15 @@ describe("createVaultAccount", () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toContain("ECONNREFUSED")
+  })
+
+  it("handles non-Error thrown value in outer catch", async () => {
+    mockFetch.mockRejectedValue("string-error")
+
+    const result = await createVaultAccount("ouroboros", "https://vault.ouro.bot", "ouroboros@ouro.bot", "test-password")
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe("string-error")
   })
 
   it("emits nerves events", async () => {

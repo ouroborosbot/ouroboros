@@ -71,6 +71,28 @@ describe("BitwardenCredentialStore", () => {
       expect(store.isReady()).toBe(true)
     })
 
+    it("handles JSON login output without access_token field", async () => {
+      mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+        cb(null, '{"some_other_field":"value"}', "")
+      })
+
+      await store.login()
+
+      // Should not throw — falls back to raw loginOutput.trim() via ??
+      expect(store.isReady()).toBe(true)
+    })
+
+    it("handles raw string session token (non-JSON output)", async () => {
+      mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
+        cb(null, "raw-session-token-string", "")
+      })
+
+      await store.login()
+
+      // Should not throw — falls back to raw string
+      expect(store.isReady()).toBe(true)
+    })
+
     it("handles login failure", async () => {
       mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
         if (args[0] === "login") {
@@ -116,6 +138,13 @@ describe("BitwardenCredentialStore", () => {
       expect(result).toBeNull()
     })
 
+    it("returns null when bw CLI fails during search", async () => {
+      setupExecMock({ stdout: "", error: new Error("vault is locked") })
+
+      const result = await store.get("test.com")
+      expect(result).toBeNull()
+    })
+
     it("emits nerves events", async () => {
       setupExecMock({ stdout: "[]" })
 
@@ -123,6 +152,49 @@ describe("BitwardenCredentialStore", () => {
 
       expect(nervesEvents.some((e) => e.event === "repertoire.bw_credential_get_start")).toBe(true)
       expect(nervesEvents.some((e) => e.event === "repertoire.bw_credential_get_end")).toBe(true)
+    })
+
+    it("uses session token in bw env after login", async () => {
+      const envCaptures: Array<Record<string, string | undefined>> = []
+      mockExecFile.mockImplementation((_cmd: string, _args: string[], opts: any, cb: Function) => {
+        envCaptures.push(opts?.env ?? {})
+        // Return matching item for search calls
+        cb(null, JSON.stringify([{
+          id: "item-1",
+          name: "test.com",
+          login: { username: "u", password: "p" },
+          revisionDate: "2026-01-01T00:00:00.000Z",
+        }]), "")
+      })
+
+      // Login first to set session token
+      await store.login()
+      envCaptures.length = 0
+
+      await store.get("test.com")
+
+      // After login, BW_SESSION should be set in env
+      expect(envCaptures.some((e) => e.BW_SESSION !== undefined)).toBe(true)
+    })
+
+    it("falls back for null notes and missing revisionDate", async () => {
+      setupExecMock({
+        stdout: JSON.stringify([{
+          id: "item-1",
+          name: "test.com",
+          login: { username: "testuser" },
+          notes: null,
+          // no revisionDate
+        }]),
+      })
+
+      const result = await store.get("test.com")
+
+      expect(result).not.toBeNull()
+      expect(result!.notes).toBeUndefined()
+      // revisionDate falls back to current ISO string
+      expect(result!.createdAt).toBeDefined()
+      expect(result!.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}/)
     })
   })
 
@@ -159,6 +231,33 @@ describe("BitwardenCredentialStore", () => {
       })
 
       await expect(store.getRawSecret("test.com", "password")).rejects.toThrow(/field "password" not found/)
+    })
+
+    it("reads arbitrary field from item when field is not password or username", async () => {
+      setupExecMock({
+        stdout: JSON.stringify([{
+          id: "item-1",
+          name: "test.com",
+          login: { username: "user", password: "pass" },
+          notes: "my-secret-note",
+        }]),
+      })
+
+      const result = await store.getRawSecret("test.com", "notes")
+      expect(result).toBe("my-secret-note")
+    })
+
+    it("returns username field when requested", async () => {
+      setupExecMock({
+        stdout: JSON.stringify([{
+          id: "item-1",
+          name: "test.com",
+          login: { username: "testuser", password: "pass" },
+        }]),
+      })
+
+      const result = await store.getRawSecret("test.com", "username")
+      expect(result).toBe("testuser")
     })
   })
 
@@ -221,11 +320,43 @@ describe("BitwardenCredentialStore", () => {
       expect(results[1].domain).toBe("site-b.com")
     })
 
+    it("handles items with null notes and missing revisionDate in list", async () => {
+      setupExecMock({
+        stdout: JSON.stringify([
+          {
+            id: "1",
+            name: "site.com",
+            login: { username: "user" },
+            notes: null,
+            // no revisionDate
+          },
+        ]),
+      })
+
+      const results = await store.list()
+
+      expect(results).toHaveLength(1)
+      expect(results[0].notes).toBeUndefined()
+      expect(results[0].createdAt).toBeDefined()
+      expect(results[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}/)
+    })
+
     it("returns empty array when vault is empty", async () => {
       setupExecMock({ stdout: "[]" })
 
       const results = await store.list()
       expect(results).toEqual([])
+    })
+
+    it("returns empty array and emits error event when bw CLI fails", async () => {
+      setupExecMock({ stdout: "", error: new Error("vault is locked") })
+
+      const results = await store.list()
+
+      expect(results).toEqual([])
+      expect(nervesEvents.some((e) =>
+        e.event === "repertoire.bw_credential_list_end" && (e.meta as any).count === 0,
+      )).toBe(true)
     })
   })
 

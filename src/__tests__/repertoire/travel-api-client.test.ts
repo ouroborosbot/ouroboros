@@ -382,6 +382,21 @@ describe("getTravelAdvisory", () => {
     expect(result.advisoryLevel).toBe(4)
   })
 
+  it("throws when ISO code diverges from FIPS but no matching title found", async () => {
+    // DE maps to "Germany" in the divergence table, but RSS has no Germany entry
+    const rssNoGermany = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Afghanistan - Level 4: Do Not Travel</title>
+    <pubDate>Mon, 15 Jan 2026</pubDate>
+    <category domain="Country-Tag">AF</category>
+  </item>
+</channel></rss>`
+    mockFetchText(rssNoGermany)
+
+    await expect(getTravelAdvisory("DE")).rejects.toThrow(/No travel advisory found/)
+  })
+
   it("matches Burma/Myanmar via ISO code MM (FIPS is BM)", async () => {
     const rssBurma = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel>

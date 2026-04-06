@@ -156,4 +156,64 @@ describe("vault_setup tool", () => {
 
     expect(nervesEvents.some((e) => e.event === "repertoire.vault_tool_call")).toBe(true)
   })
+
+  it("preserves existing vault object fields when updating secrets", async () => {
+    mockExistsSync.mockReturnValue(true)
+    mockReadFileSync.mockReturnValue(JSON.stringify({
+      vault: { customField: "keep-me", oldPassword: "old" },
+    }))
+
+    const tool = findTool("vault_setup")
+    const result = await tool.handler({})
+
+    expect(result).toContain("Vault created")
+    const written = JSON.parse(mockWriteFileSync.mock.calls[0][1])
+    // Existing vault fields should be preserved via spread
+    expect(written.vault.customField).toBe("keep-me")
+    // New fields should overwrite
+    expect(written.vault.masterPassword).toBeDefined()
+    expect(written.vault.email).toBe("ouroboros@ouro.bot")
+  })
+
+  it("handles secrets.json with non-object vault field", async () => {
+    mockExistsSync.mockReturnValue(true)
+    mockReadFileSync.mockReturnValue(JSON.stringify({ vault: "not-an-object" }))
+
+    const tool = findTool("vault_setup")
+    const result = await tool.handler({})
+
+    expect(result).toContain("Vault created")
+    const written = JSON.parse(mockWriteFileSync.mock.calls[0][1])
+    // vault should be overwritten with proper object, not spread a string
+    expect(written.vault.masterPassword).toBeDefined()
+    expect(written.vault.email).toBe("ouroboros@ouro.bot")
+  })
+
+  it("handles corrupt secrets.json gracefully", async () => {
+    mockExistsSync.mockReturnValue(true)
+    mockReadFileSync.mockReturnValue("not valid json {{{")
+
+    const tool = findTool("vault_setup")
+    const result = await tool.handler({})
+
+    // Should still succeed — corrupt file is treated as empty
+    expect(result).toContain("Vault created")
+    // Should still write updated secrets
+    expect(mockWriteFileSync).toHaveBeenCalled()
+    const written = JSON.parse(mockWriteFileSync.mock.calls[0][1])
+    expect(written.vault).toBeDefined()
+  })
+
+  it("returns error message when handler throws a non-Error value", async () => {
+    // Make loadAgentConfig throw a string (not an Error instance)
+    mockLoadAgentConfig.mockImplementation(() => {
+      throw "config-not-found"
+    })
+
+    const tool = findTool("vault_setup")
+    const result = await tool.handler({})
+
+    expect(result).toContain("Vault setup error:")
+    expect(result).toContain("config-not-found")
+  })
 })
