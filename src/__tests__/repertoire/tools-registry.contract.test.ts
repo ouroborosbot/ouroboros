@@ -142,10 +142,9 @@ describe("tool registry contract", () => {
     expect(names).toContain("intention_capture");
     expect(names).toContain("intention_manage");
 
-    // Added in capability discovery: 3 tools
+    // Added in capability discovery: 2 tools
     expect(names).toContain("read_config");
     expect(names).toContain("update_config");
-    expect(names).toContain("propose_config");
 
     // Added in credential access layer: 4 credential tools (replaced 5 vault tools)
     expect(names).toContain("credential_get");
