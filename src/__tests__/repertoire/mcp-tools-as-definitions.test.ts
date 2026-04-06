@@ -175,6 +175,21 @@ describe("mcpToolsAsDefinitions", () => {
     expect((errorEvent!.meta as Record<string, unknown>).reason).toBe("timeout")
   })
 
+  it("handler handles non-Error throw values", async () => {
+    const mgr = {
+      listAllTools: () => [{
+        server: "broken",
+        tools: [{ name: "crash", description: "Crash", inputSchema: { type: "object" } }],
+      }],
+      callTool: vi.fn().mockRejectedValue("string-error-value"),
+    } as unknown as McpManager
+
+    const result = mcpToolsAsDefinitions(mgr)
+    const output = await result[0].handler({})
+
+    expect(output).toBe("[mcp error] broken/crash: string-error-value")
+  })
+
   it("tool definition has type 'function'", () => {
     const mgr = makeMockMcpManager([{
       server: "test",
