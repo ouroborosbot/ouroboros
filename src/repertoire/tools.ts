@@ -176,10 +176,13 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
   }
 
   // Guardrail check: structural + trust-level
+  const mcpDef = mcpDefinitions.find((d) => d.tool.function.name === name)
   const guardContext = {
     readPaths: editFileReadTracker,
     trustLevel: ctx?.context?.friend?.trustLevel,
     agentRoot: safeGetAgentRoot(),
+    ...(mcpDef?.mcpServer ? { mcpServerName: mcpDef.mcpServer } : {}),
+    ...((ctx?.context as any)?.isGroupChat !== undefined ? { isGroupChat: (ctx?.context as any).isGroupChat } : {}),
   }
   const guardArgs = normalizeGuardArgs(name, args)
   const guardResult = guardInvocation(name, guardArgs, guardContext)
