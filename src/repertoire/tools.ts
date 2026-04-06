@@ -11,6 +11,8 @@ import type { ProviderCapability } from "../heart/core";
 import { guardInvocation } from "./guardrails";
 import { getAgentRoot } from "../heart/identity";
 import { surfaceToolDefinition } from "./tools-surface";
+import type { McpManager } from "./mcp-manager";
+import { mcpToolsAsDefinitions } from "./mcp-tools";
 
 function safeGetAgentRoot(): string | undefined {
   try {
@@ -29,6 +31,15 @@ export { surfaceToolDef } from "./tools-surface";
 
 // All tool definitions in a single registry
 const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...bluebubblesToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions, surfaceToolDefinition];
+
+// MCP tool definitions — populated each time getToolsForChannel() is called with an mcpManager.
+// Kept separate from allDefinitions so execTool/isConfirmation* can find them.
+let mcpDefinitions: ToolDefinition[] = []
+
+/** Exported for testing — reset the MCP definitions cache. */
+export function resetMcpDefinitions(): void {
+  mcpDefinitions = []
+}
 
 function baseToolsForCapabilities(): OpenAI.ChatCompletionFunctionTool[] {
   // Use baseToolDefinitions at call time so dynamically-added tools are included
@@ -70,6 +81,7 @@ export function getToolsForChannel(
   toolPreferences?: Record<string, string>,
   _context?: Pick<ResolvedContext, "friend" | "channel">,
   providerCapabilities?: ReadonlySet<ProviderCapability>,
+  mcpManager?: McpManager,
 ): OpenAI.ChatCompletionFunctionTool[] {
   const baseTools = baseToolsForCapabilities();
   const bluebubblesTools = capabilities?.channel === "bluebubbles"
@@ -106,6 +118,13 @@ export function getToolsForChannel(
 
       result = [...baseTools, ...bluebubblesTools, ...enrichedIntegrationTools];
     }
+  }
+
+  // Append first-class MCP tools when mcpManager is provided
+  if (mcpManager) {
+    mcpDefinitions = mcpToolsAsDefinitions(mcpManager)
+    const mcpSchemas = mcpDefinitions.map((d) => d.tool)
+    result = [...result, ...mcpSchemas]
   }
 
   return filterByCapability(result, providerCapabilities);
