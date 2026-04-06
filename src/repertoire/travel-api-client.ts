@@ -2,13 +2,12 @@
  * Travel API client module.
  *
  * Provides HTTP clients for:
- * - OpenWeatherMap (query-param auth via vault)
+ * - Open-Meteo weather forecast (no auth, WMO weather codes)
  * - US State Dept Travel Advisories (no auth)
  * - Nominatim Geocoding (no auth, requires User-Agent)
  */
 
 import { emitNervesEvent } from "../nerves/runtime"
-import { getCredentialStore } from "./credential-access"
 
 export interface WeatherData {
   temperature: number
@@ -18,6 +17,10 @@ export interface WeatherData {
   windSpeed: number
   city: string
   country: string
+  /** Daily high temperature (when available from forecast). */
+  dailyHigh?: number
+  /** Daily low temperature (when available from forecast). */
+  dailyLow?: number
 }
 
 export interface TravelAdvisory {
@@ -35,55 +38,132 @@ export interface GeoLocation {
   type: string
 }
 
-// --- OpenWeatherMap ---
+// --- Open-Meteo Weather (zero auth) ---
 
-/** Domain used for weather API key credential retrieval. */
-const WEATHER_CREDENTIAL_DOMAIN = "api.openweathermap.org"
+const OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
+const OPEN_METEO_GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
 
-async function getWeatherApiKey(): Promise<string> {
-  const store = getCredentialStore()
-  return store.getRawSecret(WEATHER_CREDENTIAL_DOMAIN, "password")
+const OPEN_METEO_HEADERS = {
+  "User-Agent": "Ouroboros/1.0 (https://github.com/ouroborosbot/ouroboros)",
+  Accept: "application/json",
+}
+
+/**
+ * WMO weather interpretation codes (WW) to human-readable descriptions.
+ * Spec: https://www.nodc.noaa.gov/archive/arc0021/0002199/1.1/data/0-data/HTML/WMO-CODE/WMO4677.HTM
+ */
+export const WMO_WEATHER_CODES: Record<number, string> = {
+  0: "clear sky",
+  1: "mainly clear",
+  2: "partly cloudy",
+  3: "overcast",
+  45: "fog",
+  48: "depositing rime fog",
+  51: "light drizzle",
+  53: "moderate drizzle",
+  55: "dense drizzle",
+  56: "light freezing drizzle",
+  57: "dense freezing drizzle",
+  61: "slight rain",
+  63: "moderate rain",
+  65: "heavy rain",
+  66: "light freezing rain",
+  67: "heavy freezing rain",
+  71: "slight snowfall",
+  73: "moderate snowfall",
+  75: "heavy snowfall",
+  77: "snow grains",
+  80: "slight rain showers",
+  81: "moderate rain showers",
+  82: "violent rain showers",
+  85: "slight snow showers",
+  86: "heavy snow showers",
+  95: "thunderstorm",
+  96: "thunderstorm with slight hail",
+  99: "thunderstorm with heavy hail",
+}
+
+/** Convert a WMO weather code to a human-readable description. */
+export function wmoWeatherDescription(code: number): string {
+  return WMO_WEATHER_CODES[code] ?? "unknown"
 }
 
 export async function getWeather(lat: number, lon: number): Promise<WeatherData> {
   return withNervesEvents("getWeather", { lat, lon }, async () => {
-    const apiKey = await getWeatherApiKey()
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`
-    const res = await fetch(url)
+    const url =
+      `${OPEN_METEO_FORECAST}?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code` +
+      `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
+      `&timezone=auto`
+
+    const res = await fetch(url, { headers: OPEN_METEO_HEADERS })
 
     if (!res.ok) {
-      throw new Error(`OpenWeatherMap API error: ${res.status} ${res.statusText}`)
+      throw new Error(`Open-Meteo API error: ${res.status} ${res.statusText}`)
     }
 
     const data = await res.json()
-    return parseWeatherResponse(data)
+    return parseOpenMeteoResponse(data, lat, lon)
   })
 }
 
 export async function getWeatherByCity(city: string): Promise<WeatherData> {
   return withNervesEvents("getWeatherByCity", { city }, async () => {
-    const apiKey = await getWeatherApiKey()
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric`
-    const res = await fetch(url)
+    // Step 1: geocode the city name via Open-Meteo geocoding
+    const geoUrl = `${OPEN_METEO_GEOCODING}?name=${encodeURIComponent(city)}&count=1&language=en`
+    const geoRes = await fetch(geoUrl, { headers: OPEN_METEO_HEADERS })
+
+    if (!geoRes.ok) {
+      throw new Error(`Open-Meteo geocoding error: ${geoRes.status} ${geoRes.statusText}`)
+    }
+
+    const geoData = await geoRes.json()
+    const results = geoData.results as any[] | undefined
+
+    if (!results || results.length === 0) {
+      throw new Error(`No location found for city "${city}"`)
+    }
+
+    const loc = results[0]
+
+    // Step 2: fetch forecast for the resolved coordinates
+    const url =
+      `${OPEN_METEO_FORECAST}?latitude=${loc.latitude}&longitude=${loc.longitude}` +
+      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code` +
+      `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
+      `&timezone=auto`
+
+    const res = await fetch(url, { headers: OPEN_METEO_HEADERS })
 
     if (!res.ok) {
-      throw new Error(`OpenWeatherMap API error: ${res.status} ${res.statusText}`)
+      throw new Error(`Open-Meteo API error: ${res.status} ${res.statusText}`)
     }
 
     const data = await res.json()
-    return parseWeatherResponse(data)
+    return parseOpenMeteoResponse(data, loc.latitude, loc.longitude, loc.name, loc.country_code)
   })
 }
 
-function parseWeatherResponse(data: any): WeatherData {
+function parseOpenMeteoResponse(
+  data: any,
+  lat: number,
+  lon: number,
+  cityName?: string,
+  countryCode?: string,
+): WeatherData {
+  const current = data.current ?? {}
+  const daily = data.daily ?? {}
+
   return {
-    temperature: data.main.temp,
-    feelsLike: data.main.feels_like,
-    description: data.weather?.[0]?.description ?? "unknown",
-    humidity: data.main.humidity,
-    windSpeed: data.wind.speed,
-    city: data.name,
-    country: data.sys.country,
+    temperature: current.temperature_2m ?? 0,
+    feelsLike: current.apparent_temperature ?? 0,
+    description: wmoWeatherDescription(current.weather_code ?? -1),
+    humidity: current.relative_humidity_2m ?? 0,
+    windSpeed: current.wind_speed_10m ?? 0,
+    city: cityName ?? `${lat},${lon}`,
+    country: countryCode ?? "",
+    dailyHigh: daily.temperature_2m_max?.[0],
+    dailyLow: daily.temperature_2m_min?.[0],
   }
 }
 
