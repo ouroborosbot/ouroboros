@@ -161,7 +161,17 @@ describe("tool registry contract", () => {
     // Added in vault integration: 1 vault tool
     expect(names).toContain("vault_setup");
 
-    // Exact count: 45 tools total (44 + vault_setup)
-    expect(names).toHaveLength(45);
+    // Added in commerce: user profile (3) + flight (4) = 7
+    // (Stripe payment tools are in PR B, not this branch)
+    expect(names).toContain("user_profile_store");
+    expect(names).toContain("user_profile_get");
+    expect(names).toContain("user_profile_delete");
+    expect(names).toContain("flight_search");
+    expect(names).toContain("flight_hold");
+    expect(names).toContain("flight_book");
+    expect(names).toContain("flight_cancel");
+
+    // Exact count: 55 tools (44 base + vault_setup + 3 user_profile + 4 flight + 3 stripe)
+    expect(names).toHaveLength(55);
   });
 });
