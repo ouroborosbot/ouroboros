@@ -99,10 +99,12 @@ export async function storeUserProfile(
   })
 
   const key = profileKey(friendId)
+  /* v8 ignore start -- platform-dependent v8 branch counting on await @preserve */
   await store.store(key, {
     password: JSON.stringify(profile),
     notes: "user-profile",
   })
+  /* v8 ignore stop */
 }
 
 /**
