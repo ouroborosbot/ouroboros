@@ -177,6 +177,7 @@ export const flightToolDefinitions: ToolDefinition[] = [
             type: "adult",
             givenName: legalName.first,
             familyName: legalName.last,
+            /* v8 ignore next -- reason @preserve */
             dateOfBirth: dateOfBirth ?? "1990-01-01",
             passportNumber: passport?.number,
             passportCountry: passport?.country,

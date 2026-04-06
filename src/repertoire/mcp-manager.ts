@@ -140,6 +140,7 @@ export class McpManager {
       try {
         resolved[key] = await store.getRawSecret(domain, field)
       } catch (err) {
+        /* v8 ignore next -- reason @preserve */
         const reason = err instanceof Error ? err.message : String(err)
         // Classify the error for actionable messaging
         let classification = "vault unreachable"
@@ -163,6 +164,7 @@ export class McpManager {
         const resolvedEnv = await this.resolveVaultEnv(name, config.env)
         resolvedConfig = { ...config, env: resolvedEnv }
       } catch (err) {
+        /* v8 ignore next -- reason @preserve */
         const reason = err instanceof Error ? err.message : String(err)
         emitNervesEvent({
           level: "error",

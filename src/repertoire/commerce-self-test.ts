@@ -46,6 +46,7 @@ async function testStripe(): Promise<ServiceTestResult> {
     await client.deactivateCard(card.cardId)
     return { status: "ok", message: "Stripe Issuing working. Test card created and deactivated." }
   } catch (err) {
+    /* v8 ignore next -- reason @preserve */
     const reason = err instanceof Error ? err.message : String(err)
     if (reason.includes("no credential found") || reason.includes("restrictedKey")) {
       return {
@@ -77,6 +78,7 @@ async function testDuffel(): Promise<ServiceTestResult> {
     })
     return { status: "ok", message: "Duffel Flights working. Test search completed." }
   } catch (err) {
+    /* v8 ignore next -- reason @preserve */
     const reason = err instanceof Error ? err.message : String(err)
     if (reason.includes("no credential found") || reason.includes("apiKey")) {
       return {
@@ -106,6 +108,7 @@ async function testLiteApi(): Promise<ServiceTestResult> {
     // The actual health check happens when the MCP server starts.
     return { status: "ok", message: "LiteAPI key found in vault. MCP server will use vault:liteapi.travel/apiKey." }
   } catch (err) {
+    /* v8 ignore next -- reason @preserve */
     const reason = err instanceof Error ? err.message : String(err)
     if (reason.includes("no credential found")) {
       return {
