@@ -88,7 +88,6 @@ describe("credential tool trust gating", () => {
     const result = guardInvocation("credential_list", {}, { readPaths: new Set(), trustLevel: "acquaintance" })
     expect(result.allowed).toBe(false)
   })
-})
 
   // --- vault_setup: family only ---
 
