@@ -466,6 +466,7 @@ export function createBlueBubblesClient(
       }
 
       emitNervesEvent({
+        level: "warn",
         component: "senses",
         event: "senses.bluebubbles_repair_start",
         message: "repairing bluebubbles event by guid",
@@ -594,6 +595,7 @@ export function createBlueBubblesClient(
           }
         }
         emitNervesEvent({
+          level: "warn",
           component: "senses",
           event: "senses.bluebubbles_repair_end",
           message: "bluebubbles event repaired",
