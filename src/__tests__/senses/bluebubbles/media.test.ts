@@ -1929,6 +1929,28 @@ describe("BlueBubbles media hydration — capability-aware image routing", () =>
     ])
   })
 
+  it("senses.bluebubbles_media_hydrate emits at warn level so it survives the BB default log level (B3)", async () => {
+    vi.resetModules()
+    const nervesMock = vi.fn()
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent: nervesMock }))
+    const { hydrateBlueBubblesAttachments } = await import("../../../senses/bluebubbles/media")
+    await hydrateBlueBubblesAttachments(
+      [{ guid: "g1", mimeType: "image/png", transferName: "pic.png" }],
+      baseConfig(),
+      baseChannel(),
+      {
+        fetchImpl: vi.fn().mockResolvedValue(pngResponse()),
+        chatModel: "claude-opus-4-6",
+      },
+    )
+    const hydrate = nervesMock.mock.calls.find(
+      (c) => c[0]?.event === "senses.bluebubbles_media_hydrate",
+    )
+    expect(hydrate).toBeDefined()
+    expect(hydrate?.[0].level).toBe("warn")
+    vi.doUnmock("../../../nerves/runtime")
+  })
+
   it("non-vision chat model with missing content-type: routes through skip-unsupported", async () => {
     vi.resetModules()
     const nervesMock = vi.fn()

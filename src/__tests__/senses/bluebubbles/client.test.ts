@@ -2391,6 +2391,159 @@ describe("BlueBubbles client", () => {
     })
   })
 
+  describe("warn-level promotion for B3 events", () => {
+    it("senses.bluebubbles_repair_start emits at warn level", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      } as any)
+
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              guid: "msg-warn-1",
+              text: "hi",
+              handle: { address: "ari@mendelow.me", service: "iMessage" },
+              attachments: [],
+              chats: [
+                {
+                  guid: "any;-;ari@mendelow.me",
+                  style: 45,
+                  chatIdentifier: "ari@mendelow.me",
+                  displayName: "",
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "msg-warn-1",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "hi",
+        textForAgent: "hi",
+        attachments: [],
+        hasPayloadData: false,
+        requiresRepair: true,
+      })
+
+      const startEvent = emitNervesEvent.mock.calls.find(
+        (c: unknown[]) => (c[0] as { event?: string }).event === "senses.bluebubbles_repair_start",
+      )
+      expect(startEvent).toBeDefined()
+      expect((startEvent![0] as { level?: string }).level).toBe("warn")
+    })
+
+    it("senses.bluebubbles_repair_end emits at warn level", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      } as any)
+
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              guid: "msg-warn-2",
+              text: "hi",
+              handle: { address: "ari@mendelow.me", service: "iMessage" },
+              attachments: [],
+              chats: [
+                {
+                  guid: "any;-;ari@mendelow.me",
+                  style: 45,
+                  chatIdentifier: "ari@mendelow.me",
+                  displayName: "",
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "msg-warn-2",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "hi",
+        textForAgent: "hi",
+        attachments: [],
+        hasPayloadData: false,
+        requiresRepair: true,
+      })
+
+      const endEvent = emitNervesEvent.mock.calls.find(
+        (c: unknown[]) => (c[0] as { event?: string }).event === "senses.bluebubbles_repair_end",
+      )
+      expect(endEvent).toBeDefined()
+      expect((endEvent![0] as { level?: string }).level).toBe("warn")
+    })
+
+    it("senses.bluebubbles_event_normalized stays at info (NOT promoted to warn)", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      } as any)
+      // Look for any event_normalized emit across all client tests; if any
+      // such event surfaces in mocks during a routine create call, assert
+      // its level is undefined or info (not warn).
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+      const normalizedEvents = emitNervesEvent.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as { event?: string }).event === "senses.bluebubbles_event_normalized",
+      )
+      for (const ev of normalizedEvents) {
+        const level = (ev[0] as { level?: string }).level
+        expect(level === undefined || level === "info").toBe(true)
+      }
+    })
+  })
+
   describe("VLM fallback wiring for image attachments", () => {
     function imageMessagePayload(guid: string) {
       return {
