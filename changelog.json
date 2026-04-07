@@ -2,6 +2,12 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.253",
+      "changes": [
+        "fix(daemon): orphan-cleanup fallback no longer kills processes from sibling harness instances. On startup, `killOrphanProcesses` scans `ps` for harness entry points (`agent-entry.js`, `daemon-entry.js`, `bluebubbles/entry.js`, `teams-entry.js`) and SIGTERMs them when the pidfile is missing. Previously any matching process was fair game, so a vitest-driven harness run from a sibling worktree (or a parallel Claude Code session running the coverage gate) would terminate the production daemon's children, triggering cascading graceful shutdowns and making production slugger unavailable for seconds-to-minutes at a time. Now the fallback only flags true orphans \u2014 processes whose PPID has been reparented to init (PID 1). Sibling daemons' live-parented children are left alone. New exported helper `parseOrphanPidsFromPs` isolates the filter for direct unit coverage."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.252",
       "changes": [
         "fix(tui): polished history preview (spacing, shadow color, showing-recent label), full-width separators, backslash+enter and ctrl+j for newlines."
