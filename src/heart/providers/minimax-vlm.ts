@@ -168,8 +168,8 @@ export async function minimaxVlmDescribe(params: MinimaxVlmDescribeParams): Prom
       signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (error) {
-    const err = error as Error & { name?: string }
-    if (err?.name === "AbortError" || err?.name === "TimeoutError") {
+    const err = (error instanceof Error ? error : new Error(String(error))) as Error & { name?: string }
+    if (err.name === "AbortError" || err.name === "TimeoutError") {
       const seconds = Math.round(timeoutMs / 1000)
       throwAndEmit(
         params,
@@ -184,7 +184,7 @@ export async function minimaxVlmDescribe(params: MinimaxVlmDescribeParams): Prom
     }
     throwAndEmit(
       params,
-      `minimax VLM: unexpected transport error (${err?.message ?? String(err)}) — retry, and if it persists surface 'image understanding is unavailable' to the user`,
+      `minimax VLM: unexpected transport error (${err.message}) — retry, and if it persists surface 'image understanding is unavailable' to the user`,
     )
   }
 

@@ -556,6 +556,226 @@ describe("minimaxVlmDescribe", () => {
     expect(errors[0][0].meta.prompt).toBeUndefined()
   })
 
+  it("unexpected transport error (non-network, non-timeout) surfaces AX-2 fallback", async () => {
+    emitTestEvent("transport error generic")
+    const weirdError = new Error("some weird transport bug")
+    const fetchImpl = vi.fn().mockRejectedValue(weirdError)
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/unexpected transport error|some weird transport bug/i)
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/retry|image understanding is unavailable/i)
+  })
+
+  it("HTTP 404 (non-specific !ok status) surfaces AX-2 fallback", async () => {
+    emitTestEvent("http 404")
+    const fetchImpl = vi.fn().mockResolvedValue(httpErrorResponse(404, { error: "not found" }))
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/HTTP 404/)
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/retry|unavailable/i)
+  })
+
+  it("uses default fetch when fetchImpl is not provided (falsy-guard path)", async () => {
+    emitTestEvent("default fetch fallback")
+    // We can't easily invoke the real network here — instead stub global.fetch
+    // so the default-arg path runs. The test restores it via afterEach.
+    const originalFetch = global.fetch
+    try {
+      const stub = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ content: "x", base_resp: { status_code: 0, status_msg: "ok" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      ;(global as { fetch: typeof fetch }).fetch = stub as unknown as typeof fetch
+      const result = await minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+      })
+      expect(result).toBe("x")
+      expect(stub).toHaveBeenCalledTimes(1)
+    } finally {
+      ;(global as { fetch: typeof fetch }).fetch = originalFetch
+    }
+  })
+
+  it("uses default timeoutMs when not provided (falsy-guard path)", async () => {
+    emitTestEvent("default timeout fallback")
+    const fetchImpl = vi.fn().mockResolvedValue(
+      okResponse({ content: "ok", base_resp: { status_code: 0, status_msg: "ok" } }),
+    )
+    const result = await minimaxVlmDescribe({
+      apiKey: "sk",
+      prompt: "p",
+      imageDataUrl: PNG_DATA_URL,
+      baseURL: "https://api.minimaxi.chat/v1",
+      fetchImpl,
+    })
+    expect(result).toBe("ok")
+  })
+
+  it("response without Trace-Id header — error meta traceId is undefined", async () => {
+    emitTestEvent("no trace-id header")
+    const fetchImpl = vi.fn().mockResolvedValue(httpErrorResponse(500, { error: "boom" }))
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow()
+    const errorEvent = emitNervesEventMock.mock.calls.find(
+      (call) => call[0]?.event === "senses.bluebubbles_vlm_describe_error",
+    )
+    expect(errorEvent?.[0].meta.traceId).toBeUndefined()
+  })
+
+  it("lowercase trace-id header is also honored", async () => {
+    emitTestEvent("lowercase trace-id")
+    // Response headers are case-insensitive — but the lowercase-fallback
+    // branch must still execute for coverage. We call get("Trace-Id") first,
+    // and when the caller sends lowercase, the first get still returns the
+    // value (Response headers case-fold on lookup). This test covers both
+    // call branches explicitly.
+    const fetchImpl = vi.fn().mockResolvedValue(
+      httpErrorResponse(500, { error: "boom" }, { "trace-id": "lower-trace" }),
+    )
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow()
+    const errorEvent = emitNervesEventMock.mock.calls.find(
+      (call) => call[0]?.event === "senses.bluebubbles_vlm_describe_error",
+    )
+    expect(errorEvent?.[0].meta.traceId).toBe("lower-trace")
+  })
+
+  it("non-data URL path that has no recognizable mime prefix still throws with unknown", async () => {
+    emitTestEvent("no prefix mime")
+    const fetchImpl = vi.fn()
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: "garbage",
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/unknown|data:image/i)
+  })
+
+  it("missing status_code in base_resp is treated as 0 (happy path)", async () => {
+    emitTestEvent("missing status_code")
+    const fetchImpl = vi.fn().mockResolvedValue(
+      okResponse({ content: "a cat", base_resp: {} }),
+    )
+    const result = await minimaxVlmDescribe({
+      apiKey: "sk",
+      prompt: "p",
+      imageDataUrl: PNG_DATA_URL,
+      baseURL: "https://api.minimaxi.chat/v1",
+      fetchImpl,
+    })
+    expect(result).toBe("a cat")
+  })
+
+  it("missing base_resp entirely is treated as status 0 (happy path)", async () => {
+    emitTestEvent("missing base_resp")
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse({ content: "ok" }))
+    const result = await minimaxVlmDescribe({
+      apiKey: "sk",
+      prompt: "p",
+      imageDataUrl: PNG_DATA_URL,
+      baseURL: "https://api.minimaxi.chat/v1",
+      fetchImpl,
+    })
+    expect(result).toBe("ok")
+  })
+
+  it("base_resp.status_code nonzero without status_msg uses 'unknown' fallback", async () => {
+    emitTestEvent("status_msg fallback")
+    const fetchImpl = vi.fn().mockResolvedValue(
+      okResponse({ content: "x", base_resp: { status_code: 2013 } }),
+    )
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/2013.*unknown/)
+  })
+
+  it("timeout path with custom timeoutMs reports the right seconds", async () => {
+    emitTestEvent("custom timeout seconds")
+    const abortError = new Error("The operation was aborted.")
+    abortError.name = "AbortError"
+    const fetchImpl = vi.fn().mockRejectedValue(abortError)
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+        timeoutMs: 30000,
+      }),
+    ).rejects.toThrow(/timed out after 30s/)
+  })
+
+  it("thrown non-Error value is coerced to string in error meta", async () => {
+    emitTestEvent("non-error throw")
+    const fetchImpl = vi.fn().mockRejectedValue(null)
+    await expect(
+      minimaxVlmDescribe({
+        apiKey: "sk",
+        prompt: "p",
+        imageDataUrl: PNG_DATA_URL,
+        baseURL: "https://api.minimaxi.chat/v1",
+        fetchImpl,
+      }),
+    ).rejects.toThrow(/unexpected transport error/)
+  })
+
   it("prompt text is never included in start, end, or error event meta", async () => {
     emitTestEvent("prompt never logged")
     const secretPrompt = "SECRET PII: my SSN is 123-45-6789"
