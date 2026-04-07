@@ -19,7 +19,9 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const emitNervesEventMock = vi.fn()
+const { emitNervesEventMock } = vi.hoisted(() => ({
+  emitNervesEventMock: vi.fn(),
+}))
 
 vi.mock("../../../nerves/runtime", () => ({
   emitNervesEvent: emitNervesEventMock,
@@ -164,7 +166,7 @@ describe("minimaxVlmDescribe", () => {
         baseURL: "https://api.minimaxi.chat/v1",
         fetchImpl,
       }),
-    ).rejects.toThrow(/pass a targeted question|supply a prompt/i)
+    ).rejects.toThrow(/targeted question|supply a prompt/i)
   })
 
   it("missing imageDataUrl throws AX-2 error", async () => {
