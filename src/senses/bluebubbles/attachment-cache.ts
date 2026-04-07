@@ -27,8 +27,8 @@ export function rememberBlueBubblesAttachment(summary: BlueBubblesAttachmentSumm
   if (cache.has(guid)) cache.delete(guid)
   cache.set(guid, { ...summary })
   while (cache.size > MAX_CACHED_ATTACHMENTS) {
-    const oldestKey = cache.keys().next().value
-    if (oldestKey === undefined) break
+    // cache.size > 0 here, so keys().next().value is always defined.
+    const oldestKey = cache.keys().next().value as string
     cache.delete(oldestKey)
   }
 }

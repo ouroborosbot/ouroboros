@@ -154,6 +154,53 @@ describe("describe_image tool", () => {
     })
   })
 
+  describe("attachment cache", () => {
+    it("lookup returns undefined for an empty guid", async () => {
+      emitTestEvent("cache empty guid")
+      const { lookupBlueBubblesAttachment, resetBlueBubblesAttachmentCache } = await import(
+        "../../senses/bluebubbles/attachment-cache"
+      )
+      resetBlueBubblesAttachmentCache()
+      expect(lookupBlueBubblesAttachment("")).toBeUndefined()
+      expect(lookupBlueBubblesAttachment("   ")).toBeUndefined()
+    })
+
+    it("remember ignores an entry with empty guid", async () => {
+      emitTestEvent("cache ignore empty guid")
+      const { rememberBlueBubblesAttachment, lookupBlueBubblesAttachment, resetBlueBubblesAttachmentCache } =
+        await import("../../senses/bluebubbles/attachment-cache")
+      resetBlueBubblesAttachmentCache()
+      rememberBlueBubblesAttachment({ guid: "", mimeType: "image/png" })
+      rememberBlueBubblesAttachment({ mimeType: "image/png" })
+      expect(lookupBlueBubblesAttachment("")).toBeUndefined()
+    })
+
+    it("remember re-inserts an existing guid (LRU move-to-end)", async () => {
+      emitTestEvent("cache LRU re-insert")
+      const { rememberBlueBubblesAttachment, lookupBlueBubblesAttachment, resetBlueBubblesAttachmentCache } =
+        await import("../../senses/bluebubbles/attachment-cache")
+      resetBlueBubblesAttachmentCache()
+      rememberBlueBubblesAttachment({ guid: "g1", mimeType: "image/png", transferName: "first" })
+      rememberBlueBubblesAttachment({ guid: "g1", mimeType: "image/jpeg", transferName: "second" })
+      expect(lookupBlueBubblesAttachment("g1")?.transferName).toBe("second")
+    })
+
+    it("remember evicts oldest entry when exceeding MAX_CACHED_ATTACHMENTS", async () => {
+      emitTestEvent("cache evict oldest")
+      const { rememberBlueBubblesAttachment, lookupBlueBubblesAttachment, resetBlueBubblesAttachmentCache } =
+        await import("../../senses/bluebubbles/attachment-cache")
+      resetBlueBubblesAttachmentCache()
+      // Insert 60 entries to exceed the 50-entry bound
+      for (let i = 0; i < 60; i++) {
+        rememberBlueBubblesAttachment({ guid: `g${i}`, mimeType: "image/png" })
+      }
+      expect(lookupBlueBubblesAttachment("g0")).toBeUndefined()
+      expect(lookupBlueBubblesAttachment("g9")).toBeUndefined()
+      expect(lookupBlueBubblesAttachment("g10")).toBeDefined()
+      expect(lookupBlueBubblesAttachment("g59")).toBeDefined()
+    })
+  })
+
   describe("handler", () => {
     it("returns description when attachment guid is found in the cache", async () => {
       emitTestEvent("describe_image handler happy")
@@ -292,6 +339,132 @@ describe("describe_image tool", () => {
         undefined,
       )
       expect(result).toMatch(/prompt.*required|missing prompt/i)
+    })
+
+    it("falls back to summary.mimeType when the download response has no content-type", async () => {
+      emitTestEvent("describe_image handler mime fallback summary")
+      const config = await import("../../heart/config")
+      config.resetConfigCache()
+      config.patchRuntimeConfig({
+        providers: { minimax: { apiKey: "test-key" } },
+        bluebubbles: { serverUrl: "http://bluebubbles.local", password: "secret", accountId: "default" },
+      })
+      const { rememberBlueBubblesAttachment, resetBlueBubblesAttachmentCache } = await import(
+        "../../senses/bluebubbles/attachment-cache"
+      )
+      resetBlueBubblesAttachmentCache()
+      rememberBlueBubblesAttachment({
+        guid: "img-mime-fallback",
+        mimeType: "image/webp",
+        transferName: "x.webp",
+      })
+      const originalFetch = global.fetch
+      try {
+        global.fetch = vi.fn().mockResolvedValue(
+          new Response(Buffer.from("bytes"), { status: 200 }),
+        ) as typeof fetch
+        vi.doMock("../../heart/providers/minimax-vlm", () => ({
+          minimaxVlmDescribe: vi.fn(async (params: { mimeType?: string }) => {
+            return `ok-${params.mimeType ?? "none"}`
+          }),
+        }))
+        const { bluebubblesToolDefinitions } = await import("../../repertoire/tools-bluebubbles")
+        const def = bluebubblesToolDefinitions.find(
+          (d) => d.tool.function.name === "describe_image",
+        )!
+        const result = await def.handler(
+          { attachment_guid: "img-mime-fallback", prompt: "what?" },
+          undefined,
+        )
+        // inferContentType returns undefined when the response has no content-type
+        // AND the attachment summary has mimeType; the summary supplies webp.
+        expect(result).toBe("ok-image/webp")
+      } finally {
+        global.fetch = originalFetch
+        vi.doUnmock("../../heart/providers/minimax-vlm")
+      }
+    })
+
+    it("falls back to 'image/png' when both download and summary lack a mime type", async () => {
+      emitTestEvent("describe_image handler mime fallback png")
+      const config = await import("../../heart/config")
+      config.resetConfigCache()
+      config.patchRuntimeConfig({
+        providers: { minimax: { apiKey: "test-key" } },
+        bluebubbles: { serverUrl: "http://bluebubbles.local", password: "secret", accountId: "default" },
+      })
+      const { rememberBlueBubblesAttachment, resetBlueBubblesAttachmentCache } = await import(
+        "../../senses/bluebubbles/attachment-cache"
+      )
+      resetBlueBubblesAttachmentCache()
+      rememberBlueBubblesAttachment({ guid: "img-no-mime" })
+      const originalFetch = global.fetch
+      try {
+        global.fetch = vi.fn().mockResolvedValue(
+          new Response(Buffer.from("bytes"), { status: 200 }),
+        ) as typeof fetch
+        vi.doMock("../../heart/providers/minimax-vlm", () => ({
+          minimaxVlmDescribe: vi.fn(async (params: { mimeType?: string }) => {
+            return `ok-${params.mimeType ?? "none"}`
+          }),
+        }))
+        const { bluebubblesToolDefinitions } = await import("../../repertoire/tools-bluebubbles")
+        const def = bluebubblesToolDefinitions.find(
+          (d) => d.tool.function.name === "describe_image",
+        )!
+        const result = await def.handler(
+          { attachment_guid: "img-no-mime", prompt: "what?" },
+          undefined,
+        )
+        expect(result).toBe("ok-image/png")
+      } finally {
+        global.fetch = originalFetch
+        vi.doUnmock("../../heart/providers/minimax-vlm")
+      }
+    })
+
+    it("surfaces non-Error thrown values from the VLM client", async () => {
+      emitTestEvent("describe_image handler non-error throw")
+      const config = await import("../../heart/config")
+      config.resetConfigCache()
+      config.patchRuntimeConfig({
+        providers: { minimax: { apiKey: "test-key" } },
+        bluebubbles: { serverUrl: "http://bluebubbles.local", password: "secret", accountId: "default" },
+      })
+      const { rememberBlueBubblesAttachment, resetBlueBubblesAttachmentCache } = await import(
+        "../../senses/bluebubbles/attachment-cache"
+      )
+      resetBlueBubblesAttachmentCache()
+      rememberBlueBubblesAttachment({
+        guid: "img-string-throw",
+        mimeType: "image/png",
+      })
+      const originalFetch = global.fetch
+      try {
+        global.fetch = vi.fn().mockResolvedValue(
+          new Response(Buffer.from("bytes"), {
+            status: 200,
+            headers: { "content-type": "image/png" },
+          }),
+        ) as typeof fetch
+        vi.doMock("../../heart/providers/minimax-vlm", () => ({
+          minimaxVlmDescribe: vi.fn(async () => {
+            throw "plain string failure"
+          }),
+        }))
+        const { bluebubblesToolDefinitions } = await import("../../repertoire/tools-bluebubbles")
+        const def = bluebubblesToolDefinitions.find(
+          (d) => d.tool.function.name === "describe_image",
+        )!
+        const result = await def.handler(
+          { attachment_guid: "img-string-throw", prompt: "what?" },
+          undefined,
+        )
+        expect(result).toBe("describe_image failed: plain string failure")
+      } finally {
+        global.fetch = originalFetch
+        vi.doUnmock("../../heart/providers/minimax-vlm")
+      }
     })
 
     it("non-minimax provider: returns AX-2 error about credentials", async () => {
