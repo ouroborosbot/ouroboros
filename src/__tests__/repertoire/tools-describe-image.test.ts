@@ -10,6 +10,24 @@ function emitTestEvent(testName: string): void {
   })
 }
 
+// Mock identity so loadConfig doesn't demand a real --agent argv; the
+// runtime config override injected via patchRuntimeConfig is all the tests
+// actually need for the BB/minimax lookups.
+vi.mock("../../heart/identity", () => ({
+  loadAgentConfig: vi.fn(() => ({
+    provider: "minimax",
+    humanFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+    agentFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+  })),
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
+  getAgentRoot: vi.fn(() => "/tmp/agents/testagent"),
+  getAgentToolsRoot: vi.fn(() => "/tmp/agents/testagent/tools"),
+  getRepoRoot: vi.fn(() => "/tmp/repo"),
+  DEFAULT_AGENT_CONTEXT: { maxTokens: 80000, contextMargin: 20 },
+  resetIdentity: vi.fn(),
+}))
+
 describe("describe_image tool", () => {
   beforeEach(() => {
     vi.resetModules()

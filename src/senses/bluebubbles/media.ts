@@ -6,6 +6,7 @@ import OpenAI from "openai"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { getAgentToolsRoot } from "../../heart/identity"
 import { getModelCapabilities } from "../../heart/model-capabilities"
+import { rememberBlueBubblesAttachment } from "./attachment-cache"
 import type { BlueBubblesAttachmentSummary } from "./model"
 
 type BlueBubblesConfig = {
@@ -127,9 +128,17 @@ const AUDIO_INPUT_FORMAT_BY_EXTENSION: Record<string, "mp3" | "wav"> = {
 const WHISPER_CPP_FORMULA = "whisper-cpp"
 const WHISPER_CPP_MODEL_NAME = "ggml-base.en.bin"
 const WHISPER_CPP_MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${WHISPER_CPP_MODEL_NAME}`
-const WHISPER_CPP_TOOLS_DIR = path.join(getAgentToolsRoot(), "whisper-cpp")
-const WHISPER_CPP_MODELS_DIR = path.join(WHISPER_CPP_TOOLS_DIR, "models")
-const WHISPER_CPP_MODEL_PATH = path.join(WHISPER_CPP_MODELS_DIR, WHISPER_CPP_MODEL_NAME)
+
+// Lazy — getAgentToolsRoot() requires identity to be resolved, which isn't
+// true at module-load time in most unit test contexts. Tests that only touch
+// the image/VLM path shouldn't break because the audio path asked for a
+// tools root they don't need.
+function whisperCppPaths(): { toolsDir: string; modelsDir: string; modelPath: string } {
+  const toolsDir = path.join(getAgentToolsRoot(), "whisper-cpp")
+  const modelsDir = path.join(toolsDir, "models")
+  const modelPath = path.join(modelsDir, WHISPER_CPP_MODEL_NAME)
+  return { toolsDir, modelsDir, modelPath }
+}
 
 function buildBlueBubblesApiUrl(baseUrl: string, endpoint: string, password: string): string {
   const root = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`
@@ -240,11 +249,12 @@ async function resolveWhisperCppBinary(timeoutMs: number): Promise<string> {
 }
 
 async function ensureWhisperCppModel(timeoutMs: number, fetchImpl: typeof fetch): Promise<string> {
+  const { modelsDir, modelPath } = whisperCppPaths()
   try {
-    await fs.access(WHISPER_CPP_MODEL_PATH)
-    return WHISPER_CPP_MODEL_PATH
+    await fs.access(modelPath)
+    return modelPath
   } catch {
-    await fs.mkdir(WHISPER_CPP_MODELS_DIR, { recursive: true })
+    await fs.mkdir(modelsDir, { recursive: true })
     const response = await fetchImpl(WHISPER_CPP_MODEL_URL, {
       method: "GET",
       signal: AbortSignal.timeout(Math.max(timeoutMs, 300_000)),
@@ -252,8 +262,8 @@ async function ensureWhisperCppModel(timeoutMs: number, fetchImpl: typeof fetch)
     if (!response.ok) {
       throw new Error(`failed to download whisper.cpp model: HTTP ${response.status}`)
     }
-    await fs.writeFile(WHISPER_CPP_MODEL_PATH, Buffer.from(await response.arrayBuffer()))
-    return WHISPER_CPP_MODEL_PATH
+    await fs.writeFile(modelPath, Buffer.from(await response.arrayBuffer()))
+    return modelPath
   }
 }
 
@@ -322,6 +332,15 @@ async function transcribeAudioWithWhisperCpp(
   }
 }
 
+export async function downloadBlueBubblesAttachment(
+  attachment: BlueBubblesAttachmentSummary,
+  config: BlueBubblesConfig,
+  channelConfig: BlueBubblesChannelConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ buffer: Buffer; contentType?: string }> {
+  return downloadAttachment(attachment, config, channelConfig, fetchImpl)
+}
+
 async function downloadAttachment(
   attachment: BlueBubblesAttachmentSummary,
   config: BlueBubblesConfig,
@@ -379,6 +398,9 @@ export async function hydrateBlueBubblesAttachments(
 
   for (const attachment of attachments) {
     const name = describeAttachment(attachment)
+    // Remember every attachment we see — the describe_image agent tool looks
+    // up guids against this cache later to re-fetch bytes on demand.
+    rememberBlueBubblesAttachment(attachment)
     try {
       const downloaded = await downloadAttachment(attachment, config, channelConfig, fetchImpl)
       const base64 = downloaded.buffer.toString("base64")
