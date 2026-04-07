@@ -2390,4 +2390,348 @@ describe("BlueBubbles client", () => {
       expect(text).toBeNull()
     })
   })
+
+  describe("VLM fallback wiring for image attachments", () => {
+    function imageMessagePayload(guid: string) {
+      return {
+        data: {
+          guid,
+          text: "check this",
+          handle: { address: "ari@mendelow.me", service: "iMessage" },
+          attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "screenshot.png" }],
+          chats: [
+            {
+              guid: "any;-;ari@mendelow.me",
+              style: 45,
+              chatIdentifier: "ari@mendelow.me",
+              displayName: "",
+            },
+          ],
+        },
+      }
+    }
+
+    it("passes chatModel and vlmDescribe into hydrateBlueBubblesAttachments from loadAgentConfig", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+        agentFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+      } as any)
+
+      const hydrateBlueBubblesAttachments = vi.fn().mockResolvedValue({
+        inputParts: [{ type: "text", text: "[image description: a cat]" }],
+        transcriptAdditions: [],
+        notices: [],
+      })
+      vi.doMock("../../../senses/bluebubbles/media", () => ({
+        hydrateBlueBubblesAttachments,
+      }))
+
+      const minimaxVlmDescribe = vi.fn().mockResolvedValue("a cat")
+      vi.doMock("../../../heart/providers/minimax-vlm", () => ({
+        minimaxVlmDescribe,
+      }))
+
+      vi.doMock("../../../heart/config", () => ({
+        getMinimaxConfig: () => ({ apiKey: "sk-test" }),
+      }))
+
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify(imageMessagePayload("img-msg")), { status: 200 }),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "img-msg",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "check this",
+        textForAgent: "check this",
+        attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "screenshot.png" }],
+        hasPayloadData: true,
+        requiresRepair: true,
+      })
+
+      expect(hydrateBlueBubblesAttachments).toHaveBeenCalledTimes(1)
+      const depsArg = hydrateBlueBubblesAttachments.mock.calls[0][3] as {
+        chatModel: string
+        vlmDescribe: (params: {
+          prompt: string
+          imageDataUrl: string
+          attachmentGuid?: string
+          mimeType?: string
+          chatModel?: string
+        }) => Promise<string>
+        userText?: string
+      }
+      expect(depsArg.chatModel).toBe("MiniMax-M2.5")
+      expect(typeof depsArg.vlmDescribe).toBe("function")
+      expect(depsArg.userText).toBe("check this")
+
+      // Call the closure → it should invoke minimaxVlmDescribe with the bound apiKey/baseURL.
+      const description = await depsArg.vlmDescribe({
+        prompt: "p",
+        imageDataUrl: "data:image/png;base64,xx",
+        attachmentGuid: "img-1",
+        mimeType: "image/png",
+        chatModel: "MiniMax-M2.5",
+      })
+      expect(description).toBe("a cat")
+      expect(minimaxVlmDescribe).toHaveBeenCalledTimes(1)
+      const vlmCallArgs = minimaxVlmDescribe.mock.calls[0][0] as {
+        apiKey: string
+        baseURL: string
+      }
+      expect(vlmCallArgs.apiKey).toBe("sk-test")
+      expect(vlmCallArgs.baseURL).toMatch(/api\.minimaxi\.chat\/v1/)
+
+      vi.doUnmock("../../../senses/bluebubbles/media")
+      vi.doUnmock("../../../heart/providers/minimax-vlm")
+      vi.doUnmock("../../../heart/config")
+    })
+
+    it("vlmDescribe closure throws AX-2 error when provider is not minimax", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "anthropic", model: "MiniMax-M2.5" },
+        agentFacing: { provider: "anthropic", model: "MiniMax-M2.5" },
+      } as any)
+
+      const hydrateBlueBubblesAttachments = vi.fn().mockResolvedValue({
+        inputParts: [],
+        transcriptAdditions: [],
+        notices: [],
+      })
+      vi.doMock("../../../senses/bluebubbles/media", () => ({
+        hydrateBlueBubblesAttachments,
+      }))
+
+      const minimaxVlmDescribe = vi.fn()
+      vi.doMock("../../../heart/providers/minimax-vlm", () => ({
+        minimaxVlmDescribe,
+      }))
+
+      vi.doMock("../../../heart/config", () => ({
+        getMinimaxConfig: () => ({ apiKey: "sk-test" }),
+      }))
+
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify(imageMessagePayload("img-msg")), { status: 200 }),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "img-msg",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "check this",
+        textForAgent: "check this",
+        attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "screenshot.png" }],
+        hasPayloadData: true,
+        requiresRepair: true,
+      })
+
+      const depsArg = hydrateBlueBubblesAttachments.mock.calls[0][3] as {
+        vlmDescribe: (params: {
+          prompt: string
+          imageDataUrl: string
+          attachmentGuid?: string
+          mimeType?: string
+          chatModel?: string
+        }) => Promise<string>
+      }
+      await expect(
+        depsArg.vlmDescribe({
+          prompt: "p",
+          imageDataUrl: "data:image/png;base64,xx",
+        }),
+      ).rejects.toThrow(/VLM fallback requires a minimax credential/)
+      await expect(
+        depsArg.vlmDescribe({
+          prompt: "p",
+          imageDataUrl: "data:image/png;base64,xx",
+        }),
+      ).rejects.toThrow(/configure|vision-capable chat model/)
+      expect(minimaxVlmDescribe).not.toHaveBeenCalled()
+
+      vi.doUnmock("../../../senses/bluebubbles/media")
+      vi.doUnmock("../../../heart/providers/minimax-vlm")
+      vi.doUnmock("../../../heart/config")
+    })
+
+    it("vlmDescribe closure throws AX-2 error when minimax credential is missing", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+        agentFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+      } as any)
+
+      const hydrateBlueBubblesAttachments = vi.fn().mockResolvedValue({
+        inputParts: [],
+        transcriptAdditions: [],
+        notices: [],
+      })
+      vi.doMock("../../../senses/bluebubbles/media", () => ({
+        hydrateBlueBubblesAttachments,
+      }))
+
+      const minimaxVlmDescribe = vi.fn()
+      vi.doMock("../../../heart/providers/minimax-vlm", () => ({
+        minimaxVlmDescribe,
+      }))
+
+      vi.doMock("../../../heart/config", () => ({
+        getMinimaxConfig: () => ({ apiKey: "" }),
+      }))
+
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify(imageMessagePayload("img-msg")), { status: 200 }),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "img-msg",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "check this",
+        textForAgent: "check this",
+        attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "screenshot.png" }],
+        hasPayloadData: true,
+        requiresRepair: true,
+      })
+
+      const depsArg = hydrateBlueBubblesAttachments.mock.calls[0][3] as {
+        vlmDescribe: (params: {
+          prompt: string
+          imageDataUrl: string
+          attachmentGuid?: string
+          mimeType?: string
+          chatModel?: string
+        }) => Promise<string>
+      }
+      await expect(
+        depsArg.vlmDescribe({
+          prompt: "p",
+          imageDataUrl: "data:image/png;base64,xx",
+        }),
+      ).rejects.toThrow(/minimax API key not found|re-run credential setup/i)
+      expect(minimaxVlmDescribe).not.toHaveBeenCalled()
+
+      vi.doUnmock("../../../senses/bluebubbles/media")
+      vi.doUnmock("../../../heart/providers/minimax-vlm")
+      vi.doUnmock("../../../heart/config")
+    })
+
+    it("vision-capable chat model: vlmDescribe closure is still passed but not called by hydration", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      } as any)
+
+      const hydrateBlueBubblesAttachments = vi.fn().mockResolvedValue({
+        inputParts: [{ type: "image_url", image_url: { url: "data:image/png;base64,xx", detail: "auto" } }],
+        transcriptAdditions: [],
+        notices: [],
+      })
+      vi.doMock("../../../senses/bluebubbles/media", () => ({
+        hydrateBlueBubblesAttachments,
+      }))
+
+      vi.doMock("../../../heart/providers/minimax-vlm", () => ({
+        minimaxVlmDescribe: vi.fn(),
+      }))
+
+      vi.doMock("../../../heart/config", () => ({
+        getMinimaxConfig: () => ({ apiKey: "sk-test" }),
+      }))
+
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify(imageMessagePayload("img-msg")), { status: 200 }),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "img-msg",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "check this",
+        textForAgent: "check this",
+        attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "screenshot.png" }],
+        hasPayloadData: true,
+        requiresRepair: true,
+      })
+
+      const depsArg = hydrateBlueBubblesAttachments.mock.calls[0][3] as {
+        chatModel: string
+        vlmDescribe: unknown
+      }
+      expect(depsArg.chatModel).toBe("claude-opus-4-6")
+      expect(typeof depsArg.vlmDescribe).toBe("function")
+
+      vi.doUnmock("../../../senses/bluebubbles/media")
+      vi.doUnmock("../../../heart/providers/minimax-vlm")
+      vi.doUnmock("../../../heart/config")
+    })
+  })
 })
