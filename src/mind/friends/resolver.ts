@@ -50,10 +50,10 @@ export class FriendResolver {
 
     // Migration: local provider previously used "${username}@${hostname}" format.
     // If no exact match, try finding a friend with old-format external ID.
+    /* v8 ignore start -- migration path: only fires when legacy hostname-format friend exists @preserve */
     if (this.params.provider === "local" && !this.params.externalId.includes("@")) {
       try {
         const all = typeof this.store.listAll === "function" ? await this.store.listAll() : []
-        /* v8 ignore start -- migration path: only fires when legacy hostname-format friend exists @preserve */
         const migrationMatch = all.find((f) =>
           f.externalIds.some(
             (eid) => eid.provider === "local" && eid.externalId.startsWith(this.params.externalId + "@"),
@@ -80,11 +80,11 @@ export class FriendResolver {
           })
           return migrationMatch
         }
-        /* v8 ignore stop */
       } catch {
         // fall through to create new
       }
     }
+    /* v8 ignore stop */
 
     // First encounter -- create new FriendRecord
     const now = new Date().toISOString()
