@@ -2820,6 +2820,88 @@ describe("BlueBubbles client", () => {
       vi.doUnmock("../../../heart/config")
     })
 
+    it("VLM prompt userText defaults to empty string when data.text is not a string", async () => {
+      const { loadAgentConfig } = await import("../../../heart/identity")
+      vi.mocked(loadAgentConfig).mockReturnValue({
+        humanFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+        agentFacing: { provider: "minimax", model: "MiniMax-M2.5" },
+      } as any)
+
+      const hydrateBlueBubblesAttachments = vi.fn().mockResolvedValue({
+        inputParts: [],
+        transcriptAdditions: [],
+        notices: [],
+      })
+      vi.doMock("../../../senses/bluebubbles/media", () => ({
+        hydrateBlueBubblesAttachments,
+      }))
+
+      vi.doMock("../../../heart/providers/minimax-vlm", () => ({
+        minimaxVlmDescribe: vi.fn(),
+      }))
+
+      vi.doMock("../../../heart/config", () => ({
+        getMinimaxConfig: () => ({ apiKey: "sk-test" }),
+      }))
+
+      // data.text is a number (not a string) — the client should treat it as empty.
+      global.fetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              guid: "img-non-string-text",
+              text: 42, // explicitly not a string
+              handle: { address: "ari@mendelow.me", service: "iMessage" },
+              attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "pic.png" }],
+              chats: [
+                {
+                  guid: "any;-;ari@mendelow.me",
+                  style: 45,
+                  chatIdentifier: "ari@mendelow.me",
+                  displayName: "",
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+      ) as typeof fetch
+
+      vi.resetModules()
+      const { createBlueBubblesClient } = await import("../../../senses/bluebubbles/client")
+      const client = createBlueBubblesClient(
+        { serverUrl: "http://bluebubbles.local", password: "secret-token", accountId: "default" },
+        { port: 18790, webhookPath: "/bluebubbles-webhook", requestTimeoutMs: 30000 },
+      )
+
+      await client.repairEvent({
+        kind: "message",
+        eventType: "new-message",
+        messageGuid: "img-non-string-text",
+        timestamp: 1,
+        fromMe: false,
+        sender: {
+          provider: "imessage-handle",
+          externalId: "ari@mendelow.me",
+          rawId: "ari@mendelow.me",
+          displayName: "ari@mendelow.me",
+        },
+        chat: dmChat,
+        text: "",
+        textForAgent: "",
+        attachments: [{ guid: "img-1", mimeType: "image/png", transferName: "pic.png" }],
+        hasPayloadData: true,
+        requiresRepair: true,
+      })
+
+      const depsArg = hydrateBlueBubblesAttachments.mock.calls[0][3] as { userText: string }
+      expect(depsArg.userText).toBe("")
+
+      vi.doUnmock("../../../senses/bluebubbles/media")
+      vi.doUnmock("../../../heart/providers/minimax-vlm")
+      vi.doUnmock("../../../heart/config")
+    })
+
     it("vision-capable chat model: vlmDescribe closure is still passed but not called by hydration", async () => {
       const { loadAgentConfig } = await import("../../../heart/identity")
       vi.mocked(loadAgentConfig).mockReturnValue({
