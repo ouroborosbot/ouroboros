@@ -33,7 +33,13 @@ export interface MinimaxVlmDescribeParams {
   chatModel?: string
 }
 
-const DEFAULT_TIMEOUT_MS = 60_000
+// 120s — raised from the original 60s after live E2E validation hit a
+// transient MiniMax VLM slow window. On a 291KB real iPhone screenshot,
+// the first call took >60s (failed), the second call took 9.5s (succeeded).
+// MiniMax VLM latency is variable under load; 120s tolerates the slow tail
+// without letting broken endpoints hang forever. If a request takes longer
+// than this, the AX-2 error message already instructs the agent to retry.
+const DEFAULT_TIMEOUT_MS = 120_000
 const MODEL_NAME = "minimax-vlm"
 const SUPPORTED_DATA_URL_PATTERN = /^data:image\/(png|jpeg|webp);base64,/i
 

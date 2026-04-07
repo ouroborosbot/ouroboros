@@ -2,6 +2,15 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.257",
+      "changes": [
+        "fix(daemon): MCP bridge empty-response bug for long-running commands. `sendDaemonCommand` and `checkDaemonSocketAlive` were calling `client.end()` immediately after writing, which half-closed the TCP connection. The daemon server's `net.createServer()` uses the default `allowHalfOpen: false`, so when it saw the client's FIN it auto-closed its own writable side — and any response the server tried to write after processing a long-running command (like `agent.senseTurn`, which runs a full LLM turn) was dropped on the floor. Verified via direct socket repro: with `client.end()`, `agent.senseTurn` returned empty in ~149ms; without it, the same call returned a real response in ~5.8s. This was a silent regression of the fix in #303 (commit `253e4b1f` titled \"socket half-close fix\" actually *added* the half-close back). Fix: drop the `client.end()` calls from both sites AND set `allowHalfOpen: true` on the daemon's `net.createServer(...)` as defense-in-depth so future clients calling `end()` don't silently break again.",
+        "fix(daemon): tighten pidfile trust — `killOrphanProcesses` now verifies each pidfile PID is an actual orphan (PPID reparented to init/PID 1) before SIGTERMing it. Previously a polluted pidfile (written by a crashed daemon whose PIDs have since been reused by the OS for unrelated processes) could cause mass-kill of unrelated apps. New exported helper `filterPidfilePidsToActualOrphans` provides direct unit coverage.",
+        "fix(daemon, repertoire): rename six `_stop` nerves events to `_end` so they pair correctly with their `_start` counterparts under the nerves audit's start/end pairing rule. Affected: `daemon.thoughts_follow_stop`, `daemon.server_stop`, `daemon.update_checker_stop`, `daemon.mcp_server_stop`, `daemon.habit_scheduler_stop`, `mcp.manager_stop`. The naming was semantically fine (`stop` pairs with `start`), but the audit specifically looks for `_end`/`_error` suffixes. Was producing intermittent audit failures whenever any test run exercised these teardown paths (seen today as flakes on `daemon-socket-errors.test.ts` and `MarkdownStreamer` tests).",
+        "fix(providers): bump MiniMax VLM default timeout from 60s \u2192 120s. Observed a real VLM request take >60s during E2E validation (first call timed out, second call for the same image returned in 9.5s). MiniMax VLM latency is variable under load; 60s was too tight. 120s tolerates the slow tail without letting truly broken endpoints hang forever. The AX-2 error message on timeout already instructs the agent to retry, so the UX is preserved."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.256",
       "changes": [
         "fix(tui): cursor renders as inverse character (not inserted block) \u2014 matches standard terminal cursor behavior.",
