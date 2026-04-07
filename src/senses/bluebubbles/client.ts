@@ -566,6 +566,13 @@ export function createBlueBubblesClient(
               chatModel: params.chatModel,
             })
           }
+          // VLM prompt context wants the user's raw inbound text — NOT
+          // the agent-facing rendering, which now carries the attachment
+          // marker after the B2 fix. Pull it from the source payload.
+          const rawUserText =
+            typeof (data as { text?: unknown }).text === "string"
+              ? ((data as { text: string }).text).trim()
+              : ""
           const media = await hydrateBlueBubblesAttachments(
             hydrated.attachments,
             config,
@@ -574,7 +581,7 @@ export function createBlueBubblesClient(
               preferAudioInput: providerSupportsAudioInput(chatProvider),
               chatModel,
               vlmDescribe,
-              userText: hydrated.textForAgent,
+              userText: rawUserText,
             },
           )
           const transcriptSuffix = media.transcriptAdditions.map((entry) => `[${entry}]`).join("\n")
