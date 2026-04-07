@@ -1862,6 +1862,25 @@ describe("BlueBubbles media hydration — capability-aware image routing", () =>
     ])
   })
 
+  it("uses global fetch when fetchImpl dep is omitted (default-arg fallback)", async () => {
+    const { hydrateBlueBubblesAttachments } = await import("../../../senses/bluebubbles/media")
+    const originalFetch = global.fetch
+    try {
+      const stub = vi.fn().mockResolvedValue(pngResponse())
+      ;(global as { fetch: typeof fetch }).fetch = stub as unknown as typeof fetch
+      const result = await hydrateBlueBubblesAttachments(
+        [{ guid: "g1", mimeType: "image/png", transferName: "pic.png" }],
+        baseConfig(),
+        baseChannel(),
+        { chatModel: "claude-opus-4-6" },
+      )
+      expect(stub).toHaveBeenCalledTimes(1)
+      expect(result.inputParts[0]).toMatchObject({ type: "image_url" })
+    } finally {
+      ;(global as { fetch: typeof fetch }).fetch = originalFetch
+    }
+  })
+
   it("webp image with non-vision chat model: supported VLM format", async () => {
     const { hydrateBlueBubblesAttachments } = await import("../../../senses/bluebubbles/media")
     const vlmDescribe = vi.fn(async () => "webp desc")
@@ -1908,6 +1927,54 @@ describe("BlueBubbles media hydration — capability-aware image routing", () =>
     expect(result.inputParts).toEqual([
       { type: "text", text: "[image description: jpeg desc]" },
     ])
+  })
+
+  it("non-vision chat model with missing content-type: routes through skip-unsupported", async () => {
+    vi.resetModules()
+    const nervesMock = vi.fn()
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent: nervesMock }))
+    const { hydrateBlueBubblesAttachments } = await import("../../../senses/bluebubbles/media")
+    // Attachment reports no mimeType and response has no content-type → image
+    // detection still fires on extension (".png") but contentType is
+    // undefined, so isSupportedVlmFormat rejects it.
+    const result = await hydrateBlueBubblesAttachments(
+      [{ guid: "g1", transferName: "pic.png" }],
+      baseConfig(),
+      baseChannel(),
+      {
+        fetchImpl: vi.fn().mockResolvedValue(new Response(Buffer.from("x"), { status: 200 })),
+        chatModel: "MiniMax-M2.5",
+        vlmDescribe: vi.fn(),
+      },
+    )
+    expect(result.inputParts[0]).toMatchObject({ type: "text" })
+    const unsupported = nervesMock.mock.calls.find(
+      (c) => c[0]?.event === "senses.bluebubbles_vision_format_unsupported",
+    )
+    expect(unsupported).toBeDefined()
+    vi.doUnmock("../../../nerves/runtime")
+  })
+
+  it("VLM describer throws a non-Error value: turn does not crash, fallback text includes coerced reason", async () => {
+    const { hydrateBlueBubblesAttachments } = await import("../../../senses/bluebubbles/media")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vlmDescribe = vi.fn(async () => {
+      throw "plain string failure"
+    }) as unknown as Parameters<typeof hydrateBlueBubblesAttachments>[3]["vlmDescribe"]
+    const result = await hydrateBlueBubblesAttachments(
+      [{ guid: "g1", mimeType: "image/png", transferName: "pic.png" }],
+      baseConfig(),
+      baseChannel(),
+      {
+        fetchImpl: vi.fn().mockResolvedValue(pngResponse()),
+        chatModel: "MiniMax-M2.5",
+        vlmDescribe,
+      },
+    )
+    expect(result.inputParts[0]).toEqual({
+      type: "text",
+      text: "[image description failed: plain string failure]",
+    })
   })
 
   it("non-vision chat model but no vlmDescribe dep provided: falls back to notice", async () => {

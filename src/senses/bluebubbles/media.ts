@@ -90,8 +90,7 @@ export const VLM_TEXT_WRAPPERS = {
 // of letting the VLM client throw.
 const VLM_SUPPORTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"])
 
-function isSupportedVlmFormat(contentType: string | undefined): boolean {
-  if (!contentType) return false
+function isSupportedVlmFormat(contentType: string): boolean {
   return VLM_SUPPORTED_MIME_TYPES.has(contentType.toLowerCase())
 }
 
