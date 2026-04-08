@@ -381,10 +381,12 @@ describe("rotation.new-scheme", () => {
         })
       }
 
-      // Wait for async flush to catch up.
-      for (let i = 0; i < 20; i++) {
+      // Wait for async flush to catch up. Generous budget (≈2s) because
+      // this test depends on the appendFile → flush() callback chain under
+      // CI load. Bails early as soon as the rotated .gz appears.
+      for (let i = 0; i < 100; i++) {
         if (fs.existsSync(path.join(dir, "events.1.ndjson.gz"))) break
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 20))
       }
 
       // Rotation happened: historical gen 1 exists as .gz.
