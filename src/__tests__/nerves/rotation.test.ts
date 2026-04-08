@@ -252,24 +252,26 @@ describe("rotation.new-scheme", () => {
       expect(typeof (end?.meta as Record<string, unknown>).bytesFreed).toBe("number")
     })
 
-    it("emits rotation_error (not rotation_end) when gzip fails", async () => {
+    it("emits rotation_error (not rotation_end) when rename fails mid-rotation", () => {
       const filePath = path.join(dir, "events.ndjson")
       fs.writeFileSync(filePath, "x".repeat(200), "utf-8")
 
-      // Mock zlib.gzipSync to throw
-      const { default: zlibMod } = await import("zlib")
-      const gzipSpy = vi.spyOn(zlibMod, "gzipSync").mockImplementation(() => {
-        throw new Error("gzip boom")
-      })
+      // Sabotage the .1.ndjson destination so that `renameSync(filePath, plain1)`
+      // after the unlink cannot succeed. We pre-create .1.ndjson as a
+      // non-empty directory. The rotation's `unlinkSync(plain1)` on a
+      // non-empty directory throws (ENOTEMPTY/EPERM), which surfaces as a
+      // rotation error in the try/catch path.
+      const plain1 = path.join(dir, "events.1.ndjson")
+      fs.mkdirSync(plain1)
+      fs.writeFileSync(path.join(plain1, "blocker.txt"), "block", "utf-8")
 
       const { events, unregister } = captureNervesEvents(
         (e) => e.event === "nerves.rotation_start" || e.event === "nerves.rotation_end" || e.event === "nerves.rotation_error",
       )
       try {
-        expect(() => rotateIfNeeded(filePath, { maxSizeBytes: 100 })).toThrow(/gzip boom/)
+        expect(() => rotateIfNeeded(filePath, { maxSizeBytes: 100 })).toThrow()
       } finally {
         unregister()
-        gzipSpy.mockRestore()
       }
 
       const start = events.find((e) => e.event === "nerves.rotation_start")
@@ -280,7 +282,13 @@ describe("rotation.new-scheme", () => {
       expect(end).toBeUndefined()
       expect(err).toBeDefined()
       expect(start?.trace_id).toBe(err?.trace_id)
-      expect((err?.meta as Record<string, unknown>).error).toContain("gzip boom")
+      expect((err?.meta as Record<string, unknown>).error).toBeTruthy()
+
+      // cleanup the sabotage
+      try {
+        fs.unlinkSync(path.join(plain1, "blocker.txt"))
+        fs.rmdirSync(plain1)
+      } catch { /* best effort */ }
     })
   })
 })
