@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from "vitest"
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
+import * as zlib from "zlib"
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   discoverLogFiles,
   readLastLines,
@@ -273,6 +278,140 @@ describe("log-tailer", () => {
     it("uses defaults when options are minimal", () => {
       const cleanup = tailLogs({})
       expect(typeof cleanup).toBe("function")
+    })
+  })
+
+  // ---------------- PR 1 — gzip-aware reads (new rotation scheme) ----------------
+
+  describe("gzip-aware log reading", () => {
+    let tmp: string
+
+    beforeEach(() => {
+      tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tailer-gz-"))
+    })
+
+    afterEach(() => {
+      try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* best effort */ }
+    })
+
+    it("discoverLogFiles returns both .ndjson and .ndjson.gz files, oldest gz first then active", () => {
+      const files = discoverLogFiles({
+        homeDir: "/home/test",
+        existsSync: (p) => p.includes("logs"),
+        readdirSync: () => [
+          "daemon.ndjson",
+          "daemon.1.ndjson.gz",
+          "daemon.2.ndjson.gz",
+          "notes.txt",
+        ],
+      })
+
+      // All three log files included, notes.txt excluded.
+      expect(files).toHaveLength(3)
+      // Order: oldest generations first (.2, .1), active .ndjson last.
+      expect(files[0]).toContain("daemon.2.ndjson.gz")
+      expect(files[1]).toContain("daemon.1.ndjson.gz")
+      expect(files[2]).toContain("daemon.ndjson")
+    })
+
+    it("discoverLogFiles respects agentFilter for gz files too", () => {
+      const files = discoverLogFiles({
+        homeDir: "/home/test",
+        existsSync: () => true,
+        readdirSync: () => [
+          "agent-slugger.ndjson",
+          "agent-slugger.1.ndjson.gz",
+          "agent-ouroboros.ndjson",
+          "agent-ouroboros.1.ndjson.gz",
+        ],
+        agentFilter: "slugger",
+      })
+
+      expect(files).toHaveLength(2)
+      expect(files.every((f) => f.includes("slugger"))).toBe(true)
+    })
+
+    it("readLastLines decompresses a .ndjson.gz file via a binary readFileSync", () => {
+      // Build a real gzipped fixture on disk.
+      const gzPath = path.join(tmp, "events.1.ndjson.gz")
+      const raw = "a\nb\nc\nd\ne\n"
+      fs.writeFileSync(gzPath, zlib.gzipSync(Buffer.from(raw, "utf-8")))
+
+      // Use the real fs.readFileSync so the helper must detect .gz and
+      // dispatch to the binary path itself.
+      const lines = readLastLines(gzPath, 3, ((target: string, encoding?: BufferEncoding | "utf-8") => {
+        // Pass-through to real fs with the requested encoding signature.
+        if (encoding === "utf-8") return fs.readFileSync(target, "utf-8")
+        return fs.readFileSync(target, "utf-8")
+      }) as (target: string, encoding: "utf-8") => string)
+
+      expect(lines).toEqual(["c", "d", "e"])
+    })
+
+    it("readLastLines returns [] for a gzipped file that cannot be read", () => {
+      const lines = readLastLines("/definitely/not/there.ndjson.gz", 10, (() => {
+        throw new Error("ENOENT")
+      }) as (target: string, encoding: "utf-8") => string)
+
+      expect(lines).toEqual([])
+    })
+
+    it("tailLogs reads a mixed history across 1 active + 2 gzipped generations in chronological order", () => {
+      const makeLine = (msg: string): string => JSON.stringify({
+        ts: "2026-03-07T12:00:00.000Z",
+        level: "info",
+        event: "test",
+        trace_id: "t",
+        component: "daemon",
+        message: msg,
+        meta: {},
+      })
+
+      // In-memory fixture: match by basename. tailer's discoverLogFiles
+      // will construct absolute paths like /home/test/AgentBundles/
+      // slugger.ouro/state/daemon/logs/daemon.N.ndjson[.gz]. We key by
+      // the basename of whatever the tailer asks for.
+      const gen2Bytes = zlib.gzipSync(Buffer.from(`${makeLine("old-1")}\n${makeLine("old-2")}\n`, "utf-8"))
+      const gen1Bytes = zlib.gzipSync(Buffer.from(`${makeLine("mid-1")}\n${makeLine("mid-2")}\n`, "utf-8"))
+      const activeText = `${makeLine("active")}\n`
+
+      // readFileSync is declared as returning string. For gz files the
+      // tailer MUST route through a binary path and decompress. We fake
+      // the binary path by letting the tailer pass through whatever
+      // argument signature it uses. The production impl will use a
+      // dedicated gunzip-aware helper, so it never calls our stub with
+      // `"utf-8"` on a .gz file.
+      const readFileSync = vi.fn((target: string, _encoding?: unknown) => {
+        const base = path.basename(target)
+        if (base === "daemon.2.ndjson.gz") return gen2Bytes as unknown as string
+        if (base === "daemon.1.ndjson.gz") return gen1Bytes as unknown as string
+        if (base === "daemon.ndjson") return activeText
+        return ""
+      })
+
+      const output: string[] = []
+      tailLogs({
+        homeDir: "/home/test",
+        existsSync: (p) => p.includes("logs"),
+        readdirSync: () => ["daemon.ndjson", "daemon.1.ndjson.gz", "daemon.2.ndjson.gz"],
+        readFileSync: readFileSync as unknown as (target: string, encoding: "utf-8") => string,
+        writer: (text: string) => { output.push(text) },
+        lines: 10,
+      })
+
+      // Chronological order: old generations first, then mid, then active.
+      const joined = output.join("")
+      const idxOld1 = joined.indexOf("old-1")
+      const idxOld2 = joined.indexOf("old-2")
+      const idxMid1 = joined.indexOf("mid-1")
+      const idxMid2 = joined.indexOf("mid-2")
+      const idxActive = joined.indexOf("active")
+
+      expect(idxOld1).toBeGreaterThan(-1)
+      expect(idxOld2).toBeGreaterThan(idxOld1)
+      expect(idxMid1).toBeGreaterThan(idxOld2)
+      expect(idxMid2).toBeGreaterThan(idxMid1)
+      expect(idxActive).toBeGreaterThan(idxMid2)
     })
   })
 })
