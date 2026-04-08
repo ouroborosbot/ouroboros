@@ -331,20 +331,23 @@ describe("log-tailer", () => {
       expect(files.every((f) => f.includes("slugger"))).toBe(true)
     })
 
-    it("readLastLines decompresses a .ndjson.gz file via a binary readFileSync", () => {
+    it("readLastLines decompresses a .ndjson.gz file via a binary-capable readFileSync", () => {
       // Build a real gzipped fixture on disk.
       const gzPath = path.join(tmp, "events.1.ndjson.gz")
       const raw = "a\nb\nc\nd\ne\n"
       fs.writeFileSync(gzPath, zlib.gzipSync(Buffer.from(raw, "utf-8")))
 
-      // Use the real fs.readFileSync so the helper must detect .gz and
-      // dispatch to the binary path itself.
-      const lines = readLastLines(gzPath, 3, ((target: string, encoding?: BufferEncoding | "utf-8") => {
-        // Pass-through to real fs with the requested encoding signature.
-        if (encoding === "utf-8") return fs.readFileSync(target, "utf-8")
-        return fs.readFileSync(target, "utf-8")
-      }) as (target: string, encoding: "utf-8") => string)
+      // DI stub that returns a Buffer for gz files and utf-8 for everything
+      // else — matches how the production impl routes based on extension.
+      const readStub = ((target: string, encoding?: "utf-8") => {
+        if (target.endsWith(".gz")) {
+          // The log-tailer ignores `encoding` for gz paths and expects a Buffer.
+          return fs.readFileSync(target) as unknown as string
+        }
+        return fs.readFileSync(target, encoding ?? "utf-8")
+      }) as (target: string, encoding: "utf-8") => string
 
+      const lines = readLastLines(gzPath, 3, readStub)
       expect(lines).toEqual(["c", "d", "e"])
     })
 
