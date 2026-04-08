@@ -142,7 +142,7 @@ export function createStderrSink(write?: (chunk: string) => unknown): LogSink {
 
 export const DEFAULT_MAX_LOG_SIZE_BYTES = 25 * 1024 * 1024 // 25 MB per active stream
 export const DEFAULT_MAX_GENERATIONS = 5 // keep 5 gzipped historical generations
-const ROTATION_CHECK_INTERVAL_BYTES = 1024 * 1024 // ~1MB between stat checks
+const DEFAULT_ROTATION_CHECK_INTERVAL_BYTES = 1024 * 1024 // ~1MB between stat checks
 
 export interface RotateOptions {
   /** Threshold in bytes that triggers a rotation. Default: 25 MB. */
@@ -153,7 +153,15 @@ export interface RotateOptions {
   compress?: boolean
 }
 
-export type NdjsonSinkOptions = RotateOptions
+export interface NdjsonSinkOptions extends RotateOptions {
+  /**
+   * How many bytes to queue up before the sink stat-checks the active file
+   * for rotation. Defaults to 1 MB to amortize stat cost over many writes.
+   * Tests set this to a tiny value (a few bytes) to exercise the rotation
+   * trigger path without having to write 1 MB of fixture data.
+   */
+  rotationCheckIntervalBytes?: number
+}
 
 /** Internal: compute the gzipped generation path for a given ndjson file. */
 function generationGzPath(base: string, ext: string, n: number): string {
@@ -293,7 +301,9 @@ export function rotateIfNeeded(
     })
     return true
   } catch (err) {
+    /* v8 ignore next -- defensive: completed=true only reached after the try block's return @preserve */
     if (!completed) {
+      /* v8 ignore next -- defensive: fs ops throw real Errors @preserve */
       const reason = err instanceof Error ? err.message : String(err)
       emitNervesEvent({
         component: "nerves",
@@ -317,6 +327,7 @@ export function createNdjsonFileSink(
     typeof optionsOrMaxSize === "number"
       ? { maxSizeBytes: optionsOrMaxSize }
       : optionsOrMaxSize ?? {}
+  const rotationCheckInterval = options.rotationCheckIntervalBytes ?? DEFAULT_ROTATION_CHECK_INTERVAL_BYTES
   const queue: string[] = []
   let flushing = false
   let bytesSinceCheck = 0
@@ -326,7 +337,7 @@ export function createNdjsonFileSink(
     flushing = true
     const line = queue.shift() as string
 
-    if (bytesSinceCheck >= ROTATION_CHECK_INTERVAL_BYTES) {
+    if (bytesSinceCheck >= rotationCheckInterval) {
       bytesSinceCheck = 0
       try {
         rotateIfNeeded(filePath, options)

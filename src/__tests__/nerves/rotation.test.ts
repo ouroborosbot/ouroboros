@@ -5,7 +5,12 @@ import * as zlib from "zlib"
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { rotateIfNeeded, createNdjsonFileSink, registerGlobalLogSink, type LogEvent } from "../../nerves"
+import {
+  rotateIfNeeded,
+  createNdjsonFileSink,
+  registerGlobalLogSink,
+  type LogEvent,
+} from "../../nerves"
 
 /**
  * PR 1 — new rotation scheme tests.
@@ -49,6 +54,37 @@ describe("rotation.new-scheme", () => {
 
   afterEach(() => {
     cleanup(dir)
+  })
+
+  describe("rotateIfNeeded — legacy number signature backcompat", () => {
+    it("still accepts a bare number as the second argument (old positional API)", () => {
+      const filePath = path.join(dir, "events.ndjson")
+      fs.writeFileSync(filePath, "x".repeat(200), "utf-8")
+
+      // Old call site: rotateIfNeeded(path, 100). Must still rotate.
+      expect(rotateIfNeeded(filePath, 100)).toBe(true)
+      expect(fs.existsSync(filePath)).toBe(false)
+      expect(fs.existsSync(path.join(dir, "events.1.ndjson.gz"))).toBe(true)
+    })
+  })
+
+  describe("createNdjsonFileSink — legacy number signature backcompat", () => {
+    it("still accepts a bare number as the second argument (old positional API)", () => {
+      const filePath = path.join(dir, "events.ndjson")
+      const sink = createNdjsonFileSink(filePath, 1024)
+      expect(typeof sink).toBe("function")
+
+      // Write one entry so the file exists.
+      sink({
+        ts: "2026-04-08T12:00:00.000Z",
+        level: "info",
+        event: "test",
+        trace_id: "t-1",
+        component: "test",
+        message: "hello",
+        meta: {},
+      })
+    })
   })
 
   describe("rotateIfNeeded — defaults and options", () => {
@@ -223,6 +259,178 @@ describe("rotation.new-scheme", () => {
       expect(rotateIfNeeded(filePath, { maxSizeBytes: 100, compress: false })).toBe(true)
       // With non-ndjson extension we fall back to appending .1 suffix
       expect(fs.existsSync(path.join(dir, "logfile.log.1"))).toBe(true)
+    })
+  })
+
+  describe("rotateIfNeeded — destination slot unlink paths", () => {
+    it("unlinks a legacy destPlain .N.ndjson occupying the destination slot during generation shift", () => {
+      const filePath = path.join(dir, "events.ndjson")
+      fs.writeFileSync(filePath, "x".repeat(200), "utf-8")
+
+      // Pre-seed the destination slot (generation 2) as a legacy uncompressed
+      // daemon.2.ndjson file. When maxGenerations=2, the shift loop iterates
+      // for n=2, sees the legacy .2.ndjson in destPlain, and must unlink it.
+      // It then migrates srcPlain (.1.ndjson) into the slot — so we ALSO
+      // pre-seed events.1.ndjson as a legacy uncompressed file.
+      fs.writeFileSync(path.join(dir, "events.2.ndjson"), "DEST-LEGACY-PLAIN", "utf-8")
+      fs.writeFileSync(path.join(dir, "events.1.ndjson"), "SRC-LEGACY-PLAIN", "utf-8")
+
+      expect(rotateIfNeeded(filePath, { maxSizeBytes: 100, maxGenerations: 2 })).toBe(true)
+
+      // destPlain removed, legacy src migrated to .2.ndjson.gz
+      expect(fs.existsSync(path.join(dir, "events.2.ndjson"))).toBe(false)
+      expect(fs.existsSync(path.join(dir, "events.2.ndjson.gz"))).toBe(true)
+      expect(
+        zlib.gunzipSync(fs.readFileSync(path.join(dir, "events.2.ndjson.gz"))).toString("utf-8"),
+      ).toBe("SRC-LEGACY-PLAIN")
+    })
+
+    it("shifts a legacy srcPlain to destPlain with compress=false (no gzip)", () => {
+      const filePath = path.join(dir, "events.ndjson")
+      fs.writeFileSync(filePath, "x".repeat(200), "utf-8")
+
+      // Pre-seed a legacy .1.ndjson file and run with compress=false.
+      fs.writeFileSync(path.join(dir, "events.1.ndjson"), "LEGACY-PLAIN", "utf-8")
+
+      expect(
+        rotateIfNeeded(filePath, { maxSizeBytes: 100, maxGenerations: 3, compress: false }),
+      ).toBe(true)
+
+      // Legacy file shifted to .2.ndjson (still uncompressed) and active
+      // file rotated into .1.ndjson.
+      expect(fs.existsSync(path.join(dir, "events.1.ndjson"))).toBe(true)
+      expect(fs.readFileSync(path.join(dir, "events.1.ndjson"), "utf-8")).toBe("x".repeat(200))
+      expect(fs.existsSync(path.join(dir, "events.2.ndjson"))).toBe(true)
+      expect(fs.readFileSync(path.join(dir, "events.2.ndjson"), "utf-8")).toBe("LEGACY-PLAIN")
+    })
+  })
+
+  describe("rotateIfNeeded — stale file cleanup paths", () => {
+    it("unlinks a stale plain .1.ndjson that exists at rename target (compress=true path)", () => {
+      const filePath = path.join(dir, "events.ndjson")
+      fs.writeFileSync(filePath, "x".repeat(200), "utf-8")
+
+      // Pre-seed a stale .1.ndjson file (e.g. from an interrupted prior rotation).
+      // This is distinct from the "legacy uncompressed generation" case — we're
+      // testing that if a file happens to exist at the rename target, it's
+      // removed cleanly before renameSync.
+      //
+      // Note: the generation-shift loop will first move this stale file to
+      // .2.ndjson.gz (as a legacy gen-1 migration). To exercise the "stale
+      // plain1 at rename target" unlink specifically, we drop it at the
+      // plain1 path AFTER the loop would have shifted it — which means
+      // we need a single-generation rotation so the shift loop doesn't run.
+      // Use maxGenerations=1, which makes the shift loop body not iterate.
+      const plain1 = path.join(dir, "events.1.ndjson")
+      fs.writeFileSync(plain1, "STALE-LEFTOVER", "utf-8")
+
+      expect(rotateIfNeeded(filePath, { maxSizeBytes: 100, maxGenerations: 1 })).toBe(true)
+
+      // Active file rotated to .1.ndjson.gz, the stale file was removed.
+      const gz1 = path.join(dir, "events.1.ndjson.gz")
+      expect(fs.existsSync(gz1)).toBe(true)
+      expect(fs.existsSync(plain1)).toBe(false)
+    })
+
+    it("unlinks a pre-existing .1.ndjson.gz at the write target before writing the new one", () => {
+      const filePath = path.join(dir, "events.ndjson")
+      fs.writeFileSync(filePath, "x".repeat(200), "utf-8")
+
+      // Pre-seed a stale .1.ndjson.gz that the step-1 shift loop won't touch
+      // because maxGenerations=1 skips the n>=2 loop body entirely. The
+      // rotation code's step 3 must defensively unlink it before writing the
+      // new gzipped file.
+      const gz1 = path.join(dir, "events.1.ndjson.gz")
+      fs.writeFileSync(gz1, zlib.gzipSync(Buffer.from("STALE-GZ", "utf-8")))
+
+      expect(rotateIfNeeded(filePath, { maxSizeBytes: 100, maxGenerations: 1 })).toBe(true)
+
+      // New gzipped content, not the stale.
+      expect(zlib.gunzipSync(fs.readFileSync(gz1)).toString("utf-8")).toBe("x".repeat(200))
+    })
+  })
+
+  describe("createNdjsonFileSink — rotation trigger path", () => {
+    it("rotates once the stat-check threshold is reached", async () => {
+      const filePath = path.join(dir, "events.ndjson")
+
+      // Pre-seed a large file so rotation fires on the first stat check.
+      fs.writeFileSync(filePath, "x".repeat(500), "utf-8")
+
+      // Use a tiny rotation check interval so a single small write triggers
+      // the rotation branch inside the sink's flush().
+      const sink = createNdjsonFileSink(filePath, {
+        maxSizeBytes: 400,
+        maxGenerations: 2,
+        compress: true,
+        rotationCheckIntervalBytes: 10,
+      })
+
+      // Two writes: the first queues bytes without triggering rotation
+      // (bytesSinceCheck is 0 at start, needs to pass the interval). The
+      // second write pushes it over.
+      for (let i = 0; i < 3; i++) {
+        sink({
+          ts: "2026-04-08T12:00:00.000Z",
+          level: "info",
+          event: "test.entry",
+          trace_id: `t-${i}`,
+          component: "test",
+          message: `entry ${i}`,
+          meta: {},
+        })
+      }
+
+      // Wait for async flush to catch up.
+      for (let i = 0; i < 20; i++) {
+        if (fs.existsSync(path.join(dir, "events.1.ndjson.gz"))) break
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+
+      // Rotation happened: historical gen 1 exists as .gz.
+      expect(fs.existsSync(path.join(dir, "events.1.ndjson.gz"))).toBe(true)
+    })
+
+    it("swallows rotation errors inside createNdjsonFileSink flush (never blocks writes)", async () => {
+      const filePath = path.join(dir, "events.ndjson")
+      fs.writeFileSync(filePath, "x".repeat(500), "utf-8")
+
+      // Sabotage the rename target to force rotateIfNeeded to throw on the
+      // inline call inside flush(). The sink must swallow it and keep writing.
+      const plain1 = path.join(dir, "events.1.ndjson")
+      fs.mkdirSync(plain1)
+      fs.writeFileSync(path.join(plain1, "blocker"), "x", "utf-8")
+
+      const sink = createNdjsonFileSink(filePath, {
+        maxSizeBytes: 400,
+        maxGenerations: 2,
+        compress: true,
+        rotationCheckIntervalBytes: 5,
+      })
+
+      // Issue writes — rotation will throw but sink must not crash.
+      expect(() => {
+        for (let i = 0; i < 3; i++) {
+          sink({
+            ts: "2026-04-08T12:00:00.000Z",
+            level: "info",
+            event: "test.entry",
+            trace_id: `t-${i}`,
+            component: "test",
+            message: `entry ${i}`,
+            meta: {},
+          })
+        }
+      }).not.toThrow()
+
+      // Give the async flush loop time to run.
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      // Clean up the sabotage.
+      try {
+        fs.unlinkSync(path.join(plain1, "blocker"))
+        fs.rmdirSync(plain1)
+      } catch { /* best effort */ }
     })
   })
 

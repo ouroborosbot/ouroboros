@@ -314,6 +314,68 @@ describe("log-tailer", () => {
       expect(files[2]).toContain("daemon.ndjson")
     })
 
+    it("discoverLogFiles treats legacy uncompressed .N.ndjson as gen-N (read before active)", () => {
+      // Mixed real-world state: the daemon shipped with the old scheme so
+      // there's still a plain daemon.1.ndjson on disk, plus the active
+      // stream. discoverLogFiles should treat the legacy file as rank 1
+      // and sort it before the active daemon.ndjson (rank 0).
+      const files = discoverLogFiles({
+        homeDir: "/home/test",
+        existsSync: (p) => p.includes("logs"),
+        readdirSync: () => [
+          "daemon.ndjson",
+          "daemon.1.ndjson", // legacy uncompressed generation
+          "random.txt",
+        ],
+      })
+
+      expect(files).toHaveLength(2)
+      // Legacy gen-1 first, active last.
+      expect(files[0]).toContain("daemon.1.ndjson")
+      expect(files[1]?.endsWith("daemon.ndjson")).toBe(true)
+    })
+
+    it("discoverLogFiles sorts stably across multiple stream names in both directions", () => {
+      // Include three different streams so the comparator's `a.streamBase <
+      // b.streamBase ? -1 : 1` ternary fires both branches during sort.
+      const files = discoverLogFiles({
+        homeDir: "/home/test",
+        existsSync: (p) => p.includes("logs"),
+        readdirSync: () => [
+          "zed.ndjson",
+          "alpha.ndjson",
+          "mid.ndjson",
+          "zed.1.ndjson.gz",
+          "alpha.1.ndjson.gz",
+        ],
+      })
+
+      expect(files).toHaveLength(5)
+      // Alphabetical across streams, gzipped older first within each stream.
+      expect(files[0]).toContain("alpha.1.ndjson.gz")
+      expect(files[1]?.endsWith("alpha.ndjson")).toBe(true)
+      expect(files[2]?.endsWith("mid.ndjson")).toBe(true)
+      expect(files[3]).toContain("zed.1.ndjson.gz")
+      expect(files[4]?.endsWith("zed.ndjson")).toBe(true)
+    })
+
+    it("discoverLogFiles ignores gz files whose name pattern does not match generation-N", () => {
+      // e.g. an unrelated backup.ndjson.gz with no numeric generation
+      // suffix should be dropped by parseLogFilename's genMatch guard.
+      const files = discoverLogFiles({
+        homeDir: "/home/test",
+        existsSync: (p) => p.includes("logs"),
+        readdirSync: () => [
+          "daemon.ndjson",
+          "backup.ndjson.gz", // no .N suffix before .ndjson.gz
+        ],
+      })
+
+      // Only daemon.ndjson survives.
+      expect(files).toHaveLength(1)
+      expect(files[0]).toContain("daemon.ndjson")
+    })
+
     it("discoverLogFiles respects agentFilter for gz files too", () => {
       const files = discoverLogFiles({
         homeDir: "/home/test",
@@ -349,6 +411,23 @@ describe("log-tailer", () => {
 
       const lines = readLastLines(gzPath, 3, readStub)
       expect(lines).toEqual(["c", "d", "e"])
+    })
+
+    it("readLastLines decompresses a .ndjson.gz when the DI stub returns a binary string", () => {
+      // Alternate code path: the DI stub returns a binary-encoded string
+      // (e.g. from `fs.readFileSync(target, "binary")`) instead of a Buffer.
+      // The log-tailer must still decompress correctly.
+      const gzPath = path.join(tmp, "events.1.ndjson.gz")
+      const raw = "one\ntwo\nthree\n"
+      fs.writeFileSync(gzPath, zlib.gzipSync(Buffer.from(raw, "utf-8")))
+
+      const readStub = ((target: string) => {
+        // Return bytes as a binary-encoded string.
+        return fs.readFileSync(target).toString("binary")
+      }) as (target: string, encoding: "utf-8") => string
+
+      const lines = readLastLines(gzPath, 10, readStub)
+      expect(lines).toEqual(["one", "two", "three"])
     })
 
     it("readLastLines returns [] for a gzipped file that cannot be read", () => {
