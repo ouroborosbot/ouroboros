@@ -2,6 +2,12 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.298",
+      "changes": [
+        "test(bundle): cover `isFirstPushToRemote` branches via mocked child_process. Exported the function from `tools-bundle.ts` (previously private) and added `src/__tests__/repertoire/bundle-push-first-push.test.ts` with 5 unit tests that mock `execFileSync` to exercise all 3 code paths: (1) `symbolic-ref --short HEAD` failure → conservative true, (2) `ls-remote --heads` returns empty stdout → true (real first push, remote branch doesn't exist), (3) `ls-remote --heads` returns non-empty → false (subsequent push, remote branch exists), (4) `ls-remote` network failure → conservative true, (5) branch name correctly threaded to `ls-remote` args. Removed the `/* v8 ignore start/stop */` wrapper since all branches are now covered. The security contract (never return false when probe fails) is verified by tests 1 and 4."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.296",
       "changes": [
         "feat(sync): pending-sync.json classification + bundleState enrichment. `postTurnPush` in `src/heart/sync.ts` now distinguishes between a push that was rejected AFTER a successful rebase retry (`classification: push_rejected`) and a rebase that itself failed with merge conflicts (`classification: pull_rebase_conflict`, with conflictFiles populated from `git status --porcelain=v1` UU/AA/DD/AU/UA/DU/UD markers). The `PendingSyncRecord` interface is exported from `sync.ts` so downstream readers can type-check. `detectBundleState` in `src/heart/bundle-state.ts` gained `remote_push_failed` and `pull_rebase_conflict` issue cases that are added alongside `pending_sync_exists` when the classification field is present. Readers tolerate pending-sync.json without a classification field (pre-alpha.296 schema) or with malformed JSON — both fall back to the plain `pending_sync_exists` signal. 4 new bundle-state tests (push_rejected, pull_rebase_conflict, legacy schema, malformed JSON) and 2 new sync tests (second-push-fails-after-rebase-success, rebase-leaves-merge-conflicts). Completes the Directive D remediation signal plumbing started in alpha.281.",
