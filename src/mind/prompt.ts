@@ -474,6 +474,7 @@ function dateSection(): string {
   const parts = Object.fromEntries(
     fmt.formatToParts(now).map((p) => [p.type, p.value]),
   )
+  /* v8 ignore next -- Intl hour-24 bug only triggers at midnight @preserve */
   const hour = parts.hour === "24" ? "00" : parts.hour
   return `current date and time: ${parts.year}-${parts.month}-${parts.day} ${hour}:${parts.minute} ${parts.timeZoneName}`
 }
