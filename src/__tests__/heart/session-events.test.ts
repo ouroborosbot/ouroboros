@@ -1034,4 +1034,21 @@ describe("session events", () => {
 
     expect(updated.projection.eventIds).toEqual(["evt-000001", "evt-000002", "evt-000003"])
   })
+
+  it("stamps a message with ingress time and reads it back", async () => {
+    const { stampIngressTime, getIngressTime } = await import("../../heart/session-events")
+    const msg: OpenAI.ChatCompletionMessageParam = { role: "user", content: "hello" }
+    stampIngressTime(msg)
+    const ts = getIngressTime(msg)
+    expect(ts).not.toBeNull()
+    expect(typeof ts).toBe("string")
+    // Should be a valid ISO date
+    expect(Number.isNaN(Date.parse(ts!))).toBe(false)
+  })
+
+  it("returns null for a message without an ingress stamp", async () => {
+    const { getIngressTime } = await import("../../heart/session-events")
+    const msg: OpenAI.ChatCompletionMessageParam = { role: "user", content: "hello" }
+    expect(getIngressTime(msg)).toBeNull()
+  })
 })
