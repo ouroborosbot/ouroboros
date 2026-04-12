@@ -675,6 +675,12 @@ export const sessionToolDefinitions: ToolDefinition[] = [
                 detail: "bluebubbles send failed",
               } as const
             }
+            if (result.reason === "internal_content_blocked") {
+              return {
+                status: "blocked",
+                detail: "bluebubbles blocked internal/meta content; rewrite as user-facing text",
+              } as const
+            }
             return {
               status: "unavailable",
               detail: "live delivery unavailable right now; queued for the next active turn",

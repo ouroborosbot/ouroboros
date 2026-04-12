@@ -122,16 +122,16 @@ const CONTENT_PREVIEW_MAX = 80
 export function buildAttentionQueueSummary(queue: AttentionItem[]): string {
   if (queue.length === 0) return ""
 
-  const lines = ["you're holding:"]
+  const lines = ["internal work items i'm holding (not messages to send as-is):"]
   for (const item of queue) {
     if (item.packetKind && item.packetObjective) {
-      lines.push(`- [${item.id}] ${item.friendName} -> ${item.packetKind}: ${item.packetObjective}`)
+      lines.push(`- [${item.id}] inner work for ${item.friendName} -> ${item.packetKind}: ${item.packetObjective}`)
       continue
     }
     const preview = item.delegatedContent.length > CONTENT_PREVIEW_MAX
       ? `${item.delegatedContent.slice(0, CONTENT_PREVIEW_MAX - 3)}...`
       : item.delegatedContent
-    lines.push(`- [${item.id}] ${item.friendName} asked: "${preview}"`)
+    lines.push(`- [${item.id}] inner work requested by ${item.friendName}: "${preview}"`)
   }
   return lines.join("\n")
 }

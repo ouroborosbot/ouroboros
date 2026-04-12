@@ -142,7 +142,56 @@ export interface ProactiveBlueBubblesSessionSendParams {
 
 export interface ProactiveBlueBubblesSessionSendResult {
   delivered: boolean
-  reason?: "friend_not_found" | "trust_skip" | "missing_target" | "send_error" | "group_blocked"
+  reason?: "friend_not_found" | "trust_skip" | "missing_target" | "send_error" | "group_blocked" | "internal_content_blocked"
+}
+
+type ProactiveContentBlockReason =
+  | "raw_meta_marker"
+  | "inner_dialog_reference"
+  | "attention_queue_reference"
+  | "return_obligation_reference"
+  | "surfacing_mechanics_reference"
+  | "prompt_reference"
+  | "routing_reference"
+
+const PROACTIVE_INTERNAL_CONTENT_PATTERNS: Array<{ reason: ProactiveContentBlockReason; pattern: RegExp }> = [
+  { reason: "raw_meta_marker", pattern: /<\s*\/?\s*(think|analysis|commentary)\b[^>]*>/i },
+  { reason: "raw_meta_marker", pattern: /\[\s*surfaced from inner dialog\s*\]/i },
+  { reason: "inner_dialog_reference", pattern: /\binner (dialog|dialogue)\b/i },
+  { reason: "attention_queue_reference", pattern: /\battention queues?\b/i },
+  { reason: "return_obligation_reference", pattern: /\b(return|held|heart|inner)\s+obligations?\b/i },
+  { reason: "surfacing_mechanics_reference", pattern: /\b(surface tool|surfacing (mechanics|itself)|surfaced? outward|call `?surface`?|delegationId|delegation id)\b/i },
+  { reason: "prompt_reference", pattern: /\b(system|developer|inner|tool|orientation)\s+prompts?\b|\bprompt\/orientation\b|\bprompt wording\b/i },
+  { reason: "routing_reference", pattern: /\b(routing target|reply target|route through surface|routed through surface|proactive bluebubbles delivery)\b/i },
+]
+
+function getProactiveInternalContentBlockReason(text: string): ProactiveContentBlockReason | null {
+  for (const { reason, pattern } of PROACTIVE_INTERNAL_CONTENT_PATTERNS) {
+    if (pattern.test(text)) return reason
+  }
+  return null
+}
+
+function emitProactiveInternalContentBlocked(params: {
+  friendId: string
+  sessionKey?: string
+  reason: ProactiveContentBlockReason
+  source: "session_send" | "pending_drain"
+  intent?: string
+}): void {
+  emitNervesEvent({
+    level: "warn",
+    component: "senses",
+    event: "senses.bluebubbles_proactive_internal_content_blocked",
+    message: "proactive bluebubbles send blocked: internal content",
+    meta: {
+      friendId: params.friendId,
+      source: params.source,
+      reason: params.reason,
+      ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
+      ...(params.intent ? { intent: params.intent } : {}),
+    },
+  })
 }
 
 const defaultDeps: RuntimeDeps = {
@@ -1559,6 +1608,18 @@ export async function sendProactiveBlueBubblesMessageToSession(
   }
   /* v8 ignore stop */
 
+  const internalContentBlockReason = getProactiveInternalContentBlockReason(params.text)
+  if (internalContentBlockReason) {
+    emitProactiveInternalContentBlocked({
+      friendId: params.friendId,
+      sessionKey: params.sessionKey,
+      reason: internalContentBlockReason,
+      source: "session_send",
+      intent: params.intent ?? "generic_outreach",
+    })
+    return { delivered: false, reason: "internal_content_blocked" }
+  }
+
   try {
     await client.sendText({ chat, text: params.text })
     emitNervesEvent({
@@ -1663,6 +1724,18 @@ export async function drainAndSendPendingBlueBubbles(
     if (!messageText.trim()) {
       result.skipped++
       try { fs.unlinkSync(filePath) } catch { /* ignore */ }
+      continue
+    }
+
+    const internalContentBlockReason = getProactiveInternalContentBlockReason(messageText)
+    if (internalContentBlockReason) {
+      result.skipped++
+      try { fs.unlinkSync(filePath) } catch { /* ignore */ }
+      emitProactiveInternalContentBlocked({
+        friendId,
+        reason: internalContentBlockReason,
+        source: "pending_drain",
+      })
       continue
     }
 

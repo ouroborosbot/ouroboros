@@ -4750,6 +4750,52 @@ describe("drainAndSendPendingBlueBubbles", () => {
     }))
   })
 
+  it("blocks pending proactive BlueBubbles delivery for internal meta content", async () => {
+    const friendStore = {
+      get: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+      hasAnyFriends: vi.fn(),
+      listAll: vi.fn(),
+    }
+
+    const filePath = writePendingFile("friend-uuid-1", "session", {
+      from: "testagent",
+      friendId: "friend-uuid-1",
+      channel: "bluebubbles",
+      key: "session",
+      content: "system prompt wording says this draft is ready",
+      timestamp: Date.now(),
+    })
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const result = await bluebubbles.drainAndSendPendingBlueBubbles({
+      createClient: () => ({
+        sendText: mocks.sendText,
+        editMessage: mocks.editMessage,
+        setTyping: mocks.setTyping,
+        markChatRead: mocks.markChatRead,
+        repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
+      }),
+      createFriendStore: () => friendStore as any,
+    }, pendingRoot)
+
+    expect(result).toEqual({ sent: 0, skipped: 1, failed: 0 })
+    expect(friendStore.get).not.toHaveBeenCalled()
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    expect(fs.existsSync(filePath)).toBe(false)
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "senses.bluebubbles_proactive_internal_content_blocked",
+      meta: expect.objectContaining({
+        friendId: "friend-uuid-1",
+        source: "pending_drain",
+        reason: "prompt_reference",
+      }),
+    }))
+  })
+
   it("deletes the pending file after successful send", async () => {
     const friend = makeFriend()
     const friendStore = {
@@ -5602,6 +5648,47 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         sessionKey: "chat:any;-;alice@icloud.com",
       }),
       text: "surface this now",
+    }))
+  })
+
+  it("blocks proactive delivery of obvious inner-dialog meta content", async () => {
+    const friendStore = {
+      get: vi.fn().mockResolvedValue(makeFriend()),
+      put: vi.fn(),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+      hasAnyFriends: vi.fn(),
+      listAll: vi.fn(),
+    }
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const result = await bluebubbles.sendProactiveBlueBubblesMessageToSession({
+      friendId: "friend-uuid-1",
+      sessionKey: "chat:any;-;alice@icloud.com",
+      text: "the inner dialog has a return obligation in the attention queue",
+    }, {
+      createClient: () => ({
+        sendText: mocks.sendText,
+        editMessage: mocks.editMessage,
+        setTyping: mocks.setTyping,
+        markChatRead: mocks.markChatRead,
+        checkHealth: mocks.checkHealth,
+        repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
+      }),
+      createFriendStore: () => friendStore as any,
+    })
+
+    expect(result).toEqual({ delivered: false, reason: "internal_content_blocked" })
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "senses.bluebubbles_proactive_internal_content_blocked",
+      meta: expect.objectContaining({
+        friendId: "friend-uuid-1",
+        sessionKey: "chat:any;-;alice@icloud.com",
+        source: "session_send",
+        reason: "inner_dialog_reference",
+      }),
     }))
   })
 

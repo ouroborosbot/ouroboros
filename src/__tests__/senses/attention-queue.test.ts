@@ -413,13 +413,14 @@ describe("attention queue", () => {
       ]
 
       const summary = buildAttentionQueueSummary(items)
-      expect(summary).toContain("you're holding:")
+      expect(summary).toContain("internal work items i'm holding (not messages to send as-is):")
       expect(summary).toContain("[abc123]")
-      expect(summary).toContain("Ari asked:")
+      expect(summary).toContain("inner work requested by Ari:")
       expect(summary).toContain("think about penguins")
       expect(summary).toContain("[def456]")
-      expect(summary).toContain("Ben asked:")
+      expect(summary).toContain("inner work requested by Ben:")
       expect(summary).toContain("review the deployment plan")
+      expect(summary).not.toContain("you're holding:")
     })
 
     it("prefers packet kind and objective when available", () => {
@@ -440,8 +441,8 @@ describe("attention queue", () => {
       ]
 
       const summary = buildAttentionQueueSummary(items)
-      expect(summary).toContain("Ari -> harness_friction: Fix image retry behavior")
-      expect(summary).not.toContain("asked:")
+      expect(summary).toContain("inner work for Ari -> harness_friction: Fix image retry behavior")
+      expect(summary).not.toContain("requested by")
     })
 
     it("returns empty string for empty queue", () => {

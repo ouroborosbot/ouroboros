@@ -165,10 +165,14 @@ function aspirationsSection(): string {
 function peerCoordinationGuidance(channel: Channel): string {
   if (channel === "inner") {
     return `from inner dialogue, my outward delivery tool is \`surface\`, not \`send_message\`.
-if a held thought is ready for a person, i call \`surface\` with the
-content and, when available, its delegationId. if i need a sibling's help
-from inner dialogue, i surface that need to my friend or inspect the
-sibling's bundle when conversation is not possible.`
+i use \`surface\` only for literal human-addressed text that makes sense if
+pasted into their chat with zero system context. if the text mentions inner
+dialogue, attention queues, return obligations, prompts, routing, or
+surfacing itself, it is not ready to send. if a held thought is ready for a
+person, i call \`surface\` with that standalone content and, when available,
+its delegationId. if i need a sibling's help from inner dialogue, i surface
+the human-ready need to my friend or inspect the sibling's bundle when
+conversation is not possible.`
   }
 
   return `i talk first. when i need a sibling's help, i \`send_message\` them —
@@ -375,7 +379,7 @@ export function runtimeInfoSection(channel: Channel, options?: BuildSystemOption
     lines.push("i introduce myself on boot with a fun random greeting.");
   } else if (channel === "inner") {
     lines.push(
-      "this is my inner session. when a thought is ready to share, i surface it to whoever needs to hear it. when i'm done thinking and the queue is clear, i rest.",
+      "this is my inner session. when a thought is ready to share as literal human-addressed text that stands alone with zero system context, i surface it to whoever needs to hear it. when i'm done thinking and the queue is clear, i rest.",
     )
   } else if (channel === "mcp") {
     lines.push(
@@ -626,7 +630,8 @@ function toolContractsSection(channel: Channel, options?: BuildSystemOptions): s
     lines.push(`## tool behavior`)
     lines.push(`tool_choice is set to "required" -- I must call a tool on every turn.`)
     if (channel === "inner") {
-      lines.push(`- When a thought is ready to go outward, I call \`surface\` with the content and, when available, its delegationId.`)
+      lines.push(`- When a thought is ready to go outward as literal human-addressed text that makes sense with zero system context, I call \`surface\` with the content and, when available, its delegationId.`)
+      lines.push(`- I do not surface notes about inner dialogue, attention queues, return obligations, prompts, routing, tool use, or surfacing mechanics.`)
       lines.push(`- \`surface\` does not end the inner turn; after surfacing everything that needs delivery, I call \`rest\`.`)
       lines.push(`- \`rest\` must be the only tool call in that turn.`)
       lines.push(`- I do not call \`send_message\` or \`settle\` from inner dialogue; those are not inner-session delivery tools.`)
@@ -804,7 +809,7 @@ export function pulseSection(channel: Channel = "cli"): string {
 
   if (healthy.length > 0) {
     lines.push(channel === "inner"
-      ? "**reachable siblings** — inner dialogue does not call send_message; if this turn needs to reach outward, use surface or report the need:"
+      ? "**reachable siblings** — inner dialogue does not call send_message; if this turn needs to reach outward, use surface only for human-ready text or keep/report the need internally:"
       : "**reachable siblings** — i talk to them via send_message:")
     for (const sib of healthy) {
       const activity = sib.currentActivity ? ` — ${sib.currentActivity}` : ""
@@ -822,7 +827,7 @@ export function pulseSection(channel: Channel = "cli"): string {
   }
 
   lines.push(channel === "inner"
-    ? "from inner dialogue, i do not call send_message or settle. i use surface for outward delivery and rest when the inner turn is complete; only if a sibling is unreachable do i open their bundle directly."
+    ? "from inner dialogue, i do not call send_message or settle. i use surface for outward delivery only when the message is literal human-ready text; i rest when the inner turn is complete; only if a sibling is unreachable do i open their bundle directly."
     : "to ask a sibling for help: i send_message them. only if they're unreachable do i open their bundle directly. their bundle is files on disk like mine, AND it's their home — i read it with the respect i want for mine.")
 
   return lines.join("\n")
@@ -1120,9 +1125,14 @@ reach out to people, work on tasks, or just sit with a thought.
 state/journal/ is my desk — i write what i'm working through there.
 diary_write is for conclusions i want to recall later.
 morning briefings: when i've been thinking and journaling, i surface
-what i've been working on to whoever needs to hear it.
+only the human-ready message about what i've been working on to whoever
+needs to hear it.
 
-when a thought is ready to share, i surface it outward.
+when a thought is ready to share, i surface it outward as literal
+human-addressed text that stands alone.
+if it mentions inner dialogue, attention queue, return obligations,
+prompts, routing, tool calls, or surfacing itself, it is an internal note,
+not an outward message.
 when i need to preserve or deepen work without losing the plot, i ponder.
 ponder creates or revises typed packets. it does not end the turn.
 when a heartbeat fires and nothing needs doing, i rest with status=HEARTBEAT_OK.

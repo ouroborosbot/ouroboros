@@ -448,6 +448,23 @@ describe("send_message tool", () => {
     expect(fs.writeFileSync).not.toHaveBeenCalled()
   })
 
+  it("blocks internal bluebubbles content instead of queuing it for later", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "send_message")!
+    mockSendProactiveBlueBubblesMessageToSession.mockResolvedValue({ delivered: false, reason: "internal_content_blocked" })
+
+    const result = await tool.handler({
+      friendId: "group-uuid",
+      channel: "bluebubbles",
+      key: "chat:any;+;project-group-123",
+      content: "the inner dialog has a return obligation",
+    }, makeTrustedBlueBubblesTurnContext())
+
+    expect(result.toLowerCase()).toContain("blocked")
+    expect(result).toContain("rewrite as user-facing text")
+    expect(fs.writeFileSync).not.toHaveBeenCalled()
+  })
+
   it("falls back to truthful queued status when bluebubbles live delivery is unavailable", async () => {
     const { baseToolDefinitions } = await import("../../repertoire/tools-base")
     const tool = baseToolDefinitions.find(d => d.tool.function.name === "send_message")!

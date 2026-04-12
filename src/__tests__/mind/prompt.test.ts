@@ -2825,6 +2825,8 @@ describe("buildSystem with context", () => {
     resetPsycheCache()
     const result = await buildSystem("inner")
     expect(result).toContain("when a thought is ready to share, i surface it outward")
+    expect(result).toContain("literal human-addressed text that stands alone")
+    expect(result).toContain("not an outward message")
     expect(result).toContain("ponder creates or revises typed packets")
     expect(result).toContain("HEARTBEAT_OK")
     expect(result).toContain("## ponder packet sops")
@@ -2843,13 +2845,17 @@ describe("buildSystem with context", () => {
     const toolsBlock = result.match(/## my tools\n[\s\S]*?(?=\n\n## |\n\n# )/)?.[0] ?? ""
 
     expect(toolsBlock).toContain("- surface:")
+    expect(toolsBlock).toContain("zero system context")
+    expect(toolsBlock).toContain("do not use for notes about inner dialog")
     expect(toolsBlock).toContain("- rest:")
     expect(toolsBlock).toContain("- ponder:")
     expect(toolsBlock).not.toContain("- send_message:")
     expect(toolsBlock).not.toContain("- settle:")
-    expect(result).toContain("When a thought is ready to go outward, I call `surface`")
-    expect(result).toContain("I do not call `send_message` or `settle` from inner dialogue")
+    expect(result).toContain("When a thought is ready to go outward as literal human-addressed text")
+    expect(result).toContain("I do not surface notes about inner dialogue")
     expect(result).toContain("my outward delivery tool is `surface`, not `send_message`")
+    expect(result).toContain("zero system context")
+    expect(result).toContain("I do not call `send_message` or `settle` from inner dialogue")
     expect(result).not.toContain("when i need a sibling's help, i `send_message` them")
     expect(result).not.toContain("to ask a sibling for help: i send_message them")
 

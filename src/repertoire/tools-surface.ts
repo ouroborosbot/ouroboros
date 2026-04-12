@@ -14,13 +14,13 @@ export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {
   function: {
     name: "surface",
     description:
-      "share a thought outward — deliver an answer, ask a follow-up, or surface progress to whoever needs to hear it. pass delegationId to address a held thought (see your attention queue above), or friendId for spontaneous outreach. does not end your turn.",
+      "deliver literal human-addressed text outward. use only for a message that makes sense if pasted into the person's chat with zero system context. do not use for notes about inner dialog, attention queue, obligations, prompts, routing, or surfacing mechanics. pass delegationId to address a held thought (see your attention queue above), or friendId for spontaneous outreach. does not end your turn.",
     parameters: {
       type: "object",
       properties: {
         content: {
           type: "string",
-          description: "the message to deliver",
+          description: "literal message for the human; no inner/session/system context or surfacing notes",
         },
         delegationId: {
           type: "string",
@@ -98,6 +98,9 @@ export const surfaceToolDefinition: ToolDefinition = {
                   appendSyntheticAssistantMessage(sessionFilePath, `[surfaced from inner dialog] ${content}`)
                   return { status: "delivered", detail: "via iMessage" }
                 }
+                if (proactiveResult.reason === "internal_content_blocked") {
+                  return { status: "failed", detail: "blocked: rewrite as human-addressed text" }
+                }
               }
               // Fall back to pending queue for bridge target
               const { queuePendingMessage, getPendingDir } = await import("../mind/pending")
@@ -133,6 +136,9 @@ export const surfaceToolDefinition: ToolDefinition = {
             const sessionFilePath = path.join(sessionsDir, bbSession.friendId, bbSession.channel, `${bbSession.key}.json`)
             appendSyntheticAssistantMessage(sessionFilePath, `[surfaced from inner dialog] ${content}`)
             return { status: "delivered", detail: "via iMessage" }
+          }
+          if (proactiveResult.reason === "internal_content_blocked") {
+            return { status: "failed", detail: "blocked: rewrite as human-addressed text" }
           }
         }
 
@@ -209,4 +215,3 @@ export const surfaceToolDefinition: ToolDefinition = {
   summaryKeys: ["content", "delegationId"],
 }
 /* v8 ignore stop */
-
