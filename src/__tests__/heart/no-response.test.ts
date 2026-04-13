@@ -451,6 +451,30 @@ describe("observe tool in runAgent", () => {
     expect(toolNames).toContain("observe")
   })
 
+  it("includes observe in activeTools for 1:1 outward chat (not group, not reaction, not inner)", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "settle", arguments: '{"answer":"done"}' } },
+        ]),
+      ])
+    )
+
+    const callbacks = makeCallbacks()
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, {
+      toolChoiceRequired: true,
+      toolContext: {
+        signin: async () => undefined,
+        context: { isGroupChat: false, channel: { channel: "bluebubbles", senseType: "open", availableIntegrations: [], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      },
+    })
+
+    const params = mockCreate.mock.calls[0][0]
+    const toolNames = params.tools.map((t: any) => t.function.name)
+    expect(toolNames).toContain("observe")
+  })
+
   it("does NOT include observe when isReactionSignal is undefined + 1:1", async () => {
     mockCreate.mockReturnValue(
       makeStream([
