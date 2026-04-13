@@ -278,7 +278,7 @@ describe("observe tool in runAgent", () => {
     expect(toolNames).toContain("settle")
   })
 
-  it("does NOT include observe in activeTools when isGroupChat is false", async () => {
+  it("includes observe in activeTools when isGroupChat is false (1:1 outward)", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -299,10 +299,10 @@ describe("observe tool in runAgent", () => {
 
     const params = mockCreate.mock.calls[0][0]
     const toolNames = params.tools.map((t: any) => t.function.name)
-    expect(toolNames).not.toContain("observe")
+    expect(toolNames).toContain("observe")
   })
 
-  it("does NOT include observe when isGroupChat is undefined", async () => {
+  it("includes observe when isGroupChat is undefined (outward channel)", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -323,7 +323,7 @@ describe("observe tool in runAgent", () => {
 
     const params = mockCreate.mock.calls[0][0]
     const toolNames = params.tools.map((t: any) => t.function.name)
-    expect(toolNames).not.toContain("observe")
+    expect(toolNames).toContain("observe")
   })
 
   it("emits a nerves event when observe is used", async () => {
@@ -475,7 +475,7 @@ describe("observe tool in runAgent", () => {
     expect(toolNames).toContain("observe")
   })
 
-  it("does NOT include observe when isReactionSignal is undefined + 1:1", async () => {
+  it("includes observe when isReactionSignal is undefined + 1:1 (all outward channels get observe)", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -496,7 +496,7 @@ describe("observe tool in runAgent", () => {
 
     const params = mockCreate.mock.calls[0][0]
     const toolNames = params.tools.map((t: any) => t.function.name)
-    expect(toolNames).not.toContain("observe")
+    expect(toolNames).toContain("observe")
   })
 
   it("includes observe when isReactionSignal:true + group chat (still works)", async () => {
