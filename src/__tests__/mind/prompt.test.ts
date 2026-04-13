@@ -2863,7 +2863,7 @@ describe("buildSystem with context", () => {
     expect(toolsBlock).toContain("- ponder:")
     expect(toolsBlock).not.toContain("- send_message:")
     expect(toolsBlock).not.toContain("- settle:")
-    expect(result).toContain("When a thought is ready to go outward, I call `surface`")
+    expect(result).toContain("When I have something to say to a person, I call `surface`")
     expect(result).toContain("I do not call `send_message` or `settle` from inner dialogue")
     expect(result).toContain("my outward delivery tool is `surface`, not `send_message`")
     expect(result).not.toContain("when i need a sibling's help, i `send_message` them")

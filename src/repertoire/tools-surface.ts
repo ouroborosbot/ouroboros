@@ -14,7 +14,7 @@ export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {
   function: {
     name: "surface",
     description:
-      "share a thought outward — deliver an answer, ask a follow-up, or surface progress to whoever needs to hear it. pass delegationId to address a held thought (see your attention queue above), or friendId for spontaneous outreach. does not end your turn.",
+      "send a message to someone — write it the way you'd text a friend. pass delegationId to address a held thought (see your attention queue above), or friendId for spontaneous outreach. does not end your turn.",
     parameters: {
       type: "object",
       properties: {
