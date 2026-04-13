@@ -1232,6 +1232,22 @@ describe("buildSystem", () => {
     expect(result).toContain("- settle:")
   })
 
+  it("inner dialog tool behavior guides agent to use rest/ponder for internal state, not surface", async () => {
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("inner", { toolChoiceRequired: true })
+    // Should mention rest with note for internal state
+    expect(result).toMatch(/rest.*note|note.*rest/i)
+    // Should mention ponder for reflection
+    expect(result).toMatch(/ponder.*reflection|reflection.*ponder/i)
+    // Should NOT frame surface as progress reporting
+    expect(result).not.toContain("surface progress")
+  })
+
   it("toolsSection keeps flow tools when a custom tool subset is provided", async () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
