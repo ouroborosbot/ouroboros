@@ -95,7 +95,7 @@ export const surfaceToolDefinition: ToolDefinition = {
                   // Inject surfaced content into the target session so it knows what was delivered
                   const { appendSyntheticAssistantMessage } = await import("../mind/context")
                   const sessionFilePath = path.join(sessionsDir, bridgeTarget.friendId, bridgeTarget.channel, `${bridgeTarget.key}.json`)
-                  appendSyntheticAssistantMessage(sessionFilePath, `[surfaced from inner dialog] ${content}`)
+                  appendSyntheticAssistantMessage(sessionFilePath, content)
                   return { status: "delivered", detail: "via iMessage" }
                 }
               }
@@ -131,7 +131,7 @@ export const surfaceToolDefinition: ToolDefinition = {
           if (proactiveResult.delivered) {
             const { appendSyntheticAssistantMessage } = await import("../mind/context")
             const sessionFilePath = path.join(sessionsDir, bbSession.friendId, bbSession.channel, `${bbSession.key}.json`)
-            appendSyntheticAssistantMessage(sessionFilePath, `[surfaced from inner dialog] ${content}`)
+            appendSyntheticAssistantMessage(sessionFilePath, content)
             return { status: "delivered", detail: "via iMessage" }
           }
         }
