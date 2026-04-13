@@ -64,7 +64,7 @@ describe("buildHabitTurnMessage", () => {
       ],
     }))
 
-    expect(result).toContain("something for ari has been sitting for 45 minutes")
+    expect(result).toContain("[internal] obligation: ari — waiting 45 minutes")
   })
 
   it("normal turn: multiple stale obligations each on their own line", () => {
@@ -75,11 +75,11 @@ describe("buildHabitTurnMessage", () => {
       ],
     }))
 
-    expect(result).toContain("something for ari has been sitting for 1 hour")
-    expect(result).toContain("something for kai has been sitting for 1 hour")
+    expect(result).toContain("[internal] obligation: ari — waiting 1 hour")
+    expect(result).toContain("[internal] obligation: kai — waiting 1 hour")
     // Each on separate line
     const lines = result.split("\n")
-    const obligationLines = lines.filter((l) => l.startsWith("something for"))
+    const obligationLines = lines.filter((l) => l.includes("[internal] obligation:"))
     expect(obligationLines).toHaveLength(2)
   })
 
@@ -150,8 +150,8 @@ describe("buildHabitTurnMessage", () => {
       staleObligations: [],
     }))
 
-    expect(result).not.toContain("something for")
-    expect(result).not.toContain("has been sitting")
+    expect(result).not.toContain("[internal] obligation:")
+    expect(result).not.toContain("waiting")
   })
 
   // ── Cold start ─────────────────────────────────────────────────────
@@ -333,7 +333,7 @@ describe("buildHabitTurnMessage", () => {
       ],
     }))
 
-    expect(result).toContain("something for ari has been sitting for 2 hours")
+    expect(result).toContain("[internal] obligation: ari — waiting 2 hours")
   })
 
   it("stale obligations: singular 1 hour", () => {
@@ -343,7 +343,7 @@ describe("buildHabitTurnMessage", () => {
       ],
     }))
 
-    expect(result).toContain("something for ari has been sitting for 1 hour")
+    expect(result).toContain("[internal] obligation: ari — waiting 1 hour")
     expect(result).not.toContain("1 hours")
   })
 
