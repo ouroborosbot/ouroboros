@@ -144,7 +144,7 @@ function copyKnownFields(
   return result
 }
 
-function splitLegacyProviderConfig(
+export function splitProviderCredentialFields(
   provider: AgentProvider,
   rawConfig: Record<string, unknown>,
 ): { credentials: Record<string, string | number>; config: Record<string, string | number> } {
@@ -174,6 +174,13 @@ function makeRevision(): string {
 
 export function getProviderCredentialPoolPath(homeDir = os.homedir()): string {
   return path.join(homeDir, ".agentsecrets", "providers.json")
+}
+
+export function providerCredentialHomeDirFromSecretsRoot(secretsRoot?: string): string {
+  if (!secretsRoot) return os.homedir()
+  return path.basename(secretsRoot) === ".agentsecrets"
+    ? path.dirname(secretsRoot)
+    : secretsRoot
 }
 
 export function validateProviderCredentialPool(value: unknown): ProviderCredentialPool {
@@ -393,7 +400,7 @@ export function readLegacyAgentProviderCredentials(
     if (!legacyProviderHasCredentialData(providerKey, rawProviderConfig)) {
       continue
     }
-    const { credentials, config } = splitLegacyProviderConfig(providerKey, rawProviderConfig)
+    const { credentials, config } = splitProviderCredentialFields(providerKey, rawProviderConfig)
     candidates.push({
       provider: providerKey,
       credentials,

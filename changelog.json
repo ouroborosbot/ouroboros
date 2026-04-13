@@ -2,11 +2,23 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.349",
+      "version": "0.1.0-alpha.351",
       "changes": [
         "Settle tool description now communicates turn-ending semantics: 'deliver your response and end your turn' with explicit guidance against settling with status updates mid-task.",
         "Observe tool now available in all outward channels including 1:1 chats, not just groups and reactions — agents can absorb messages without responding when the moment doesn't call for words.",
         "Autonomous execution prompt contract added: when told to work autonomously, agents use ponder to absorb new messages and continue using tools, settling only with the final result."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.350",
+      "changes": [
+        "`ouro up`, hatch, and doctor now use the same local provider-state and machine-credential readiness path: new agents get bootstrapped `state/providers.json`, startup checks ping the selected lane/provider/model with machine-wide credentials, readiness is persisted per lane, legacy per-agent secrets migrate into `~/.agentsecrets/providers.json`, and doctor checks provider-pool/state safety without exposing secrets."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.349",
+      "changes": [
+        "`ouro use`, `ouro check`, provider-scoped `ouro status --agent`, and machine-pool `ouro auth` now operate on machine-local provider state and credentials, with safe provenance, explicit lane/provider/model repair guidance, and legacy `auth switch`/`config model` compatibility routed through `state/providers.json` instead of mutating synced `agent.json`."
       ]
     },
     {
