@@ -7282,6 +7282,39 @@ describe("chat provider health check", () => {
     expect(result).toContain("provider unreachable")
   })
 
+  it("bare ouro with multi-agent selection bails when provider health check fails", async () => {
+    mockHealthCheck.mockResolvedValueOnce({
+      ok: false,
+      error: "copilot token expired",
+      fix: "run ouro auth --provider github-copilot",
+    })
+    const startChat = vi.fn(async () => {})
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 42 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      listDiscoveredAgents: vi.fn(async () => ["slugger", "ouroboros"]),
+      promptInput: vi.fn(async () => "slugger"),
+      startChat,
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+      promptInput: (prompt: string) => Promise<string>
+      startChat: typeof startChat
+    }
+
+    const result = await runOuroCli([], deps)
+
+    expect(startChat).not.toHaveBeenCalled()
+    expect(result).toContain("copilot token expired")
+    expect(deps.writeStdout).toHaveBeenCalledWith(
+      expect.stringContaining("run ouro auth --provider github-copilot"),
+    )
+  })
+
   it("health check failure includes fix hint when provided", async () => {
     mockHealthCheck.mockResolvedValueOnce({
       ok: false,
