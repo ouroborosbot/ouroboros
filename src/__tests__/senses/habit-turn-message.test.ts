@@ -296,7 +296,7 @@ describe("buildHabitTurnMessage", () => {
     const elapsedIdx = result.indexOf("30 minutes have passed")
     const bodyIdx = result.indexOf("Check in on responsibilities.")
     const alsoDueIdx = result.indexOf("also due:")
-    const obligationIdx = result.indexOf("something for ari")
+    const obligationIdx = result.indexOf("[internal] obligation: ari")
     const parseIdx = result.indexOf("bad.md")
     const degradedIdx = result.indexOf("[note:")
 
