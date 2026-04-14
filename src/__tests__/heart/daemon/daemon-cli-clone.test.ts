@@ -141,7 +141,7 @@ describe("ouro clone execution", () => {
 
     // Track which CLI sub-commands get chained
     const chainedCommands: string[][] = []
-    const promptResponses = ["y", "n", "y"]  // auth=yes, up=no, setup=yes
+    const promptResponses = ["y", "y", "y"]  // auth=yes, up=yes, setup=yes
     let promptIndex = 0
     deps.promptInput = vi.fn().mockImplementation(() => {
       return Promise.resolve(promptResponses[promptIndex++] ?? "n")

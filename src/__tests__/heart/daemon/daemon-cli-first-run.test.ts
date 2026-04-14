@@ -140,6 +140,29 @@ describe("first-run hatch-or-clone choice", () => {
     expect(cloneCalls.length).toBe(1)
   })
 
+  it("when clone is chosen but remote URL is empty, falls through to hatch", async () => {
+    const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps()
+    deps.writeStdout = vi.fn()
+    deps.listDiscoveredAgents = vi.fn().mockReturnValue([])
+    // First prompt: "clone", second prompt: empty string (no URL)
+    deps.promptInput = vi.fn()
+      .mockResolvedValueOnce("clone")
+      .mockResolvedValueOnce("")
+      .mockResolvedValue("hatch")
+    deps.runSerpentGuide = vi.fn().mockResolvedValue(null)
+    deps.startChat = vi.fn().mockResolvedValue(undefined)
+
+    await runOuroCli([], deps)
+
+    const output = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0])
+      .join("\n")
+    expect(output).toContain("no remote URL provided")
+    // Should fall through to hatch
+    expect(deps.runSerpentGuide).toHaveBeenCalled()
+  })
+
   it("when promptInput returns unexpected input, defaults to hatch", async () => {
     const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
     const deps = createDefaultOuroCliDeps()
