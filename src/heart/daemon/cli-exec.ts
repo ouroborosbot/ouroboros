@@ -3085,9 +3085,47 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     // 8. Output success message
     emitNervesEvent({ component: "daemon", event: "daemon.clone_complete", message: "clone complete", meta: { agentName, targetPath } })
-    const message = `cloned ${agentName} to ${targetPath}\nsync enabled (remote: origin)\nnext steps:\n  ouro auth run --agent ${agentName}`
-    deps.writeStdout(message)
-    return message
+    deps.writeStdout(`cloned ${agentName} to ${targetPath}\nsync enabled (remote: origin)`)
+
+    // 9. Guided post-clone flow (when interactive)
+    if (deps.promptInput) {
+      // Auth
+      const authAnswer = await deps.promptInput(`\nSet up provider auth now? (y/n): `)
+      if (authAnswer.trim().toLowerCase() === "y") {
+        emitNervesEvent({ component: "daemon", event: "daemon.clone_chain_auth", message: "chaining auth from clone flow", meta: { agentName } })
+        try {
+          await runOuroCli(["auth", "--agent", agentName], deps)
+        } catch (e) {
+          deps.writeStdout(`auth setup failed: ${e instanceof Error ? e.message : String(e)}\nYou can retry later with: ouro auth run --agent ${agentName}`)
+        }
+      }
+
+      // Daemon
+      const upAnswer = await deps.promptInput(`\nStart the daemon now? (y/n): `)
+      if (upAnswer.trim().toLowerCase() === "y") {
+        emitNervesEvent({ component: "daemon", event: "daemon.clone_chain_up", message: "chaining daemon start from clone flow", meta: { agentName } })
+        try {
+          await runOuroCli(["up"], deps)
+        } catch (e) {
+          deps.writeStdout(`daemon start failed: ${e instanceof Error ? e.message : String(e)}\nYou can retry later with: ouro up`)
+        }
+      }
+
+      // Dev tool setup
+      const setupAnswer = await deps.promptInput(`\nSet up Claude Code integration? (y/n): `)
+      if (setupAnswer.trim().toLowerCase() === "y") {
+        emitNervesEvent({ component: "daemon", event: "daemon.clone_chain_setup", message: "chaining dev tool setup from clone flow", meta: { agentName } })
+        try {
+          await runOuroCli(["setup", "--tool", "claude-code", "--agent", agentName], deps)
+        } catch (e) {
+          deps.writeStdout(`dev tool setup failed: ${e instanceof Error ? e.message : String(e)}\nYou can retry later with: ouro setup --tool claude-code --agent ${agentName}`)
+        }
+      }
+    } else {
+      deps.writeStdout(`\nnext steps:\n  ouro auth run --agent ${agentName}\n  ouro up\n  ouro setup --tool claude-code --agent ${agentName}`)
+    }
+
+    return `clone complete: ${agentName}`
   }
 
   const daemonCommand = toDaemonCommand(command)
