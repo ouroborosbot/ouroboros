@@ -129,8 +129,8 @@ describe("first-run hatch-or-clone choice", () => {
 
     await runOuroCli([], deps)
 
-    // promptInput should have been called twice: choice then remote URL
-    expect(deps.promptInput).toHaveBeenCalledTimes(2)
+    // promptInput called 5 times: choice, remote URL, then chained auth/up/setup prompts
+    expect(deps.promptInput).toHaveBeenCalledTimes(5)
     // runSerpentGuide should NOT be called (clone path)
     expect(deps.runSerpentGuide).not.toHaveBeenCalled()
     // git clone should have been called

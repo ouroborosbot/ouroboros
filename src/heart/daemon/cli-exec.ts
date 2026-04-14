@@ -3090,7 +3090,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     // 9. Guided post-clone flow (when interactive)
     if (deps.promptInput) {
       // Auth
-      const authAnswer = await deps.promptInput(`\nSet up provider auth now? (y/n): `)
+      const authAnswer = await deps.promptInput(`\nSet up provider auth now? (y/n): `) ?? ""
       if (authAnswer.trim().toLowerCase() === "y") {
         emitNervesEvent({ component: "daemon", event: "daemon.clone_chain_auth", message: "chaining auth from clone flow", meta: { agentName } })
         try {
@@ -3101,7 +3101,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       }
 
       // Daemon
-      const upAnswer = await deps.promptInput(`\nStart the daemon now? (y/n): `)
+      const upAnswer = await deps.promptInput(`\nStart the daemon now? (y/n): `) ?? ""
       if (upAnswer.trim().toLowerCase() === "y") {
         emitNervesEvent({ component: "daemon", event: "daemon.clone_chain_up", message: "chaining daemon start from clone flow", meta: { agentName } })
         try {
@@ -3112,7 +3112,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       }
 
       // Dev tool setup
-      const setupAnswer = await deps.promptInput(`\nSet up Claude Code integration? (y/n): `)
+      const setupAnswer = await deps.promptInput(`\nSet up Claude Code integration? (y/n): `) ?? ""
       if (setupAnswer.trim().toLowerCase() === "y") {
         emitNervesEvent({ component: "daemon", event: "daemon.clone_chain_setup", message: "chaining dev tool setup from clone flow", meta: { agentName } })
         try {
