@@ -3125,6 +3125,17 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.writeStdout(`\nnext steps:\n  ouro auth run --agent ${agentName}\n  ouro up\n  ouro setup --tool claude-code --agent ${agentName}`)
     }
 
+    // Remind about PATH if running inside npx (ouro may not be on PATH yet)
+    if (process.env.npm_execpath) {
+      const shell = process.env.SHELL ? path.basename(process.env.SHELL) : ""
+      const bashProfile = process.platform === "darwin" ? "~/.bash_profile" : "~/.bashrc"
+      const sourceCmd = shell === "zsh" ? "source ~/.zshrc"
+        : shell === "bash" ? `source ${bashProfile}`
+        : shell === "fish" ? "source ~/.config/fish/config.fish"
+        : "restart your shell"
+      deps.writeStdout(`\ntip: if 'ouro' is not found, run: ${sourceCmd}`)
+    }
+
     return `clone complete: ${agentName}`
   }
 
