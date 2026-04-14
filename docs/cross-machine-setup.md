@@ -124,6 +124,12 @@ After setup, open Claude Code in PowerShell — the agent is there.
 | Skills | |
 | Agent config (`agent.json`) | |
 
+## For agents reading this doc
+
+If someone asks you "how do I set you up on another computer?", you don't need to ask what OS they're on — you can check `detectPlatform()` (from `src/heart/platform.ts`) or just tell them the full picture and let them skip what doesn't apply. The platform detection module returns `"macos" | "linux" | "wsl" | "windows-native"` and is available at runtime via `process.platform` plus WSL detection.
+
+The guided flow handles platform differences automatically: `ouro clone` works on all Unix-like platforms, and `ouro setup --tool claude-code` detects WSL and bridges to Windows-side Claude Code without the user needing to know the mechanics.
+
 ## Troubleshooting
 
 **"git is not installed"** — Install git for your platform. The error message includes instructions.
