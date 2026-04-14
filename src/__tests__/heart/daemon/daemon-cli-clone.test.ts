@@ -176,6 +176,31 @@ describe("ouro clone execution", () => {
     expect(output).toContain("could not reach remote")
   })
 
+  it("remote auth failure: suggests gh auth login", async () => {
+    const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps()
+    deps.writeStdout = vi.fn()
+    deps.bundlesRoot = "/mock/bundles"
+
+    mockExecFileSync.mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === "git" && args[0] === "--version") return Buffer.from("git version 2.40.0")
+      if (cmd === "git" && args[0] === "ls-remote") {
+        const err = new Error("fatal: Authentication failed") as Error & { stderr: Buffer }
+        err.stderr = Buffer.from("fatal: Authentication failed for 'https://github.com/user/private.git'")
+        throw err
+      }
+      return Buffer.from("")
+    })
+
+    await runOuroCli(["clone", "https://github.com/user/private.git"], deps)
+
+    const output = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0])
+      .join("\n")
+    expect(output).toContain("authentication failed")
+    expect(output).toContain("gh auth login")
+  })
+
   it("target path already exists: outputs error message", async () => {
     const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
     const deps = createDefaultOuroCliDeps()

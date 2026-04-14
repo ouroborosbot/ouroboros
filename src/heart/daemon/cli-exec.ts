@@ -3051,10 +3051,18 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     emitNervesEvent({ component: "daemon", event: "daemon.clone_remote_check", message: "checking remote accessibility", meta: { remote: command.remote } })
     try {
       execFileSync("git", ["ls-remote", "--exit-code", command.remote], { stdio: "pipe", timeout: 15000 })
-    } catch {
-      const message = `could not reach remote: ${command.remote}\nCheck the URL and your network connection.`
-      deps.writeStdout(message)
-      return message
+    } catch (lsErr) {
+      const stderr = (lsErr as { stderr?: Buffer })?.stderr?.toString() ?? ""
+      const isAuth = stderr.includes("Authentication failed")
+        || stderr.includes("could not read Username")
+        || stderr.includes("terminal prompts disabled")
+        || stderr.includes("403")
+        || stderr.includes("401")
+      const hint = isAuth
+        ? `authentication failed for: ${command.remote}\nSet up credentials first:\n  gh auth login          (GitHub repos)\n  git config credential.helper store   (other hosts)`
+        : `could not reach remote: ${command.remote}\nCheck the URL and your network connection.`
+      deps.writeStdout(hint)
+      return hint
     }
 
     // 5. Clone
