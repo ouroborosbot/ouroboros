@@ -74,6 +74,7 @@ function detectShellProfile(homeDir: string, shell: string | undefined, platform
     // macOS uses .bash_profile; Linux/WSL uses .bashrc (the default
     // interactive shell config on Debian/Ubuntu). Writing to .bash_profile
     // on Linux often has no effect because non-login shells skip it.
+    /* v8 ignore next -- ?? fallback: callers always pass platform from deps @preserve */
     const effectivePlatform = platform ?? process.platform
     return effectivePlatform === "darwin"
       ? path.join(homeDir, ".bash_profile")
