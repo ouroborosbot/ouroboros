@@ -56,9 +56,11 @@ The agent name is inferred from the URL. Override with `--agent <name>` if neede
 
 **Already cloned manually?** If you `git clone`d the bundle yourself before running `ouro up`, the daemon will detect it and offer to enable sync.
 
+**Guided flow:** After cloning, the CLI offers to continue with provider auth, daemon start, and dev tool setup — all inline. You can accept each step or skip it and run the commands yourself later.
+
 ## Step 3: Set up provider auth
 
-The agent needs model provider credentials on each machine. These are never synced — you set them up per machine:
+If you skipped the guided prompt, or need to re-run auth later:
 
 ```bash
 ouro auth run --agent <name>
@@ -67,6 +69,8 @@ ouro auth run --agent <name>
 This walks you through authenticating with your model provider (Anthropic, Azure, GitHub Copilot, etc.).
 
 ## Step 4: Start the daemon
+
+If you skipped the guided prompt:
 
 ```bash
 ouro up
