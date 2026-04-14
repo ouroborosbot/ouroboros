@@ -1566,10 +1566,13 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
             message: "user chose clone in first-run flow",
             meta: {},
           })
-          const remote = await deps.promptInput("Enter the git remote URL for the agent bundle: ")
-          // Run clone execution path
-          const cloneCommand = { kind: "clone" as const, remote: remote.trim() }
-          return await runOuroCli(["clone", cloneCommand.remote], deps)
+          const remote = (await deps.promptInput("Enter the git remote URL for the agent bundle: "))?.trim() ?? ""
+          if (!remote) {
+            deps.writeStdout("no remote URL provided — skipping clone")
+            // Fall through to hatch flow
+          } else {
+            return await runOuroCli(["clone", remote], deps)
+          }
         }
         emitNervesEvent({
           component: "daemon",
@@ -3075,17 +3078,22 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     // 7. Enable sync in agent.json
     const agentJsonPath = path.join(targetPath, "agent.json")
+    let syncEnabled = false
     if (fs.existsSync(agentJsonPath)) {
       const raw = fs.readFileSync(agentJsonPath, "utf-8")
       const config = JSON.parse(raw) as Record<string, unknown>
       config.sync = { enabled: true, remote: "origin" }
       fs.writeFileSync(agentJsonPath, JSON.stringify(config, null, 2) + "\n")
+      syncEnabled = true
       emitNervesEvent({ component: "daemon", event: "daemon.clone_sync_enabled", message: "sync enabled in agent.json", meta: { agentName } })
+    } else {
+      emitNervesEvent({ level: "warn", component: "daemon", event: "daemon.clone_no_agent_json", message: "cloned repo has no agent.json — may not be a valid bundle", meta: { agentName, targetPath } })
     }
 
     // 8. Output success message
     emitNervesEvent({ component: "daemon", event: "daemon.clone_complete", message: "clone complete", meta: { agentName, targetPath } })
-    deps.writeStdout(`cloned ${agentName} to ${targetPath}\nsync enabled (remote: origin)`)
+    const syncMsg = syncEnabled ? "\nsync enabled (remote: origin)" : "\nwarning: no agent.json found — this may not be a valid agent bundle"
+    deps.writeStdout(`cloned ${agentName} to ${targetPath}${syncMsg}`)
 
     // 9. Guided post-clone flow (when interactive)
     if (deps.promptInput) {
