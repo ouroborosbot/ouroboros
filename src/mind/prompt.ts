@@ -381,6 +381,7 @@ export function runtimeInfoSection(channel: Channel, options?: BuildSystemOption
   lines.push(`process type: ${processTypeLabel(channel)}`);
   lines.push(`daemon: ${daemonStatus(options?.daemonRunning)}`);
   lines.push(`mcp serve: i can expose my tools to dev tools via \`ouro mcp-serve\`. see the configure-dev-tools skill for setup.`);
+  lines.push(`harness docs: ${sourceRoot}/docs/ has guides for setup, cross-machine cloning, deployment, and operations. when someone asks how to install, set up, or move me to another machine, read the relevant doc there instead of guessing.`);
 
   if (channel === "cli") {
     lines.push("i introduce myself on boot with a fun random greeting.");
