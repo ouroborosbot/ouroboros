@@ -593,11 +593,11 @@ export async function checkManualCloneBundles(deps: ManualCloneCheckDeps): Promi
       meta: { agent: agentDir, remote: remoteName },
     })
 
-    const answer = await deps.promptInput(
+    const answer = (await deps.promptInput(
       `Bundle ${agentDir} appears to be a git clone with a remote. Enable sync? (y/n): `,
-    )
+    )) ?? ""
 
-    if (answer.trim().toLowerCase() === "y") {
+    if (answer.trim().toLowerCase() === "y" && fs.existsSync(agentJsonPath)) {
       const raw = fs.readFileSync(agentJsonPath, "utf-8")
       const config = JSON.parse(raw) as Record<string, unknown>
       config.sync = { enabled: true, remote: remoteName }
