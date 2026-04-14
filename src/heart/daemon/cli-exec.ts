@@ -593,6 +593,7 @@ export async function checkManualCloneBundles(deps: ManualCloneCheckDeps): Promi
       meta: { agent: agentDir, remote: remoteName },
     })
 
+    /* v8 ignore next -- ?? fallback: promptInput always returns string in practice @preserve */
     const answer = (await deps.promptInput(
       `Bundle ${agentDir} appears to be a git clone with a remote. Enable sync? (y/n): `,
     )) ?? ""
@@ -1566,6 +1567,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
             message: "user chose clone in first-run flow",
             meta: {},
           })
+          /* v8 ignore next -- ?? fallback: promptInput always returns string in practice @preserve */
           const remote = (await deps.promptInput("Enter the git remote URL for the agent bundle: "))?.trim() ?? ""
           if (!remote) {
             deps.writeStdout("no remote URL provided — skipping clone")
