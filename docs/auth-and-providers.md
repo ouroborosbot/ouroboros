@@ -269,13 +269,13 @@ Use this checklist for any existing agent that predates the vault-backed credent
    ouro vault status --agent <agent>
    ```
 
-   If the agent has no vault yet, create one:
+   If the status says `vault locator: not configured in agent.json`, the agent has not set up its vault yet. Create one:
 
    ```bash
    ouro vault create --agent <agent>
    ```
 
-   Enter a human-chosen unlock secret when prompted. The prompt does not echo the secret. Save that unlock secret outside Ouro immediately. Another machine cannot unlock this agent vault without it.
+   Enter a human-chosen unlock secret when prompted. The prompt does not echo the secret. Save that unlock secret outside Ouro immediately. Another machine cannot unlock this agent vault without it. After this, re-enter provider/runtime credentials with the auth and vault config commands below.
 
 3. If the bundle has vault coordinates but nobody saved an unlock secret, choose the replacement path that matches what actually exists.
 

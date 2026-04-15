@@ -76,6 +76,8 @@ ouro vault unlock --agent <agent>
 
 Ouro stores local unlock material in Keychain, DPAPI, Secret Service, or an explicit plaintext fallback if the human chooses it. Local unlock material is a machine-local cache, not a credential source of truth.
 
+If `ouro vault status --agent <agent>` says the vault locator is not configured in `agent.json`, this agent has not set up its vault yet. Run `ouro vault create --agent <agent>`, save the human-chosen unlock secret outside Ouro, then re-enter provider credentials with `ouro auth --agent <agent>`.
+
 Then refresh and verify the credentials this machine can use:
 
 ```bash

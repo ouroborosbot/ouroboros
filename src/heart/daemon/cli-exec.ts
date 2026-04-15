@@ -1104,6 +1104,19 @@ async function executeVaultStatus(
   }
   const { config } = readAgentConfigForAgent(command.agent, deps.bundlesRoot)
   const vault = resolveVaultConfig(command.agent, config.vault)
+  if (!config.vault) {
+    const lines = [
+      `agent: ${command.agent}`,
+      `vault: ${vault.email} at ${vault.serverUrl}`,
+      "vault locator: not configured in agent.json",
+      "local unlock: not checked",
+      "",
+      `fix: Run 'ouro vault create --agent ${command.agent}' to create this agent's vault, then run 'ouro auth --agent ${command.agent} --provider <provider>' and 'ouro provider refresh --agent ${command.agent}'.`,
+    ]
+    const message = lines.join("\n")
+    deps.writeStdout(message)
+    return message
+  }
   const status = getVaultUnlockStatus({
     agentName: command.agent,
     email: vault.email,
@@ -1113,7 +1126,7 @@ async function executeVaultStatus(
   const lines = [
     `agent: ${command.agent}`,
     `vault: ${vault.email} at ${vault.serverUrl}`,
-    `vault locator: ${config.vault ? "agent.json" : "default"}`,
+    "vault locator: agent.json",
     `local unlock store: ${status.store ? `${status.store.kind}${status.store.secure ? "" : " (explicit plaintext fallback)"}` : "unavailable"}`,
     `local unlock: ${status.stored ? "available" : "missing"}`,
   ]

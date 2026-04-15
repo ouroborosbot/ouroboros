@@ -279,6 +279,16 @@ function readAgentConfig(bundlesRoot: string, agentName: string): Record<string,
   return JSON.parse(fs.readFileSync(path.join(agentRoot(bundlesRoot, agentName), "agent.json"), "utf-8")) as Record<string, unknown>
 }
 
+function writeAgentVaultLocator(
+  bundlesRoot: string,
+  agentName: string,
+  vault: { email: string; serverUrl: string },
+): void {
+  const agentConfigPath = path.join(bundlesRoot, `${agentName}.ouro`, "agent.json")
+  const agentConfig = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as Record<string, unknown>
+  fs.writeFileSync(agentConfigPath, `${JSON.stringify({ ...agentConfig, vault }, null, 2)}\n`, "utf-8")
+}
+
 afterEach(() => {
   mockPingProvider.mockReset()
   mockProviderCredentials.pools.clear()
@@ -1456,6 +1466,10 @@ describe("provider CLI command execution", () => {
     const bundlesRoot = makeTempDir("provider-cli-vault-status-bundles")
     const homeDir = makeTempDir("provider-cli-vault-status-home")
     writeAgentConfig(bundlesRoot, "Slugger")
+    writeAgentVaultLocator(bundlesRoot, "Slugger", {
+      email: "slugger@example.com",
+      serverUrl: "https://vault.example.com",
+    })
     mockVaultDeps.getVaultUnlockStatus.mockReturnValueOnce({
       configured: true,
       stored: true,
@@ -1523,15 +1537,6 @@ describe("provider CLI command execution", () => {
     expect(missingRuntime).toContain("runtime credentials: missing")
     expect(missingRuntime).toContain("ouro vault config set --agent Slugger")
 
-    const agentConfigPath = path.join(bundlesRoot, "Slugger.ouro", "agent.json")
-    const agentConfig = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as Record<string, unknown>
-    fs.writeFileSync(agentConfigPath, `${JSON.stringify({
-      ...agentConfig,
-      vault: {
-        email: "slugger@example.com",
-        serverUrl: "https://vault.example.com",
-      },
-    }, null, 2)}\n`, "utf-8")
     mockVaultDeps.getVaultUnlockStatus.mockReturnValueOnce({
       configured: true,
       stored: true,
@@ -1594,6 +1599,21 @@ describe("provider CLI command execution", () => {
 
     const serpent = await runOuroCli(["vault", "status", "--agent", "SerpentGuide"], makeCliDeps(homeDir, bundlesRoot))
     expect(serpent).toContain("SerpentGuide has no persistent credential vault")
+  })
+
+  it("vault status gives a create path when an existing agent has no vault locator", async () => {
+    emitTestEvent("provider cli vault status no locator")
+    const bundlesRoot = makeTempDir("provider-cli-vault-status-no-locator-bundles")
+    const homeDir = makeTempDir("provider-cli-vault-status-no-locator-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+
+    const result = await runOuroCli(["vault", "status", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot))
+
+    expect(result).toContain("vault locator: not configured in agent.json")
+    expect(result).toContain("local unlock: not checked")
+    expect(result).toContain("ouro vault create --agent Slugger")
+    expect(result).toContain("ouro auth --agent Slugger --provider <provider>")
+    expect(mockVaultDeps.getVaultUnlockStatus).not.toHaveBeenCalled()
   })
 
   it("vault config set and status manage runtime credentials without printing values", async () => {

@@ -45,6 +45,7 @@ describe("auth/provider documentation contract", () => {
     expect(authGuide).toContain("ouro vault create --agent <agent>")
     expect(authGuide).toContain("ouro vault replace --agent <agent>")
     expect(authGuide).toContain("no local credential export")
+    expect(authGuide).toContain("vault locator: not configured in agent.json")
     expect(authGuide).toContain("The prompt does not echo the secret.")
     expect(authGuide).toContain("ouro auth --agent <agent> --provider <provider>")
     expect(authGuide).toContain("ouro vault config set --agent <agent> --key bluebubbles.serverUrl")
