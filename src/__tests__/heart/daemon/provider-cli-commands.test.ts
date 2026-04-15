@@ -1040,7 +1040,7 @@ describe("provider CLI command execution", () => {
     )
   })
 
-  it("vault replace creates an empty replacement vault for pre-vault agents", async () => {
+  it("vault replace creates an empty vault at the stable agent email by default", async () => {
     emitTestEvent("provider cli vault replace")
     const bundlesRoot = makeTempDir("provider-cli-vault-replace-bundles")
     const homeDir = makeTempDir("provider-cli-vault-replace-home")
@@ -1058,13 +1058,13 @@ describe("provider CLI command execution", () => {
     ], makeCliDeps(homeDir, bundlesRoot, {
       now: () => Date.parse(NOW),
       promptSecret: async (question) => {
-        expect(question).toBe("Choose replacement Ouro vault unlock secret for slugger+replaced-20260412201000@ouro.bot: ")
+        expect(question).toBe("Choose Ouro vault unlock secret for slugger@ouro.bot: ")
         return "chosen-replacement-secret"
       },
     }))
 
     expect(result).toContain("vault replaced for Slugger")
-    expect(result).toContain("vault: slugger+replaced-20260412201000@ouro.bot at https://vault.example.com")
+    expect(result).toContain("vault: slugger@ouro.bot at https://vault.example.com")
     expect(result).toContain("credentials imported: none")
     expect(result).toContain("no-export path")
     expect(result).toContain("ouro auth --agent Slugger --provider <provider>")
@@ -1074,19 +1074,52 @@ describe("provider CLI command execution", () => {
     expect(mockVaultDeps.createVaultAccount).toHaveBeenCalledWith(
       "Ouro credential vault",
       "https://vault.example.com",
-      "slugger+replaced-20260412201000@ouro.bot",
+      "slugger@ouro.bot",
       "chosen-replacement-secret",
     )
     expect(mockVaultDeps.storeVaultUnlockSecret).toHaveBeenCalledWith(
-      { agentName: "Slugger", email: "slugger+replaced-20260412201000@ouro.bot", serverUrl: "https://vault.example.com" },
+      { agentName: "Slugger", email: "slugger@ouro.bot", serverUrl: "https://vault.example.com" },
       "chosen-replacement-secret",
       { homeDir, store: "plaintext-file" },
     )
     expect(readAgentConfig(bundlesRoot, "Slugger").vault).toEqual({
-      email: "slugger+replaced-20260412201000@ouro.bot",
+      email: "slugger@ouro.bot",
       serverUrl: "https://vault.example.com",
     })
     expect(mockVaultDeps.rawSecrets.size).toBe(0)
+  })
+
+  it("vault replace repairs prior generated replacement emails instead of compounding them", async () => {
+    emitTestEvent("provider cli vault replace stable default")
+    const bundlesRoot = makeTempDir("provider-cli-vault-replace-stable-bundles")
+    const homeDir = makeTempDir("provider-cli-vault-replace-stable-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    writeAgentVaultLocator(bundlesRoot, "Slugger", {
+      email: "slugger+replaced-20260412201000@ouro.bot",
+      serverUrl: "https://vault.example.com",
+    })
+
+    const result = await runOuroCli([
+      "vault",
+      "replace",
+      "--agent",
+      "Slugger",
+    ], makeCliDeps(homeDir, bundlesRoot, {
+      now: () => Date.parse(NOW),
+      promptSecret: async (question) => {
+        expect(question).toBe("Choose Ouro vault unlock secret for slugger@ouro.bot: ")
+        return "chosen-replacement-secret"
+      },
+    }))
+
+    expect(result).toContain("vault: slugger@ouro.bot at https://vault.example.com")
+    expect(result).not.toContain("+replaced-20260412201000+replaced")
+    expect(mockVaultDeps.createVaultAccount).toHaveBeenCalledWith(
+      "Ouro credential vault",
+      "https://vault.example.com",
+      "slugger@ouro.bot",
+      "chosen-replacement-secret",
+    )
   })
 
   it("vault replace covers prompted secrets, failures, and guards", async () => {
@@ -1109,7 +1142,7 @@ describe("provider CLI command execution", () => {
       "slugger+manual@example.com",
     ], makeCliDeps(homeDir, bundlesRoot, {
       promptSecret: async (question) => {
-        expect(question).toBe("Choose replacement Ouro vault unlock secret for slugger+manual@example.com: ")
+        expect(question).toBe("Choose Ouro vault unlock secret for slugger+manual@example.com: ")
         return "chosen-replacement-secret"
       },
     }))
@@ -1157,7 +1190,9 @@ describe("provider CLI command execution", () => {
       promptSecret: async () => "chosen-replacement-secret",
     }))
     expect(failed).toContain("vault replace failed for Slugger: already exists")
-    expect(failed).toContain("retry with a fresh --email value")
+    expect(failed).toContain("If this is the existing vault, run:")
+    expect(failed).toContain("ouro vault unlock --agent Slugger")
+    expect(failed).toContain("If the unlock secret is lost and you intentionally need a different vault account, rerun with --email <email>.")
   })
 
   it("vault recover creates a replacement vault and imports local JSON credential exports without printing values", async () => {
@@ -1209,7 +1244,7 @@ describe("provider CLI command execution", () => {
     }))
 
     expect(result).toContain("vault recovered for Slugger")
-    expect(result).toContain("vault: slugger+recovered-20260412201000@ouro.bot at https://vault.example.com")
+    expect(result).toContain("vault: slugger@ouro.bot at https://vault.example.com")
     expect(result).toContain("provider credentials imported: anthropic, github-copilot, minimax")
 	    expect(result).toContain("runtime credentials imported: bluebubbles.accountId, bluebubbles.password, bluebubbles.serverUrl, operatorNote")
     expect(result).toContain("credential values were not printed")
@@ -1221,16 +1256,16 @@ describe("provider CLI command execution", () => {
     expect(mockVaultDeps.createVaultAccount).toHaveBeenCalledWith(
       "Ouro credential vault",
       "https://vault.example.com",
-      "slugger+recovered-20260412201000@ouro.bot",
+      "slugger@ouro.bot",
       "chosen-recovery-secret",
     )
     expect(mockVaultDeps.storeVaultUnlockSecret).toHaveBeenCalledWith(
-      { agentName: "Slugger", email: "slugger+recovered-20260412201000@ouro.bot", serverUrl: "https://vault.example.com" },
+      { agentName: "Slugger", email: "slugger@ouro.bot", serverUrl: "https://vault.example.com" },
       "chosen-recovery-secret",
       { homeDir, store: "plaintext-file" },
     )
     expect(readAgentConfig(bundlesRoot, "Slugger").vault).toEqual({
-      email: "slugger+recovered-20260412201000@ouro.bot",
+      email: "slugger@ouro.bot",
       serverUrl: "https://vault.example.com",
     })
     const minimaxRaw = mockVaultDeps.rawSecrets.get("Slugger:providers/minimax")
@@ -1289,7 +1324,7 @@ describe("provider CLI command execution", () => {
       "slugger+manual@example.com",
     ], makeCliDeps(homeDir, bundlesRoot, {
       promptSecret: async (question) => {
-        expect(question).toBe("Choose replacement Ouro vault unlock secret for slugger+manual@example.com: ")
+        expect(question).toBe("Choose Ouro vault unlock secret for slugger+manual@example.com: ")
         return "chosen-recovery-secret"
       },
     }))
@@ -1343,7 +1378,9 @@ describe("provider CLI command execution", () => {
       promptSecret: async () => "chosen-recovery-secret",
     }))
     expect(failed).toContain("vault recover failed for Slugger: already exists")
-    expect(failed).toContain("retry with a fresh --email value")
+    expect(failed).toContain("If this is the existing vault, run:")
+    expect(failed).toContain("ouro vault unlock --agent Slugger")
+    expect(failed).toContain("If the unlock secret is lost and you intentionally need a different vault account, rerun with --email <email>.")
 
     const nonObjectSource = path.join(sourceDir, "non-object.json")
     fs.writeFileSync(nonObjectSource, "[]", "utf-8")
@@ -1400,7 +1437,7 @@ describe("provider CLI command execution", () => {
 	      promptSecret: async () => "chosen-recovery-secret",
 	    }))
 
-	    expect(recovered).toContain("vault: agent+recovered-20260412201000@ouro.bot at https://vault.ouroboros.bot")
+	    expect(recovered).toContain("vault: agent@ouro.bot at https://vault.ouroboros.bot")
 	    expect(recovered).toContain("local unlock store: macos-keychain")
 	    expect(recovered).not.toContain("explicit plaintext fallback")
 
