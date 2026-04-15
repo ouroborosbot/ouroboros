@@ -1094,6 +1094,11 @@ describe("provider CLI command execution", () => {
     const bundlesRoot = makeTempDir("provider-cli-vault-replace-guards-bundles")
     const homeDir = makeTempDir("provider-cli-vault-replace-guards-home")
     writeAgentConfig(bundlesRoot, "Slugger")
+    mockVaultDeps.storeVaultUnlockSecret.mockReturnValueOnce({
+      kind: "macos-keychain",
+      secure: true,
+      location: "macOS Keychain",
+    })
 
     const prompted = await runOuroCli([
       "vault",
@@ -1109,6 +1114,8 @@ describe("provider CLI command execution", () => {
       },
     }))
     expect(prompted).toContain("vault replaced for Slugger")
+    expect(prompted).toContain("local unlock store: macos-keychain")
+    expect(prompted).not.toContain("explicit plaintext fallback")
     expect(prompted).not.toContain("chosen-replacement-secret")
 
     await expect(runOuroCli([
