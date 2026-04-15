@@ -1069,7 +1069,7 @@ describe("provider CLI command execution", () => {
     expect(result).toContain("no-export path")
     expect(result).toContain("ouro auth --agent Slugger --provider <provider>")
     expect(result).toContain("ouro vault config set --agent Slugger --key <field>")
-    expect(result).toContain("Keep the replacement vault unlock secret saved outside Ouro")
+    expect(result).toContain("Keep the vault unlock secret saved outside Ouro")
     expect(result).not.toContain("chosen-replacement-secret")
     expect(mockVaultDeps.createVaultAccount).toHaveBeenCalledWith(
       "Ouro credential vault",
@@ -1095,7 +1095,7 @@ describe("provider CLI command execution", () => {
     const homeDir = makeTempDir("provider-cli-vault-replace-stable-home")
     writeAgentConfig(bundlesRoot, "Slugger")
     writeAgentVaultLocator(bundlesRoot, "Slugger", {
-      email: "slugger+replaced-20260412201000@ouro.bot",
+      email: "slugger+replaced-20260412201000+replaced-20260415233600@ouro.bot",
       serverUrl: "https://vault.example.com",
     })
 
@@ -1113,7 +1113,8 @@ describe("provider CLI command execution", () => {
     }))
 
     expect(result).toContain("vault: slugger@ouro.bot at https://vault.example.com")
-    expect(result).not.toContain("+replaced-20260412201000+replaced")
+    expect(result).not.toContain("+replaced-20260412201000")
+    expect(result).not.toContain("+replaced-20260415233600")
     expect(mockVaultDeps.createVaultAccount).toHaveBeenCalledWith(
       "Ouro credential vault",
       "https://vault.example.com",
@@ -1164,7 +1165,7 @@ describe("provider CLI command execution", () => {
       "Slugger",
     ], makeCliDeps(homeDir, bundlesRoot, {
       promptSecret: async () => "   ",
-    }))).rejects.toThrow("vault replace requires a replacement unlock secret")
+    }))).rejects.toThrow("vault replace requires an unlock secret")
     await expect(runOuroCli(["vault", "replace", "--agent", "SerpentGuide"], makeCliDeps(homeDir, bundlesRoot, {
       promptSecret: async () => "chosen-replacement-secret",
     }))).rejects.toThrow("Replace the hatchling agent vault")
@@ -1330,7 +1331,7 @@ describe("provider CLI command execution", () => {
     }))
     expect(prompted).toContain("provider credentials imported: none")
     expect(prompted).toContain("runtime credentials imported: none")
-    expect(prompted).toContain("Keep the replacement vault unlock secret saved outside Ouro")
+    expect(prompted).toContain("Keep the vault unlock secret saved outside Ouro")
     expect(prompted).not.toContain("chosen-recovery-secret")
     expect(prompted).not.toContain("ignored-secret")
 
@@ -1351,7 +1352,7 @@ describe("provider CLI command execution", () => {
       emptySource,
     ], makeCliDeps(homeDir, bundlesRoot, {
       promptSecret: async () => "   ",
-    }))).rejects.toThrow("vault recover requires a replacement unlock secret")
+    }))).rejects.toThrow("vault recover requires an unlock secret")
 
     await expect(runOuroCli([
       "vault",
