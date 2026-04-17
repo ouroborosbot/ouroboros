@@ -864,6 +864,31 @@ describe("provider CLI command execution", () => {
     expect(result).toContain("ouro auth --agent Slugger --provider minimax")
   })
 
+  it("ouro use keeps progress visible when the credential read throws", async () => {
+    emitTestEvent("provider cli use credential read throws")
+    const bundlesRoot = makeTempDir("provider-cli-use-read-throws-bundles")
+    const homeDir = makeTempDir("provider-cli-use-read-throws-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    writeProviderState(agentRoot(bundlesRoot, "Slugger"), providerState())
+    mockProviderCredentials.refreshProviderCredentialPool.mockRejectedValueOnce(new Error("vault exploded"))
+    const deps = makeCliDeps(homeDir, bundlesRoot)
+
+    await expect(runOuroCli([
+      "use",
+      "--agent",
+      "Slugger",
+      "--lane",
+      "inner",
+      "--provider",
+      "minimax",
+      "--model",
+      "MiniMax-M2.5",
+    ], deps)).rejects.toThrow("vault exploded")
+
+    const output = (deps as OuroCliDeps & { _output: string[] })._output.join("\n")
+    expect(output).toContain("... reading minimax credentials")
+  })
+
   it("ouro use --force records a failed binding when credentials are unavailable", async () => {
     emitTestEvent("provider cli use force missing credentials")
     const bundlesRoot = makeTempDir("provider-cli-force-missing-bundles")
