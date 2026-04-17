@@ -624,6 +624,28 @@ describe("startup-tui", () => {
       expect(progress).toContain("waiting for agents: alpha/cli running")
     })
 
+    it("reports daemon answered in progress-only mode when there are no workers", async () => {
+      const now = new Date("2026-04-09T12:00:10.000Z").getTime()
+      const writes: string[] = []
+      const progress: string[] = []
+
+      const result = await pollDaemonStartup({
+        sendCommand: vi.fn(async () => makeDaemonResponse(makePayload([]))),
+        socketPath: "/tmp/test.sock",
+        daemonPid: 12345,
+        writeRaw: vi.fn((text: string) => writes.push(text)),
+        now: vi.fn(() => now),
+        sleep: vi.fn(async () => {}),
+        isTTY: false,
+        render: false,
+        onProgress: (message) => progress.push(message),
+      })
+
+      expect(result).toEqual({ stable: [], degraded: [] })
+      expect(writes).toEqual([])
+      expect(progress).toContain("daemon answered")
+    })
+
     it("writes plain degraded error and fix summary in non-TTY startup polling", async () => {
       const now = new Date("2026-04-09T12:00:10.000Z").getTime()
       const payload = makePayload([

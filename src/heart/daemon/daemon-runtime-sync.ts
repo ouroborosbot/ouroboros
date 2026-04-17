@@ -145,8 +145,7 @@ function collectRuntimeDriftReasons(
 function formatRuntimeDriftPublicSummary(
   reasons: RuntimeDriftReason[],
 ): string {
-  const labels = reasons.map((reason) => reason.label)
-  return labels.length > 0 ? labels.join(", ") : "runtime metadata"
+  return reasons.map((reason) => reason.label).join(", ")
 }
 
 export async function ensureCurrentDaemonRuntime(
