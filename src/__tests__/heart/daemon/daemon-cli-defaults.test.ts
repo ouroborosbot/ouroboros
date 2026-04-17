@@ -418,7 +418,7 @@ describe("daemon CLI default dependency branches", () => {
     const unref = vi.fn()
     const spawn = vi.fn(() => ({ pid: undefined, unref }))
     const createConnection = vi.fn()
-    const consoleLog = vi.fn()
+    const stdoutWrite = vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.doMock("child_process", () => ({ spawn }))
     vi.doMock("net", () => ({ createConnection }))
@@ -445,8 +445,6 @@ describe("daemon CLI default dependency branches", () => {
       openSync: vi.fn(() => 99),
       closeSync: vi.fn(),
     }))
-    vi.stubGlobal("console", { ...console, log: consoleLog })
-
     const { createDefaultOuroCliDeps, runOuroCli } = await import("../../../heart/daemon/daemon-cli")
 
     const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
@@ -474,7 +472,8 @@ describe("daemon CLI default dependency branches", () => {
       startupRetryLimit: 0,
     })
     expect(result).toContain("daemon started")
-    expect(consoleLog).toHaveBeenCalled()
+    expect(stdoutWrite).toHaveBeenCalled()
+    stdoutWrite.mockRestore()
   })
 
   it("resolves default current CLI version via homedir-backed version layout", async () => {
