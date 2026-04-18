@@ -3139,6 +3139,57 @@ describe("provider CLI command execution", () => {
     expect(prompts.join("\n")).toContain("\x1b[1mSlugger connect bay\x1b[0m")
   })
 
+  it("renders the TTY connect bay as framed panels with humane provider lane labels", async () => {
+    emitTestEvent("provider cli connect menu framed panels")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-framed-panels-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-framed-panels-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    writeProviderCredentialPool(homeDir, credentialPool())
+
+    const prompts: string[] = []
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      isTTY: true,
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "cancel"
+      },
+    }))
+
+    const prompt = prompts.join("\n")
+    expect(result).toBe("connect cancelled.")
+    expect(prompt).toContain("╭")
+    expect(prompt).toContain("╰")
+    expect(prompt).toContain("Outward lane")
+    expect(prompt).toContain("Inner lane")
+    expect(prompt).toContain("Pick a path")
+  })
+
+  it("uses a side-by-side layout on wide TTY terminals", async () => {
+    emitTestEvent("provider cli connect menu wide tty layout")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-wide-tty-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-wide-tty-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    writeProviderCredentialPool(homeDir, credentialPool())
+
+    const prompts: string[] = []
+    const result = await runOuroCli(
+      ["connect", "--agent", "Slugger"],
+      makeCliDeps(homeDir, bundlesRoot, {
+        isTTY: true,
+        promptInput: async (question) => {
+          prompts.push(question)
+          return "cancel"
+        },
+        ...( { stdoutColumns: 132 } as Record<string, unknown>),
+      }),
+    )
+
+    const promptLines = prompts.join("\n").split("\n")
+    expect(result).toBe("connect cancelled.")
+    expect(promptLines.some((line) => line.includes("Provider core") && line.includes("Portable"))).toBe(true)
+    expect(promptLines.some((line) => line.includes("Next best move") && line.includes("This machine"))).toBe(true)
+  })
+
   it("shows setup guidance when a provider lane is not configured on this machine", async () => {
     emitTestEvent("provider cli connect menu unconfigured lane")
     const bundlesRoot = makeTempDir("provider-cli-connect-menu-unconfigured-lane-bundles")
