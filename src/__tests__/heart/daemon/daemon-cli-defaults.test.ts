@@ -1578,8 +1578,9 @@ describe("daemon CLI default dependency branches", () => {
     ])
     expect(deps.startupPollIntervalMs).toBe(250)
     expect(deps.startupStabilityWindowMs).toBe(1_500)
-    expect(deps.startupTimeoutMs).toBe(10_000)
+    expect(deps.startupTimeoutMs).toBe(60_000)
     expect(deps.startupRetryLimit).toBe(1)
+    expect(typeof deps.tailLogs).toBe("function")
     await expect(deps.sleep?.(0)).resolves.toBeUndefined()
   })
 

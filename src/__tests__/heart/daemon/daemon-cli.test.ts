@@ -1099,6 +1099,40 @@ describe("ouro CLI execution", () => {
     expect(writeStdout).toHaveBeenCalledWith(expect.stringContaining("string-status-probe-failure"))
   })
 
+  it("marks `ouro up` as failed at the shell level when daemon startup never answers", async () => {
+    let nowMs = Date.parse("2026-04-10T05:02:36.000Z")
+    const sleep = vi.fn(async (ms: number) => {
+      nowMs += ms
+    })
+    const setExitCode = vi.fn()
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, summary: "ok" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 5184 })),
+      writeStdout: vi.fn(),
+      setExitCode,
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      sleep,
+      now: () => nowMs,
+      startupPollIntervalMs: 5,
+      startupTimeoutMs: 20,
+      startupRetryLimit: 0,
+    } as OuroCliDeps & {
+      sleep: typeof sleep
+      now: () => number
+      startupPollIntervalMs: number
+      startupTimeoutMs: number
+      startupRetryLimit: number
+    }
+
+    const result = await runOuroCli(["up"], deps)
+
+    expect(result).toContain("did not finish booting")
+    expect(setExitCode).toHaveBeenCalledWith(1)
+  })
+
   it("runs `auth` locally with provider autodetected from agent.json", async () => {
     const tmp = createTmpBundle({
       agentName: "auth-local",
@@ -4397,8 +4431,12 @@ describe("ensureDaemonRunning", () => {
     vi.resetModules()
     const tmp = createTmpBundle({ agentName: "slugger" })
     const ensureCurrentDaemonRuntime = vi.fn(async () => ({
+      ok: true,
       alreadyRunning: false,
       message: "restarted drifted daemon",
+      verifyStartupStatus: true,
+      startedPid: null,
+      startupFailureReason: null,
     }))
     vi.doMock("../../../heart/daemon/runtime-metadata", () => ({
       getRuntimeMetadata: () => ({
@@ -4456,8 +4494,13 @@ describe("ensureDaemonRunning", () => {
       }
 
       expect(result).toEqual({
+        ok: true,
         alreadyRunning: false,
         message: "restarted drifted daemon",
+        verifyStartupStatus: true,
+        startedPid: null,
+        startupFailureReason: null,
+        stability: { stable: [], degraded: [] },
       })
       expect(ensureCurrentDaemonRuntime).toHaveBeenCalledWith(expect.objectContaining({
         socketPath: "/tmp/ouro-test.sock",
@@ -4885,7 +4928,8 @@ describe("ensureDaemonRunning", () => {
     const result = await ensureDaemonRunning(deps)
 
     expect(result.alreadyRunning).toBe(false)
-    expect(result.message).toContain("failed to stabilize")
+    expect(result.message).toContain("did not finish booting")
+    expect(result.message).toContain("answered once and then disappeared during startup")
     expect(result.message).toContain("stale shutdown unlinked active socket")
     expect(result.message).not.toContain("daemon started")
     expect(startDaemonProcess).toHaveBeenCalledTimes(2)
@@ -4951,8 +4995,8 @@ describe("ensureDaemonRunning", () => {
     const result = await ensureDaemonRunning(deps)
 
     expect(result.alreadyRunning).toBe(false)
-    expect(result.message).toContain("failed to stabilize")
-    expect(result.message).toContain("did not publish fresh health")
+    expect(result.message).toContain("did not finish booting")
+    expect(result.message).toContain("never published a ready signal")
     expect(result.message).not.toContain("recent daemon logs:")
     expect(deps.startDaemonProcess).toHaveBeenCalledTimes(1)
   })
@@ -5153,8 +5197,8 @@ describe("ensureDaemonRunning", () => {
     const result = await ensureDaemonRunning(deps)
 
     expect(result.alreadyRunning).toBe(false)
-    expect(result.message).toContain("failed to stabilize")
-    expect(result.message).toContain("failed to respond within 1s")
+    expect(result.message).toContain("did not finish booting")
+    expect(result.message).toContain("did not answer within 1s")
   })
 
   it("returns a socket-timeout failure when no health monitor is wired and the daemon never responds", async () => {
@@ -5188,9 +5232,9 @@ describe("ensureDaemonRunning", () => {
     const result = await ensureDaemonRunning(deps)
 
     expect(result.alreadyRunning).toBe(false)
-    expect(result.message).toContain("failed to stabilize")
-    expect(result.message).toContain("failed to respond within 1s")
-    expect(result.message).toContain("fix hint for daemon")
+    expect(result.message).toContain("did not finish booting")
+    expect(result.message).toContain("did not answer within 1s")
+    expect(result.message).toContain("Run `ouro logs` to watch live startup logs")
     expect(result.message).toContain("pid unknown")
   })
 
@@ -7668,7 +7712,7 @@ describe("ouro up startup progress", () => {
     const lines = writeStdout.mock.calls.map((call: unknown[]) => String(call[0]))
     const startIndex = lines.findIndex((line) => line.includes("starting a fresh background service"))
     const socketIndex = lines.findIndex((line) => line.includes("waiting for the new background service to answer"))
-    const healthIndex = lines.findIndex((line) => line.includes("verifying daemon health"))
+    const healthIndex = lines.findIndex((line) => line.includes("waiting for this boot to publish its ready signal"))
     const stableIndex = lines.findIndex((line) => line.includes("\u2713 starting daemon"))
 
     expect(result).toContain("daemon started")
