@@ -34,6 +34,18 @@ describe("UpProgress", () => {
     })
   })
 
+  describe("setPhasePlan", () => {
+    it("falls back to the default boot checklist when labels are blank", () => {
+      const progress = new UpProgress({ write: vi.fn(), isTTY: true })
+
+      progress.setPhasePlan(["   ", ""])
+
+      const output = progress.render(1000)
+      expect(output).toContain("Check for updates")
+      expect(output).toContain("Confirm the background service stayed up")
+    })
+  })
+
   // ── startPhase ──
 
   describe("startPhase", () => {
