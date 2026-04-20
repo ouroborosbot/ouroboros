@@ -185,7 +185,7 @@ function returnCliFailure(deps: Pick<OuroCliDeps, "setExitCode" | "writeStdout">
   return message
 }
 
-function summarizeDaemonStartupFailure(result: EnsureDaemonResult): string {
+export function summarizeDaemonStartupFailure(result: EnsureDaemonResult): string {
   if (result.startupFailureReason && result.startupFailureReason.trim().length > 0) {
     return result.startupFailureReason
   }

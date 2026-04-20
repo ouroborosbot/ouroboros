@@ -63,6 +63,7 @@ import {
   createDefaultOuroCliDeps,
   parseOuroCommand,
   runOuroCli,
+  summarizeDaemonStartupFailure,
   type OuroCliDeps,
 } from "../../../heart/daemon/daemon-cli"
 import { OuroDaemon } from "../../../heart/daemon/daemon"
@@ -77,6 +78,35 @@ import { checkAgentConfigWithProviderHealth } from "../../../heart/daemon/agent-
 const PACKAGE_VERSION = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8"),
 ) as { version: string }
+
+describe("summarizeDaemonStartupFailure", () => {
+  it("prefers the explicit startup failure reason when present", () => {
+    expect(summarizeDaemonStartupFailure({
+      ok: false,
+      alreadyRunning: false,
+      message: "background service started (pid 777) but did not finish booting",
+      startupFailureReason: "replacement background service did not answer within 1s",
+    })).toBe("replacement background service did not answer within 1s")
+  })
+
+  it("falls back to the first message line when no explicit reason is available", () => {
+    expect(summarizeDaemonStartupFailure({
+      ok: false,
+      alreadyRunning: false,
+      message: "background service started (pid 777) but did not finish booting\nRun `ouro logs` to watch live startup logs.",
+      startupFailureReason: "",
+    })).toBe("background service started (pid 777) but did not finish booting")
+  })
+
+  it("uses the stock startup failure sentence when neither reason nor message first line are usable", () => {
+    expect(summarizeDaemonStartupFailure({
+      ok: false,
+      alreadyRunning: false,
+      message: "\nRun `ouro logs` to watch live startup logs.",
+      startupFailureReason: "",
+    })).toBe("background service failed to finish booting")
+  })
+})
 
 function runningDaemonStatusResponse(overrides?: {
   socketPath?: string
@@ -5236,6 +5266,130 @@ describe("ensureDaemonRunning", () => {
     expect(result.message).toContain("did not answer within 1s")
     expect(result.message).toContain("Run `ouro logs` to watch live startup logs")
     expect(result.message).toContain("pid unknown")
+  })
+
+  it("returns a replacement-daemon timeout when swapping out an older running daemon", async () => {
+    const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
+
+    let nowMs = Date.parse("2026-04-10T05:02:36.000Z")
+    const sleep = vi.fn(async (ms: number) => {
+      nowMs += ms
+    })
+    const sendCommand = vi.fn(async (_socketPath, command) => {
+      if (command.kind === "daemon.status") {
+        return {
+          ok: true,
+          summary: "running",
+          data: {
+            overview: {
+              daemon: "running",
+              health: "ok",
+              socketPath: "/tmp/ouro-test.sock",
+              version: "0.1.0-alpha.6",
+              lastUpdated: "2026-03-08T00:00:00.000Z",
+              workerCount: 0,
+              senseCount: 0,
+            },
+            senses: [],
+            workers: [],
+          },
+        }
+      }
+      if (command.kind === "daemon.stop") {
+        return { ok: true, message: "daemon stopped" }
+      }
+      throw new Error(`unexpected command ${command.kind}`)
+    })
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand,
+      startDaemonProcess: vi.fn(async () => ({ pid: 777 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      healthFilePath: "/tmp/ouro-health.json",
+      readHealthState: vi.fn(() => null),
+      readHealthUpdatedAt: vi.fn(() => nowMs),
+      sleep,
+      now: () => nowMs,
+      startupPollIntervalMs: 5,
+      startupTimeoutMs: 20,
+      startupRetryLimit: 0,
+    } as OuroCliDeps & {
+      readHealthState: () => null
+      readHealthUpdatedAt: () => number
+      sleep: typeof sleep
+      now: () => number
+      startupPollIntervalMs: number
+      startupTimeoutMs: number
+      startupRetryLimit: number
+    }
+
+    const result = await ensureDaemonRunning(deps)
+
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain("replaced an older background service")
+    expect(result.message).toContain("replacement background service did not answer within 1s")
+    expect(result.startupFailureReason).toBe("replacement background service did not answer within 1s")
+  })
+
+  it("normalizes missing runtime-sync startup reasons to null", async () => {
+    vi.resetModules()
+    vi.doMock("../../../heart/daemon/runtime-metadata", () => ({
+      getRuntimeMetadata: () => ({
+        version: "0.1.0-alpha.20",
+      }),
+    }))
+    vi.doMock("../../../heart/daemon/daemon-runtime-sync", async () => {
+      const actual = await vi.importActual<typeof import("../../../heart/daemon/daemon-runtime-sync")>("../../../heart/daemon/daemon-runtime-sync")
+      return {
+        ...actual,
+        ensureCurrentDaemonRuntime: vi.fn(async () => ({
+          ok: false,
+          alreadyRunning: false,
+          message: "replacement background service failed",
+          verifyStartupStatus: false,
+          startedPid: 777,
+          startupFailureReason: undefined,
+        })),
+      }
+    })
+    try {
+      const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
+
+      const result = await ensureDaemonRunning({
+        socketPath: "/tmp/ouro-test.sock",
+        sendCommand: vi.fn(async () => ({
+          ok: true,
+          summary: "running",
+          data: {
+            overview: {
+              daemon: "running",
+              health: "ok",
+              socketPath: "/tmp/ouro-test.sock",
+              version: "0.1.0-alpha.6",
+              workerCount: 0,
+              senseCount: 0,
+            },
+            senses: [],
+            workers: [],
+          },
+        })),
+        startDaemonProcess: vi.fn(async () => ({ pid: 777 })),
+        writeStdout: vi.fn(),
+        checkSocketAlive: vi.fn(async () => true),
+        cleanupStaleSocket: vi.fn(),
+        fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      })
+
+      expect(result.ok).toBe(false)
+      expect(result.startupFailureReason).toBeNull()
+    } finally {
+      vi.doUnmock("../../../heart/daemon/runtime-metadata")
+      vi.doUnmock("../../../heart/daemon/daemon-runtime-sync")
+      vi.resetModules()
+    }
   })
 
   it("formats unknown pid when startDaemonProcess returns null pid", async () => {

@@ -231,6 +231,31 @@ describe("ensureCurrentDaemonRuntime", () => {
     expect(result.message).toContain("pid unknown")
   })
 
+  it("uses the replacement startup check result when the restarted daemon never answers", async () => {
+    const waitForDaemonStartup = vi.fn(async () => ({ ok: false as const }))
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      localVersion: "0.1.0-alpha.20",
+      fetchRunningVersion: vi.fn(async () => "0.1.0-alpha.6"),
+      stopDaemon: vi.fn(async () => {}),
+      cleanupStaleSocket: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: null })),
+      waitForDaemonStartup,
+    }
+
+    const result = await ensureCurrentDaemonRuntime(deps)
+
+    expect(waitForDaemonStartup).toHaveBeenCalledWith({ pid: null })
+    expect(result).toEqual({
+      ok: false,
+      alreadyRunning: false,
+      message: "replaced an older background service 0.1.0-alpha.6 -> 0.1.0-alpha.20 (pid unknown)\nreplacement background service did not answer in time; check logs with `ouro logs` or run `ouro doctor`.",
+      verifyStartupStatus: false,
+      startedPid: null,
+      startupFailureReason: "replacement background service did not answer in time",
+    })
+  })
+
   it("keeps the daemon when the local version is unknown", async () => {
     const deps = {
       socketPath: "/tmp/ouro-test.sock",
