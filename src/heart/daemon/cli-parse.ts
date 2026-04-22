@@ -14,6 +14,7 @@ import type { TrustLevel } from "../../mind/friends/types"
 import type { HatchCredentialsInput } from "../hatch/hatch-flow"
 import type { OuroCliCommand } from "./cli-types"
 import { suggestCommand } from "./cli-help"
+import { normalizePorkbunOpsAccount } from "./porkbun-ops"
 
 // ── Shared helpers ──
 
@@ -565,16 +566,6 @@ function parseVaultCommand(args: string[]): OuroCliCommand {
   return { kind: "vault.status", ...(agent ? { agent } : {}), ...(store ? { store } : {}) }
 }
 
-const PORKBUN_ACCOUNT_FORBIDDEN = /[\/\r\n\t]/
-
-function normalizePorkbunAccountInput(value: string | undefined): string {
-  const account = value?.trim() ?? ""
-  if (!account || PORKBUN_ACCOUNT_FORBIDDEN.test(account)) {
-    throw new Error("Porkbun account must be a non-empty account label without slashes or control characters.")
-  }
-  return account
-}
-
 function parseVaultOpsCommand(args: string[]): OuroCliCommand {
   const provider = args[0]
   const action = args[1]
@@ -590,7 +581,7 @@ function parseVaultOpsCommand(args: string[]): OuroCliCommand {
   for (let i = 0; i < rest.length; i += 1) {
     const token = rest[i]
     if (token === "--account") {
-      account = normalizePorkbunAccountInput(rest[i + 1])
+      account = normalizePorkbunOpsAccount(rest[i + 1])
       i += 1
       continue
     }
