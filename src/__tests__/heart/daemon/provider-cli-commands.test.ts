@@ -774,6 +774,16 @@ describe("provider CLI command parsing", () => {
       agent: "Slugger",
       scope: "all",
     })
+    expect(parseOuroCommand(["vault", "ops", "porkbun", "set", "--agent", "Slugger", "--account", "ari@mendelow.me"])).toEqual({
+      kind: "vault.ops.porkbun.set",
+      agent: "Slugger",
+      account: "ari@mendelow.me",
+    })
+    expect(parseOuroCommand(["vault", "ops", "porkbun", "status", "--agent", "Slugger", "--account", "ari@mendelow.me"])).toEqual({
+      kind: "vault.ops.porkbun.status",
+      agent: "Slugger",
+      account: "ari@mendelow.me",
+    })
     expect(() => parseOuroCommand(["vault", "config", "status", "--agent", "Slugger", "--key", "bluebubbles.password"]))
       .toThrow("ouro vault config status")
     expect(() => parseOuroCommand(["vault", "config", "set", "--agent", "Slugger"]))
@@ -786,6 +796,12 @@ describe("provider CLI command parsing", () => {
       .toThrow("scope all is only valid for status")
     expect(() => parseOuroCommand(["vault", "config", "delete", "--agent", "Slugger"]))
       .toThrow("ouro vault config set")
+    expect(() => parseOuroCommand(["vault", "ops", "porkbun", "set", "--agent", "Slugger"]))
+      .toThrow("ouro vault ops porkbun set")
+    expect(() => parseOuroCommand(["vault", "ops", "porkbun", "set", "--agent", "Slugger", "--account", "ari/mendelow.me"]))
+      .toThrow("Porkbun account")
+    expect(() => parseOuroCommand(["vault", "ops", "dnsimple", "set", "--agent", "Slugger"]))
+      .toThrow("ouro vault ops porkbun")
     expect(() => parseOuroCommand(["vault", "unlock", "--agent", "Slugger", "--store", "bad"]))
       .toThrow("vault --store")
     expect(() => parseOuroCommand(["vault", "unlock", "--agent", "Slugger", "--bad"]))
@@ -3085,6 +3101,50 @@ describe("provider CLI command execution", () => {
     }))
     expect(promptedSecret).toContain("stored integrations.perplexityApiKey")
     expect(promptedSecret).not.toContain("pplx-hidden")
+  })
+
+  it("vault ops porkbun stores account-scoped credentials outside connect/runtime config", async () => {
+    emitTestEvent("provider cli vault ops porkbun")
+    const bundlesRoot = makeTempDir("provider-cli-vault-ops-porkbun-bundles")
+    const homeDir = makeTempDir("provider-cli-vault-ops-porkbun-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    const prompted: string[] = []
+    const deps = makeCliDeps(homeDir, bundlesRoot, {
+      now: () => Date.parse(NOW),
+      promptSecret: async (question) => {
+        prompted.push(question)
+        return question.includes("Secret") ? "porkbun-secret-key" : "porkbun-api-key"
+      },
+    })
+
+    const result = await runOuroCli(
+      ["vault", "ops", "porkbun", "set", "--agent", "Slugger", "--account", "ari@mendelow.me"],
+      deps,
+    )
+
+    expect(prompted).toEqual([
+      "Porkbun API key for ari@mendelow.me: ",
+      "Porkbun Secret API key for ari@mendelow.me: ",
+    ])
+    expect(result).toContain("stored Porkbun ops credentials for Slugger")
+    expect(result).toContain("ops/registrars/porkbun/accounts/ari@mendelow.me")
+    expect(result).toContain("account: ari@mendelow.me")
+    expect(result).toContain("secret values were not printed")
+    expect(result).not.toContain("porkbun-api-key")
+    expect(result).not.toContain("porkbun-secret-key")
+    expect(mockVaultDeps.rawSecrets.has("Slugger:runtime/config")).toBe(false)
+
+    const raw = mockVaultDeps.rawSecrets.get("Slugger:ops/registrars/porkbun/accounts/ari@mendelow.me")
+    expect(raw).toBeDefined()
+    const payload = JSON.parse(raw ?? "{}") as Record<string, unknown>
+    expect(payload).toMatchObject({
+      schemaVersion: 1,
+      kind: "ops-credential/porkbun",
+      updatedAt: NOW,
+      account: "ari@mendelow.me",
+      apiKey: "porkbun-api-key",
+      secretApiKey: "porkbun-secret-key",
+    })
   })
 
   it("connects Perplexity through a discoverable hidden-prompt flow", async () => {

@@ -97,6 +97,8 @@ export function usage(): string {
     "  ouro vault status [--agent <name>] [--store auto|macos-keychain|windows-dpapi|linux-secret-service|plaintext-file]",
     "  ouro vault config set [--agent <name>] --key <path> [--value <value>] [--scope agent|machine]",
     "  ouro vault config status [--agent <name>] [--scope agent|machine|all]",
+    "  ouro vault ops porkbun set [--agent <name>] --account <account>",
+    "  ouro vault ops porkbun status [--agent <name>] [--account <account>]",
     "  ouro chat <agent>",
     "  ouro msg --to <agent> [--session <id>] [--task <ref>] <message>",
     "  ouro poke <agent> --task <task-id>",
@@ -474,6 +476,7 @@ function isVaultUnlockStoreKind(value: unknown): value is VaultUnlockStoreKind {
 function parseVaultCommand(args: string[]): OuroCliCommand {
   const sub = args[0]
   if (sub === "config") return parseVaultConfigCommand(args.slice(1))
+  if (sub === "ops") return parseVaultOpsCommand(args.slice(1))
   const { agent, rest } = extractAgentFlag(args.slice(1))
   let email: string | undefined
   let serverUrl: string | undefined
@@ -560,6 +563,45 @@ function parseVaultCommand(args: string[]): OuroCliCommand {
     return { kind: "vault.unlock", ...(agent ? { agent } : {}), ...(store ? { store } : {}) }
   }
   return { kind: "vault.status", ...(agent ? { agent } : {}), ...(store ? { store } : {}) }
+}
+
+const PORKBUN_ACCOUNT_FORBIDDEN = /[\/\r\n\t]/
+
+function normalizePorkbunAccountInput(value: string | undefined): string {
+  const account = value?.trim() ?? ""
+  if (!account || PORKBUN_ACCOUNT_FORBIDDEN.test(account)) {
+    throw new Error("Porkbun account must be a non-empty account label without slashes or control characters.")
+  }
+  return account
+}
+
+function parseVaultOpsCommand(args: string[]): OuroCliCommand {
+  const provider = args[0]
+  const action = args[1]
+  if (provider !== "porkbun") {
+    throw new Error("Usage: ouro vault ops porkbun set|status [--agent <name>] [--account <account>]")
+  }
+  if (action !== "set" && action !== "status") {
+    throw new Error("Usage: ouro vault ops porkbun set|status [--agent <name>] [--account <account>]")
+  }
+
+  const { agent, rest } = extractAgentFlag(args.slice(2))
+  let account: string | undefined
+  for (let i = 0; i < rest.length; i += 1) {
+    const token = rest[i]
+    if (token === "--account") {
+      account = normalizePorkbunAccountInput(rest[i + 1])
+      i += 1
+      continue
+    }
+    throw new Error(`Usage: ouro vault ops porkbun ${action} [--agent <name>] [--account <account>]`)
+  }
+
+  if (action === "set") {
+    if (!account) throw new Error("Usage: ouro vault ops porkbun set [--agent <name>] --account <account>")
+    return { kind: "vault.ops.porkbun.set", ...(agent ? { agent } : {}), account }
+  }
+  return { kind: "vault.ops.porkbun.status", ...(agent ? { agent } : {}), ...(account ? { account } : {}) }
 }
 
 function parseVaultConfigCommand(args: string[]): OuroCliCommand {
