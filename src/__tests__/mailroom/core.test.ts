@@ -115,6 +115,7 @@ describe("mailroom core", () => {
     })
     expect(result.accepted).toHaveLength(1)
     expect(result.rejectedRecipients).toEqual(["unknown@ouro.bot"])
+    expect(result.accepted[0].ingest).toEqual({ schemaVersion: 1, kind: "smtp" })
 
     const duplicate = await ingestRawMailToStore({ registry, store, envelope, rawMime: sampleRawMail() })
     expect(duplicate.accepted[0].id).toBe(result.accepted[0].id)

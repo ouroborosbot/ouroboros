@@ -2133,6 +2133,8 @@ describe("provider CLI command execution", () => {
     expect(result).toContain("grant:")
     expect(result).toContain("scanned: 1")
     expect(result).toContain("imported: 1")
+    expect(result).toContain("source fresh through: 2026-04-20T19:00:00.000Z")
+    expect(result).toContain("archive imports are historical; they do not create Screener wakeups")
     expect(result).toContain("body reads remain explicit")
     expect(fs.readdirSync(path.join(mailStateDir, "messages")).some((name) => name.endsWith(".json"))).toBe(true)
   })
