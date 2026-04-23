@@ -229,7 +229,33 @@ Suggested policy shape:
 }
 ```
 
-Local proof still uses the local-sink transport. Production sending needs a separately confirmed outbound transport and domain-authentication setup. Do not enable autonomous native-agent sending without final explicit human confirmation.
+Local proof still uses the local-sink transport. Production sending uses a provider adapter, currently Azure Communication Services for `ouro.bot`.
+
+Provider-state rules:
+
+- provider submission records `submitted`, provider name, provider message/operation id, and operation location when available;
+- `submitted` means the provider accepted the API request for processing, not that the recipient received the mail;
+- later delivery reports reconcile the same outbound record to `accepted`, `delivered`, `bounced`, `suppressed`, `quarantined`, `spam-filtered`, or `failed`;
+- duplicate provider events are idempotent by provider event id;
+- delivery event records are body-safe and must not include raw MIME, message bodies, access keys, or vault unlock material.
+
+Provider credentials are workflow/runtime binding facts. A mail outbound binding may name an ordinary vault item and explicit secret field names, for example:
+
+```json
+{
+  "outbound": {
+    "transport": "azure-communication-services",
+    "endpoint": "https://example.communication.azure.com",
+    "senderAddress": "slugger@ouro.bot",
+    "credentialItem": "ops/mail/azure-communication-services/ouro.bot",
+    "credentialFields": { "accessKey": "accessKey" }
+  }
+}
+```
+
+That binding does not make the referenced vault item an "ACS credential kind." It is still an ordinary vault item. Notes remain human/agent orientation; code must not infer credential fields from notes.
+
+Do not enable autonomous native-agent sending without final explicit human confirmation.
 
 ## Ouro Outlook
 

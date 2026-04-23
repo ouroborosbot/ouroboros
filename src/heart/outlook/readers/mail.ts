@@ -105,7 +105,7 @@ function buildFolders(messages: OutlookMailMessageSummary[], outbound: OutlookMa
     { id: "discarded", label: "Discarded", count: messages.filter((message) => message.placement === "discarded").length },
     { id: "quarantine", label: "Quarantine", count: messages.filter((message) => message.placement === "quarantine").length },
     { id: "draft", label: "Drafts", count: outbound.filter((record) => record.status === "draft").length },
-    { id: "sent", label: "Sent", count: outbound.filter((record) => record.status === "sent").length },
+    { id: "sent", label: "Sent", count: outbound.filter((record) => record.status !== "draft").length },
     { id: "delegated", label: "Delegated", count: messages.filter((message) => message.compartmentKind === "delegated").length },
     { id: "native", label: "Native", count: messages.filter((message) => message.compartmentKind === "native").length },
   ]
@@ -168,6 +168,10 @@ function outboundRecord(record: MailOutboundRecord): OutlookMailOutboundRecord {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     sentAt: record.sentAt ?? null,
+    submittedAt: record.submittedAt ?? null,
+    deliveredAt: record.deliveredAt ?? null,
+    provider: record.provider ?? null,
+    providerMessageId: record.providerMessageId ?? null,
     transport: record.transport ?? null,
     reason: record.reason,
   }

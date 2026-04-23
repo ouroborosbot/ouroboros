@@ -510,11 +510,13 @@ export const mailToolDefinitions: ToolDefinition[] = [
           tool: "mail_send",
           reason: args.reason || "confirmed outbound send",
         })
+        const submittedOrSentAt = sent.sentAt ?? sent.submittedAt ?? sent.updatedAt
         return [
-          `Mail sent: ${sent.id}`,
+          `${sent.status === "submitted" ? "Mail submitted" : "Mail sent"}: ${sent.id}`,
+          `status: ${sent.status}`,
           `mode: ${sent.sendMode}`,
-          `transport: ${sent.transport}`,
-          `sentAt: ${sent.sentAt}`,
+          `transport: ${sent.transport ?? sent.provider ?? "unknown"}`,
+          `time: ${submittedOrSentAt}`,
           `to: ${sent.to.join(", ")}`,
         ].join("\n")
       } catch (error) {

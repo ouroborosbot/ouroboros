@@ -445,7 +445,7 @@ export interface OutlookMailScreenerCandidate {
 
 export interface OutlookMailOutboundRecord {
   id: string
-  status: "draft" | "sent" | "failed"
+  status: "draft" | "sent" | "submitted" | "accepted" | "delivered" | "bounced" | "suppressed" | "quarantined" | "spam-filtered" | "failed"
   mailboxRole: "agent-native-mailbox" | "delegated-human-mailbox"
   sendAuthority: "agent-native"
   ownerEmail: string | null
@@ -458,6 +458,10 @@ export interface OutlookMailOutboundRecord {
   createdAt: string
   updatedAt: string
   sentAt: string | null
+  submittedAt: string | null
+  deliveredAt: string | null
+  provider: string | null
+  providerMessageId: string | null
   transport: string | null
   reason: string
 }

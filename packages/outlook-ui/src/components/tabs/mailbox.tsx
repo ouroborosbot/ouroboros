@@ -129,7 +129,8 @@ export function MailboxTab({ agentName, focus, onFocusConsumed, refreshGeneratio
 
   const visibleOutbound = useMemo(() => {
     if (activeFolder !== "draft" && activeFolder !== "sent") return []
-    return (view?.outbound ?? []).filter((record) => record.status === activeFolder)
+    return (view?.outbound ?? []).filter((record) =>
+      activeFolder === "draft" ? record.status === "draft" : record.status !== "draft")
   }, [activeFolder, view])
 
   if (!view) return <Loading label="Opening mailbox" />

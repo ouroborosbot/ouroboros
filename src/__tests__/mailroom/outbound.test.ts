@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { FileMailroomStore } from "../../mailroom/file-store"
 import {
   confirmMailDraftSend,
+  createAcsEmailProviderClient,
   createMailDraft,
   listMailOutboundRecords,
   parseAcsEmailDeliveryReportEvent,
@@ -166,6 +167,31 @@ describe("mail outbound confirmed send", () => {
       .toThrow("choose local-sink or azure-communication-services")
   })
 
+  it("keeps ACS credentials as explicit vault item bindings without parsing notes", () => {
+    expect(resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        senderAddress: "slugger@ouro.bot",
+        credentialItem: "ops/mail/azure-communication-services/ouro.bot",
+        credentialFields: { accessKey: "accessKey" },
+      },
+    })).toEqual({
+      kind: "azure-communication-services",
+      endpoint: "https://mail.communication.azure.com",
+      senderAddress: "slugger@ouro.bot",
+      credentialItem: "ops/mail/azure-communication-services/ouro.bot",
+      credentialFields: { accessKey: "accessKey" },
+    })
+    expect(() => resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        credentialItemNoteQuery: "find the Azure email key",
+      },
+    })).toThrow("outbound provider binding must not infer credentials from vault notes")
+  })
+
   it("covers recipient, missing draft, already-sent, and ACS refusal branches", async () => {
     const root = tempDir()
     const store = new FileMailroomStore({ rootDir: path.join(root, "mailroom") })
@@ -304,5 +330,74 @@ describe("mail outbound confirmed send", () => {
 
     const duplicate = await reconcileOutboundDeliveryEvent({ store, agentId: "slugger", event })
     expect(duplicate.deliveryEvents).toHaveLength(1)
+  })
+
+  it("signs ACS REST sends through the provider client without leaking the access key", async () => {
+    const accessKey = Buffer.from("acs-secret-key").toString("base64")
+    const fetchImpl = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({
+      id: "acs-operation-1",
+      status: "Running",
+    }), {
+      status: 202,
+      headers: {
+        "operation-location": "https://contoso.communication.azure.com/emails/operations/acs-operation-1?api-version=2025-09-01",
+        "x-ms-request-id": "req-1",
+      },
+    }))
+    const client = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com",
+      accessKey,
+      fetch: fetchImpl,
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+
+    const result = await client.submit({
+      draft: {
+        schemaVersion: 1,
+        id: "draft_1",
+        agentId: "slugger",
+        status: "submitted",
+        mailboxRole: "agent-native-mailbox",
+        sendAuthority: "agent-native",
+        ownerEmail: null,
+        source: null,
+        from: "slugger@ouro.bot",
+        to: ["ari@mendelow.me"],
+        cc: ["ops@example.com"],
+        bcc: [],
+        subject: "ACS REST proof",
+        text: "Hello from the provider client.",
+        actor: { kind: "agent", agentId: "slugger" },
+        reason: "prove ACS signing",
+        createdAt: "2026-04-23T01:30:00.000Z",
+        updatedAt: "2026-04-23T01:30:00.000Z",
+      },
+      transport: {
+        kind: "azure-communication-services",
+        endpoint: "https://contoso.communication.azure.com",
+        senderAddress: "slugger@ouro.bot",
+      },
+      submittedAt: "2026-04-23T01:31:00.000Z",
+    })
+
+    expect(result).toEqual({
+      provider: "azure-communication-services",
+      providerMessageId: "acs-operation-1",
+      operationLocation: "https://contoso.communication.azure.com/emails/operations/acs-operation-1?api-version=2025-09-01",
+      providerRequestId: "req-1",
+      submittedAt: "2026-04-23T01:31:00.000Z",
+    })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://contoso.communication.azure.com/emails:send?api-version=2025-09-01",
+      expect.objectContaining({ method: "POST" }),
+    )
+    const init = fetchImpl.mock.calls[0]![1]
+    const headers = new Headers(init.headers)
+    expect(headers.get("x-ms-date")).toBe("Thu, 23 Apr 2026 01:31:00 GMT")
+    expect(headers.get("x-ms-content-sha256")).toBeTruthy()
+    expect(headers.get("authorization")).toMatch(/^HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=/)
+    expect(String(init.body)).toContain("\"senderAddress\":\"slugger@ouro.bot\"")
+    expect(String(init.body)).toContain("\"plainText\":\"Hello from the provider client.\"")
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain(accessKey)
   })
 })
