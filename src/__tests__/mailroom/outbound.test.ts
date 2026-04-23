@@ -13,6 +13,11 @@ import {
   resolveOutboundTransport,
   type MailOutboundProviderClient,
 } from "../../mailroom/outbound"
+import {
+  reconcileMailDeliveryEvent,
+  type MailOutboundDeliveryEvent,
+  type MailOutboundRecord,
+} from "../../mailroom/core"
 
 const tempRoots: string[] = []
 
@@ -174,20 +179,66 @@ describe("mail outbound confirmed send", () => {
         endpoint: "https://mail.communication.azure.com",
         senderAddress: "slugger@ouro.bot",
         credentialItem: "ops/mail/azure-communication-services/ouro.bot",
-        credentialFields: { accessKey: "accessKey" },
+        credentialFields: { accessKey: "accessKey", connectionString: "connectionString" },
       },
     })).toEqual({
       kind: "azure-communication-services",
       endpoint: "https://mail.communication.azure.com",
       senderAddress: "slugger@ouro.bot",
       credentialItem: "ops/mail/azure-communication-services/ouro.bot",
+      credentialFields: { accessKey: "accessKey", connectionString: "connectionString" },
+    })
+    expect(resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        credentialFields: { accessKey: "accessKey" },
+      },
+    })).toEqual({
+      kind: "azure-communication-services",
+      endpoint: "https://mail.communication.azure.com",
       credentialFields: { accessKey: "accessKey" },
+    })
+    expect(resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        credentialFields: { connectionString: "connectionString" },
+      },
+    })).toEqual({
+      kind: "azure-communication-services",
+      endpoint: "https://mail.communication.azure.com",
+      credentialFields: { connectionString: "connectionString" },
+    })
+    expect(resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        credentialFields: { accessKey: "  ", connectionString: "  " },
+      },
+    })).toEqual({
+      kind: "azure-communication-services",
+      endpoint: "https://mail.communication.azure.com",
     })
     expect(() => resolveOutboundTransport({
       outbound: {
         transport: "azure-communication-services",
         endpoint: "https://mail.communication.azure.com",
         credentialItemNoteQuery: "find the Azure email key",
+      },
+    })).toThrow("outbound provider binding must not infer credentials from vault notes")
+    expect(() => resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        noteQuery: "find the Azure email key",
+      },
+    })).toThrow("outbound provider binding must not infer credentials from vault notes")
+    expect(() => resolveOutboundTransport({
+      outbound: {
+        transport: "azure-communication-services",
+        endpoint: "https://mail.communication.azure.com",
+        notes: "the key is somewhere in the vault",
       },
     })).toThrow("outbound provider binding must not infer credentials from vault notes")
   })
@@ -332,6 +383,150 @@ describe("mail outbound confirmed send", () => {
     expect(duplicate.deliveryEvents).toHaveLength(1)
   })
 
+  it("maps all ACS delivery outcomes and rejects mismatched delivery events", () => {
+    const statuses: Array<[string, MailOutboundDeliveryEvent["outcome"]]> = [
+      ["Delivered", "delivered"],
+      ["Suppressed", "suppressed"],
+      ["Bounced", "bounced"],
+      ["Quarantined", "quarantined"],
+      ["FilteredSpam", "spam-filtered"],
+      ["Expanded", "accepted"],
+      ["Failed", "failed"],
+    ]
+
+    for (const [status, outcome] of statuses) {
+      expect(parseAcsEmailDeliveryReportEvent({
+        id: `event-${status}`,
+        eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+        eventTime: "2026-04-23T01:35:00.000Z",
+        data: {
+          recipient: "ARI@MENDELOW.ME",
+          messageId: "acs-operation-1",
+          status,
+        },
+      })).toEqual(expect.objectContaining({
+        providerEventId: `event-${status}`,
+        providerMessageId: "acs-operation-1",
+        outcome,
+        recipient: "ari@mendelow.me",
+        occurredAt: "2026-04-23T01:35:00.000Z",
+        receivedAt: "2026-04-23T01:35:00.000Z",
+      }))
+    }
+
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      id: "event-missing-type",
+      data: { messageId: "acs-operation-1", status: "Delivered" },
+    })).toThrow("unsupported ACS event type: unknown")
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      id: "event-wrong-type",
+      eventType: "Microsoft.Communication.EmailEngagementTrackingReportReceived",
+      data: { messageId: "acs-operation-1", status: "Delivered" },
+    })).toThrow("unsupported ACS event type")
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+      data: { messageId: "acs-operation-1", status: "Delivered" },
+    })).toThrow("ACS delivery event is missing id")
+    expect(() => parseAcsEmailDeliveryReportEvent([]))
+      .toThrow("ACS delivery event is missing id")
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      id: "event-missing-message",
+      eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+      data: { status: "Delivered" },
+    })).toThrow("ACS delivery event is missing messageId")
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      id: "event-array-data",
+      eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+      data: [],
+    })).toThrow("ACS delivery event is missing messageId")
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      id: "event-unknown-status",
+      eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+      data: { messageId: "acs-operation-1", status: "Mystery" },
+    })).toThrow("unsupported ACS delivery status")
+    expect(() => parseAcsEmailDeliveryReportEvent({
+      id: "event-empty-status",
+      eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+      data: { messageId: "acs-operation-1", status: "" },
+    })).toThrow("unsupported ACS delivery status: unknown")
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-04-23T01:36:00.000Z"))
+    try {
+      expect(parseAcsEmailDeliveryReportEvent({
+        id: "event-no-recipient",
+        eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+        data: { messageId: "acs-operation-1", status: "Delivered" },
+      })).toEqual(expect.objectContaining({
+        providerEventId: "event-no-recipient",
+        occurredAt: "2026-04-23T01:36:00.000Z",
+        receivedAt: "2026-04-23T01:36:00.000Z",
+        bodySafeSummary: "ACS delivery report Delivered for unknown recipient",
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const outbound: MailOutboundRecord = {
+      schemaVersion: 1,
+      id: "draft_1",
+      agentId: "slugger",
+      status: "submitted",
+      mailboxRole: "agent-native-mailbox",
+      sendAuthority: "agent-native",
+      ownerEmail: null,
+      source: null,
+      from: "slugger@ouro.bot",
+      to: ["ari@mendelow.me"],
+      cc: [],
+      bcc: [],
+      subject: "Provider status",
+      text: "Track every provider outcome.",
+      actor: { kind: "agent", agentId: "slugger" },
+      reason: "delivery evidence",
+      createdAt: "2026-04-23T01:30:00.000Z",
+      updatedAt: "2026-04-23T01:31:00.000Z",
+      provider: "azure-communication-services",
+      providerMessageId: "acs-operation-1",
+      submittedAt: "2026-04-23T01:31:00.000Z",
+    }
+    const acceptedEvent: MailOutboundDeliveryEvent = {
+      schemaVersion: 1,
+      provider: "azure-communication-services",
+      providerEventId: "event-accepted",
+      providerMessageId: "acs-operation-1",
+      outcome: "accepted",
+      occurredAt: "2026-04-23T01:32:00.000Z",
+      receivedAt: "2026-04-23T01:32:01.000Z",
+      bodySafeSummary: "ACS delivery report Expanded for unknown recipient",
+      providerStatus: "Expanded",
+    }
+    const accepted = reconcileMailDeliveryEvent({ outbound, event: acceptedEvent })
+    expect(accepted).toEqual(expect.objectContaining({
+      status: "accepted",
+      acceptedAt: "2026-04-23T01:32:00.000Z",
+      deliveryEvents: [acceptedEvent],
+    }))
+
+    const bouncedEvent: MailOutboundDeliveryEvent = {
+      ...acceptedEvent,
+      providerEventId: "event-bounced",
+      outcome: "bounced",
+      occurredAt: "2026-04-23T01:33:00.000Z",
+      providerStatus: "Bounced",
+    }
+    const bounced = reconcileMailDeliveryEvent({ outbound: accepted, event: bouncedEvent })
+    expect(bounced).toEqual(expect.objectContaining({
+      status: "bounced",
+      failedAt: "2026-04-23T01:33:00.000Z",
+    }))
+    expect(bounced.deliveryEvents).toHaveLength(2)
+
+    expect(() => reconcileMailDeliveryEvent({
+      outbound,
+      event: { ...acceptedEvent, providerMessageId: "different-operation" },
+    })).toThrow("delivery event providerMessageId does not match outbound record")
+  })
+
   it("signs ACS REST sends through the provider client without leaking the access key", async () => {
     const accessKey = Buffer.from("acs-secret-key").toString("base64")
     const fetchImpl = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({
@@ -399,5 +594,192 @@ describe("mail outbound confirmed send", () => {
     expect(String(init.body)).toContain("\"senderAddress\":\"slugger@ouro.bot\"")
     expect(String(init.body)).toContain("\"plainText\":\"Hello from the provider client.\"")
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain(accessKey)
+  })
+
+  it("handles ACS REST provider edge cases without leaking provider secrets", async () => {
+    const accessKey = Buffer.from("acs-secret-key").toString("base64")
+    const draft: MailOutboundRecord = {
+      schemaVersion: 1,
+      id: "draft_1",
+      agentId: "slugger",
+      status: "submitted",
+      mailboxRole: "agent-native-mailbox",
+      sendAuthority: "agent-native",
+      ownerEmail: null,
+      source: null,
+      from: "slugger@ouro.bot",
+      to: ["ari@mendelow.me"],
+      cc: [],
+      bcc: [],
+      subject: "ACS REST edge proof",
+      text: "Exercise provider edge paths.",
+      actor: { kind: "agent", agentId: "slugger" },
+      reason: "prove ACS edge behavior",
+      createdAt: "2026-04-23T01:30:00.000Z",
+      updatedAt: "2026-04-23T01:30:00.000Z",
+    }
+    const submitInput = {
+      draft,
+      transport: {
+        kind: "azure-communication-services" as const,
+        endpoint: "https://contoso.communication.azure.com",
+      },
+      submittedAt: "2026-04-23T01:31:00.000Z",
+    }
+
+    const fromOperationLocation = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com/",
+      accessKey,
+      fetch: vi.fn(async () => new Response(JSON.stringify({ status: "Running" }), {
+        status: 202,
+        headers: {
+          "operation-location": "https://contoso.communication.azure.com/emails/operations/acs-operation-from-location?api-version=2025-09-01",
+        },
+      })),
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+    await expect(fromOperationLocation.submit(submitInput)).resolves.toEqual({
+      provider: "azure-communication-services",
+      providerMessageId: "acs-operation-from-location",
+      operationLocation: "https://contoso.communication.azure.com/emails/operations/acs-operation-from-location?api-version=2025-09-01",
+      submittedAt: "2026-04-23T01:31:00.000Z",
+    })
+
+    const idOnly = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com",
+      accessKey,
+      fetch: vi.fn(async () => new Response(JSON.stringify({ id: "acs-operation-id-only", status: "Running" }), {
+        status: 202,
+      })),
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+    await expect(idOnly.submit(submitInput)).resolves.toEqual({
+      provider: "azure-communication-services",
+      providerMessageId: "acs-operation-id-only",
+      submittedAt: "2026-04-23T01:31:00.000Z",
+    })
+
+    const originalFetch = globalThis.fetch
+    const fetchDefault = vi.fn(async () => new Response(JSON.stringify({ id: "acs-operation-defaults", status: "Running" }), {
+      status: 202,
+    }))
+    vi.stubGlobal("fetch", fetchDefault)
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-04-23T01:37:00.000Z"))
+    try {
+      const defaultFetchAndClock = createAcsEmailProviderClient({
+        endpoint: "https://contoso.communication.azure.com",
+        accessKey,
+      })
+      await expect(defaultFetchAndClock.submit(submitInput)).resolves.toEqual({
+        provider: "azure-communication-services",
+        providerMessageId: "acs-operation-defaults",
+        submittedAt: "2026-04-23T01:31:00.000Z",
+      })
+      const headers = new Headers(fetchDefault.mock.calls[0]![1].headers)
+      expect(headers.get("x-ms-date")).toBe("Thu, 23 Apr 2026 01:37:00 GMT")
+    } finally {
+      vi.useRealTimers()
+      vi.stubGlobal("fetch", originalFetch)
+    }
+
+    const providerError = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com",
+      accessKey,
+      fetch: vi.fn(async () => new Response(JSON.stringify({ error: { message: "sender domain is not verified" } }), {
+        status: 400,
+      })),
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+    await expect(providerError.submit(submitInput)).rejects.toThrow("sender domain is not verified")
+
+    const httpError = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com",
+      accessKey,
+      fetch: vi.fn(async () => new Response("not json", { status: 503 })),
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+    await expect(httpError.submit(submitInput)).rejects.toThrow("HTTP 503")
+
+    const missingOperationId = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com",
+      accessKey,
+      fetch: vi.fn(async () => new Response(JSON.stringify({ status: "Running" }), {
+        status: 202,
+        headers: {
+          "operation-location": "https://contoso.communication.azure.com/emails/not-an-operation",
+        },
+      })),
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+    await expect(missingOperationId.submit(submitInput)).rejects.toThrow("ACS outbound send did not return an operation id")
+
+    const missingOperationLocation = createAcsEmailProviderClient({
+      endpoint: "https://contoso.communication.azure.com",
+      accessKey,
+      fetch: vi.fn(async () => new Response(JSON.stringify({ status: "Running" }), { status: 202 })),
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+    await expect(missingOperationLocation.submit(submitInput)).rejects.toThrow("ACS outbound send did not return an operation id")
+  })
+
+  it("persists minimal provider submissions and reports missing outbound delivery records", async () => {
+    const root = tempDir()
+    const store = new FileMailroomStore({ rootDir: path.join(root, "mailroom") })
+    const providerClient: MailOutboundProviderClient = {
+      submit: vi.fn(async () => ({
+        provider: "azure-communication-services",
+        providerMessageId: "acs-operation-minimal",
+      })),
+    }
+    const draft = await createMailDraft({
+      store,
+      agentId: "slugger",
+      from: "slugger@ouro.bot",
+      to: ["ari@mendelow.me"],
+      subject: "Minimal provider submit",
+      text: "Provider metadata is sometimes sparse.",
+      actor: { kind: "agent", agentId: "slugger" },
+      reason: "provider sparse metadata proof",
+      now: () => new Date("2026-04-23T01:30:00.000Z"),
+    })
+
+    const submitted = await confirmMailDraftSend({
+      store,
+      agentId: "slugger",
+      draftId: draft.id,
+      transport: { kind: "azure-communication-services", endpoint: "https://contoso.communication.azure.com" },
+      confirmation: "CONFIRM_SEND",
+      actor: { kind: "agent", agentId: "slugger" },
+      reason: "confirmed provider submit",
+      providerClient,
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+
+    expect(submitted).toEqual(expect.objectContaining({
+      status: "submitted",
+      provider: "azure-communication-services",
+      providerMessageId: "acs-operation-minimal",
+      submittedAt: "2026-04-23T01:31:00.000Z",
+      transport: "azure-communication-services",
+    }))
+    expect(submitted).not.toHaveProperty("operationLocation")
+    expect(submitted).not.toHaveProperty("providerRequestId")
+
+    await expect(reconcileOutboundDeliveryEvent({
+      store,
+      agentId: "slugger",
+      event: {
+        schemaVersion: 1,
+        provider: "azure-communication-services",
+        providerEventId: "event-missing-outbound",
+        providerMessageId: "missing-operation",
+        outcome: "delivered",
+        occurredAt: "2026-04-23T01:32:00.000Z",
+        receivedAt: "2026-04-23T01:32:01.000Z",
+        bodySafeSummary: "ACS delivery report Delivered for unknown recipient",
+        providerStatus: "Delivered",
+      },
+    })).rejects.toThrow("No outbound record found for provider message missing-operation")
   })
 })
