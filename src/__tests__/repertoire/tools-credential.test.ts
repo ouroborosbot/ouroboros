@@ -480,4 +480,22 @@ describe("tool definitions structure", () => {
       "credential_store",
     ])
   })
+
+  it("describes stored credentials as vault item names, not only domains", () => {
+    for (const toolName of ["credential_get", "credential_store", "credential_list", "credential_delete"]) {
+      const tool = findTool(toolName)
+      expect(tool.tool.function.description.toLowerCase()).toContain("vault item")
+    }
+
+    const getParams = findTool("credential_get").tool.function.parameters as any
+    expect(getParams.properties.item).toBeDefined()
+    expect(getParams.properties.item.description).toContain("name/path")
+    expect(getParams.properties.domain.description).toContain("compatibility alias")
+
+    const storeParams = findTool("credential_store").tool.function.parameters as any
+    expect(storeParams.properties.item).toBeDefined()
+    expect(storeParams.properties.item.description).toContain("name/path")
+    expect(storeParams.properties.notes.description).toContain("human/agent orientation")
+    expect(storeParams.properties.notes.description).toContain("not parsed by code")
+  })
 })
