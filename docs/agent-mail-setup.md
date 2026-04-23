@@ -23,8 +23,8 @@ Hard rule: the agent must not tell the human to run `ouro account ensure`, `ouro
 - **Implemented in the harness:** `ouro account ensure`, `ouro connect mail`, `ouro mail import-mbox`, Mail sense readiness checks, bounded mail read tools, guarded native autonomous send policy evaluation, confirmed outbound drafts/sends, and Outlook read-only mailbox views.
 - **Hosted service source:** production-oriented Mail ingress, Vault control, shared work protocol, and Azure infra live in [`ouroborosbot/ouro-work-substrate`](https://github.com/ouroborosbot/ouro-work-substrate). This harness keeps local runtime, agent setup, sense orchestration, tools, and Outlook.
 - **Agent-runnable:** provisioning Mailroom, storing private keys in the agent vault, enabling `senses.mail.enabled`, importing a human-provided MBOX, verifying the Mail sense, and managing Screener decisions after family authorization.
-- **Human-required:** HEY browser export, HEY forwarding/extension changes, DNS changes at the registrar, provider/browser auth, secret entry, final production MX cutover, and final autonomous-send enablement.
-- **Not enabled by default:** autonomous sending, destructive mail actions, and production MX cutover.
+- **Human-required:** HEY browser export, HEY forwarding/extension changes, DNS changes at the registrar, provider/browser auth, secret entry, and final autonomous-send enablement.
+- **Not enabled by default:** autonomous sending, destructive mail actions, and new DNS/provider changes.
 - **Not the implementation:** HEY OAuth, HEY IMAP, `ouro auth verify --provider mail`, `ouro mcp call mail ...`, and ad hoc policy flags. Do not invent those steps.
 
 ## Mental Model
@@ -158,24 +158,26 @@ Hosted service code now lives in [`ouroborosbot/ouro-work-substrate`](https://gi
 - `apps/vault-control` owns authenticated programmatic Vaultwarden account creation.
 - `infra/azure` owns the Container Apps/Blob Storage deployment shape.
 
-Current proof state as of April 21, 2026:
+Current production proof state as of April 23, 2026:
 
-- Azure Container Apps proved SMTP ingress, Azure Blob storage, and Slugger decryption on external TCP port `2525`.
-- The same Azure proof path did not prove public port `25` for production MX delivery.
-- Azure Communication Services can help with outbound/domain-authenticated sending, but it is not the inbound mailbox engine for Agent Mail.
+- Production DNS/MX for `ouro.bot` points at `mx1.ouro.bot`.
+- `mx1.ouro.bot:25` reaches the hosted Mail Ingress edge.
+- Mail Ingress advertises STARTTLS from mounted PEM secrets and enforces size, recipient, connection, and rate limits.
+- Hosted Mail Control can ensure `slugger@ouro.bot` and `me.mendelow.ari.slugger@ouro.bot`.
+- Accepted hosted mail lands in encrypted Azure Blob Storage and decrypts through Slugger's vault-held keys.
+- Azure Communication Services is the current outbound provider lane; Event Grid delivery events reconcile accepted API submissions to later delivery outcomes.
 
-Before live forwarding:
+Before HEY forwarding or autonomous native-agent sending:
 
-- Do not publish production MX records.
-- Do not claim `@ouro.bot` live delivery is active.
-- Do not enable autonomous native-agent sending until the human explicitly approves the policy and the live delivery path.
-- Wait for a final explicit human confirmation after a port-25 production ingress path is proven.
+- Verify the current `ouro.bot` DNS/MX state instead of assuming a stale proof.
+- Verify live delegated forwarding with a body-safe test message after the human confirms HEY settings.
+- Do not enable autonomous native-agent sending until the human explicitly approves the policy and the live outbound provider path.
 
-Human-only DNS/MX later:
+Human-only DNS/provider changes:
 
-- Registrar MX for `ouro.bot` should point only at the final proven production inbound host.
+- Registrar MX, SPF, DKIM, DMARC, provider-domain verification, and webhook subscription changes must be inspected before editing; do not overwrite unrelated DNS records.
 - Outbound SPF/DKIM/domain verification should follow the selected outbound provider's official instructions.
-- Existing registrar records should be inspected before editing; do not overwrite unrelated DNS records.
+- The agent may run binding-backed dry-runs and verification, but intentional DNS/provider changes remain human-confirmed.
 
 ## HEY Forwarding
 
@@ -307,6 +309,8 @@ Human/UI check, guided by the agent:
 - Confirm the mailbox appears as that agent's mailbox, with Imbox/Screener/source folders and no send/delete controls.
 
 ## Troubleshooting
+
+For the full recovery map, use the repo path `docs/agent-mail-recovery.md` ([Agent Mail Recovery](agent-mail-recovery.md)).
 
 - `AUTH_REQUIRED:mailroom`: unlock or repair the agent vault if prompted, then the agent should run `ouro account ensure --agent <agent> --owner-email <email> --source hey` or `ouro connect mail --agent <agent> --owner-email <email> --source hey`.
 - Missing `registryPath` or `storePath`: the agent should rerun `ouro connect mail --agent <agent> --owner-email <email> --source hey` after vault unlock.
