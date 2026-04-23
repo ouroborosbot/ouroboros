@@ -8,6 +8,7 @@ import { applyMailDecision, buildSenderPolicy, type MailDecisionAction, type Mai
 import {
   describeMailProvenance,
   normalizeMailAddress,
+  type MailOutboundRecord,
   type MailPlacement,
   type MailroomRegistry,
   type MailScreenerCandidate,
@@ -135,6 +136,11 @@ function renderAccessLogProvenance(entry: MailAccessLogEntry): string {
     return " native agent mailbox"
   }
   return ""
+}
+
+function renderSendAuthority(record: Pick<MailOutboundRecord, "sendAuthority" | "mailboxRole">): string {
+  if ((record.sendAuthority ?? "agent-native") === "agent-native") return "native agent mailbox"
+  return record.mailboxRole ?? "unknown mailbox"
 }
 
 function accessProvenance(message: StoredMailMessage): Pick<MailAccessLogEntry, "mailboxRole" | "compartmentKind" | "ownerEmail" | "source"> {
@@ -509,12 +515,19 @@ export const mailToolDefinitions: ToolDefinition[] = [
           agentId: resolved.agentName,
           tool: "mail_send",
           reason: args.reason || "confirmed outbound send",
+          mailboxRole: sent.mailboxRole ?? "agent-native-mailbox",
+          compartmentKind: (sent.mailboxRole ?? "agent-native-mailbox") === "delegated-human-mailbox" ? "delegated" : "native",
+          ownerEmail: sent.ownerEmail ?? null,
+          source: sent.source ?? null,
         })
         const submittedOrSentAt = sent.sentAt ?? sent.submittedAt ?? sent.updatedAt
         return [
           `${sent.status === "submitted" ? "Mail submitted" : "Mail sent"}: ${sent.id}`,
           `status: ${sent.status}`,
           `mode: ${sent.sendMode}`,
+          `send authority: ${renderSendAuthority(sent)}`,
+          `policy decision: ${sent.policyDecision?.code ?? "unknown"}`,
+          `policy fallback: ${sent.policyDecision?.fallback ?? "unknown"}`,
           `transport: ${sent.transport ?? sent.provider ?? "unknown"}`,
           `time: ${submittedOrSentAt}`,
           `to: ${sent.to.join(", ")}`,
