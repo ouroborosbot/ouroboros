@@ -76,4 +76,16 @@ describe("agent mail setup documentation contract", () => {
     expect(guide).toContain("Archive imports are historical backfill")
     expect(guide).toContain("Forwarding status can be `blocked_by_human`, `pending_propagation`, `ready`, or `failed_recoverable`")
   })
+
+  it("documents guarded native autonomous sending instead of a blended or always-disabled outbound story", () => {
+    const guide = readGuide()
+
+    expect(guide).toContain("autonomous native-agent sending is policy-governed")
+    expect(guide).toContain("mailroom.autonomousSendPolicy")
+    expect(guide).toContain("kill switch")
+    expect(guide).toContain("allowed recipients or domains")
+    expect(guide).toContain("recipient and rate limits")
+    expect(guide).toContain("new or risky recipients fall back to `CONFIRM_SEND`")
+    expect(guide).toContain("Delegated human mail still never grants send-as-human authority")
+  })
 })

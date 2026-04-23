@@ -106,7 +106,7 @@ describe("mail outbound confirmed send", () => {
     ])
   })
 
-  it("refuses autonomous sending even when the transport is configured", async () => {
+  it("requires an enabled native-agent policy before autonomous sending can run", async () => {
     const root = tempDir()
     const store = new FileMailroomStore({ rootDir: path.join(root, "mailroom") })
     const draft = await createMailDraft({
@@ -129,7 +129,7 @@ describe("mail outbound confirmed send", () => {
       autonomous: true,
       actor: { kind: "agent", agentId: "slugger" },
       reason: "autonomous send attempt",
-    })).rejects.toThrow("Autonomous mail sending is disabled")
+    })).rejects.toThrow("Autonomous mail sending requires an enabled native-agent policy")
   })
 
   it("surfaces missing outbound transport as human-required setup", () => {

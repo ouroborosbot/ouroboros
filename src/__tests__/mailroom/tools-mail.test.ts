@@ -3,6 +3,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 import { provisionMailboxRegistry } from "../../mailroom/core"
+import { buildNativeMailAutonomyPolicy } from "../../mailroom/autonomy"
 import { FileMailroomStore, ingestRawMailToStore } from "../../mailroom/file-store"
 import { cacheRuntimeCredentialConfig, resetRuntimeCredentialConfigCache } from "../../heart/runtime-credentials"
 import { resetIdentity, setAgentName } from "../../heart/identity"
@@ -696,7 +697,7 @@ describe("mail tools", () => {
       confirmation: "CONFIRM_SEND",
       autonomous: "true",
       reason: "autonomous proof",
-    }, trustedContext())).resolves.toContain("Autonomous mail sending is disabled")
+    }, trustedContext())).resolves.toContain("Autonomous mail sending requires an enabled native-agent policy")
     expect(fs.existsSync(sinkPath)).toBe(false)
 
     const sent = await tool("mail_send").handler({
@@ -720,6 +721,77 @@ describe("mail tools", () => {
       draft_id: noReasonDraftId!,
       confirmation: "CONFIRM_SEND",
     }, trustedContext())).resolves.toContain("Mail sent")
+  })
+
+  it("lets policy-approved native mail send autonomously while new recipients require confirmation fallback", async () => {
+    setAgentName("slugger")
+    const storePath = tempDir()
+    const sinkPath = path.join(storePath, "outbound-sink.jsonl")
+    const { keys } = provisionMailboxRegistry({ agentId: "slugger" })
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: {
+        mailboxAddress: "slugger@ouro.bot",
+        storePath,
+        privateKeys: keys,
+        outbound: {
+          transport: "local-sink",
+          sinkPath,
+        },
+        autonomousSendPolicy: buildNativeMailAutonomyPolicy({
+          agentId: "slugger",
+          mailboxAddress: "slugger@ouro.bot",
+          enabled: true,
+          killSwitch: false,
+          allowedRecipients: ["ari@mendelow.me"],
+          allowedDomains: ["trusted.example"],
+          maxRecipientsPerMessage: 3,
+          rateLimit: { maxSends: 2, windowMs: 60_000 },
+          actor: { kind: "human", friendId: "ari", trustLevel: "family" },
+          reason: "family approved low-risk autonomous native mail",
+          updatedAt: "2026-04-23T00:00:00.000Z",
+        }),
+      },
+    })
+
+    const approvedDraft = await tool("mail_compose").handler({
+      to: "ari@mendelow.me",
+      subject: "Autonomous check",
+      text: "Can you confirm the plan?",
+      reason: "draft low-risk autonomous mail",
+    }, trustedContext())
+    const approvedDraftId = /draft_[a-f0-9]+/.exec(String(approvedDraft))?.[0]
+    expect(approvedDraftId).toBeTruthy()
+
+    const autonomous = await tool("mail_send").handler({
+      draft_id: approvedDraftId!,
+      autonomous: "true",
+      reason: "policy-approved autonomous native send",
+    }, contextWithoutFriend())
+    expect(autonomous).toContain("Mail sent")
+    expect(autonomous).toContain("mode: autonomous")
+
+    const newRecipientDraft = await tool("mail_compose").handler({
+      to: "new.person@example.net",
+      subject: "Needs confirmation",
+      text: "This recipient should not send autonomously.",
+      reason: "draft risky recipient mail",
+    }, trustedContext())
+    const newRecipientDraftId = /draft_[a-f0-9]+/.exec(String(newRecipientDraft))?.[0]
+    expect(newRecipientDraftId).toBeTruthy()
+
+    await expect(tool("mail_send").handler({
+      draft_id: newRecipientDraftId!,
+      autonomous: "true",
+      reason: "autonomous attempt to new recipient",
+    }, contextWithoutFriend())).resolves.toContain("requires confirmation")
+
+    const confirmed = await tool("mail_send").handler({
+      draft_id: newRecipientDraftId!,
+      confirmation: "CONFIRM_SEND",
+      reason: "family confirmed new recipient",
+    }, trustedContext())
+    expect(confirmed).toContain("Mail sent")
+    expect(confirmed).toContain("mode: confirmed")
   })
 
   it("keeps outbound sends family/self-only and reports missing transport setup", async () => {
