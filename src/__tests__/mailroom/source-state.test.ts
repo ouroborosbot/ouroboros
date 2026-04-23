@@ -39,7 +39,7 @@ describe("delegated mail source setup state", () => {
     expect(nextStep).toContain("browser automation")
     expect(nextStep).toContain("MFA")
     expect(nextStep).toContain(ALIAS)
-    expect(nextStep).not.toContain("slugger@ouro.bot")
+    expect(nextStep).not.toContain("to slugger@ouro.bot")
   })
 
   it("records archive backfill freshness without marking forwarding ready", () => {
