@@ -790,6 +790,13 @@ describe("mail tools", () => {
     }, contextWithoutFriend())
     expect(autonomous).toContain("Mail sent")
     expect(autonomous).toContain("mode: autonomous")
+    expect(autonomous).toContain("send authority: native agent mailbox")
+    expect(autonomous).toContain("policy decision: allowed")
+    expect(autonomous).toContain("policy fallback: none")
+
+    const autonomyAccessLog = await tool("mail_access_log").handler({}, contextWithoutFriend())
+    expect(autonomyAccessLog).toContain("mail_send mailbox native agent mailbox")
+    expect(autonomyAccessLog).toContain("policy-approved autonomous native send")
 
     const newRecipientDraft = await tool("mail_compose").handler({
       to: "new.person@example.net",
