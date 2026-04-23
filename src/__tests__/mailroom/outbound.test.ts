@@ -1,13 +1,16 @@
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { FileMailroomStore } from "../../mailroom/file-store"
 import {
   confirmMailDraftSend,
   createMailDraft,
   listMailOutboundRecords,
+  parseAcsEmailDeliveryReportEvent,
+  reconcileOutboundDeliveryEvent,
   resolveOutboundTransport,
+  type MailOutboundProviderClient,
 } from "../../mailroom/outbound"
 
 const tempRoots: string[] = []
@@ -227,5 +230,79 @@ describe("mail outbound confirmed send", () => {
       actor,
       reason: "send twice",
     })).rejects.toThrow("already sent")
+  })
+
+  it("submits through ACS without treating provider acceptance as final delivery, then reconciles events idempotently", async () => {
+    const root = tempDir()
+    const store = new FileMailroomStore({ rootDir: path.join(root, "mailroom") })
+    const providerClient: MailOutboundProviderClient = {
+      submit: vi.fn(async () => ({
+        provider: "azure-communication-services",
+        providerMessageId: "acs-operation-1",
+        operationLocation: "https://contoso.communication.azure.com/emails/operations/acs-operation-1?api-version=2025-09-01",
+        providerRequestId: "req-1",
+        submittedAt: "2026-04-23T01:31:00.000Z",
+      })),
+    }
+    const draft = await createMailDraft({
+      store,
+      agentId: "slugger",
+      from: "slugger@ouro.bot",
+      to: ["ari@mendelow.me"],
+      subject: "Provider submit",
+      text: "Provider acceptance is not delivery.",
+      actor: { kind: "agent", agentId: "slugger" },
+      reason: "acs submit proof",
+    })
+
+    const submitted = await confirmMailDraftSend({
+      store,
+      agentId: "slugger",
+      draftId: draft.id,
+      transport: { kind: "azure-communication-services", endpoint: "https://contoso.communication.azure.com" },
+      confirmation: "CONFIRM_SEND",
+      actor: { kind: "agent", agentId: "slugger" },
+      reason: "confirmed provider submit",
+      providerClient,
+      now: () => new Date("2026-04-23T01:31:00.000Z"),
+    })
+
+    expect(providerClient.submit).toHaveBeenCalledWith(expect.objectContaining({
+      draft: expect.objectContaining({ id: draft.id, from: "slugger@ouro.bot", to: ["ari@mendelow.me"] }),
+      transport: expect.objectContaining({ kind: "azure-communication-services" }),
+    }))
+    expect(submitted).toEqual(expect.objectContaining({
+      status: "submitted",
+      provider: "azure-communication-services",
+      providerMessageId: "acs-operation-1",
+      submittedAt: "2026-04-23T01:31:00.000Z",
+      deliveryEvents: [],
+    }))
+    expect(submitted).not.toHaveProperty("deliveredAt")
+
+    const event = parseAcsEmailDeliveryReportEvent({
+      id: "event-delivered-1",
+      eventType: "Microsoft.Communication.EmailDeliveryReportReceived",
+      eventTime: "2026-04-23T01:35:00.000Z",
+      data: {
+        sender: "slugger@ouro.bot",
+        recipient: "ari@mendelow.me",
+        messageId: "acs-operation-1",
+        status: "Delivered",
+        deliveryStatusDetails: { statusMessage: "250 2.0.0 accepted" },
+        deliveryAttemptTimeStamp: "2026-04-23T01:34:59.000Z",
+      },
+    })
+
+    const delivered = await reconcileOutboundDeliveryEvent({ store, agentId: "slugger", event })
+    expect(delivered).toEqual(expect.objectContaining({
+      id: draft.id,
+      status: "delivered",
+      deliveredAt: "2026-04-23T01:34:59.000Z",
+    }))
+    expect(delivered.deliveryEvents).toHaveLength(1)
+
+    const duplicate = await reconcileOutboundDeliveryEvent({ store, agentId: "slugger", event })
+    expect(duplicate.deliveryEvents).toHaveLength(1)
   })
 })
