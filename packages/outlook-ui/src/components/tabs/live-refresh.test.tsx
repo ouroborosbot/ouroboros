@@ -1,7 +1,8 @@
-import { act } from "react"
+import { act, StrictMode } from "react"
 import { fireEvent, render, waitFor, cleanup } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { NavigationContext } from "../../navigation"
+import { AgentInspector } from "../agent-inspector"
 import { OverviewTab } from "./overview"
 import { SessionsTab } from "./sessions"
 import { WorkTab } from "./work"
@@ -159,6 +160,48 @@ afterEach(() => {
 })
 
 describe("Outlook deep-tab live refresh", () => {
+  it("keeps the initial hash tab under StrictMode", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith("/mail")) {
+        return jsonResponse({
+          status: "ready",
+          agentName: "slugger",
+          mailboxAddress: "slugger@ouro.bot",
+          generatedAt: "2026-04-23T01:35:00.000Z",
+          store: { kind: "file", label: "/tmp/mailroom" },
+          folders: [],
+          messages: [],
+          screener: [],
+          outbound: [],
+          recovery: { discardedCount: 0, quarantineCount: 0 },
+          accessLog: [],
+          error: null,
+        })
+      }
+      throw new Error(`unexpected url: ${url}`)
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const ui = render(
+      <StrictMode>
+        <AgentInspector
+          agentName="slugger"
+          view={makeAgentView()}
+          deskPrefs={null}
+          refreshGeneration={0}
+          initialRoute={{ agent: "slugger", tab: "mail", focus: undefined }}
+        />
+      </StrictMode>
+    )
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await flushRefresh()
+
+    expect(ui.container.textContent).toContain("Agent mailbox")
+    expect(ui.container.textContent).not.toContain("CENTER OF GRAVITY")
+  })
+
   it("re-fetches overview deep data when refreshGeneration advances", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)

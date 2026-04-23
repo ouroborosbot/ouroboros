@@ -532,6 +532,15 @@ describe("Outlook mail reader", () => {
         receivedAt: "2026-04-23T01:33:01.000Z",
         bodySafeSummary: "ACS delivery report Bounced for ari@mendelow.me",
         providerStatus: "Bounced",
+      }, {
+        schemaVersion: 1,
+        provider: "azure-communication-services",
+        providerEventId: "event-expanded-unknown-recipient",
+        providerMessageId: "acs-operation-1",
+        outcome: "accepted",
+        occurredAt: "2026-04-23T01:32:00.000Z",
+        receivedAt: "2026-04-23T01:32:01.000Z",
+        bodySafeSummary: "ACS delivery report Expanded for unknown recipient",
       }],
     })
     cacheRuntimeCredentialConfig("slugger", {
@@ -562,13 +571,19 @@ describe("Outlook mail reader", () => {
         submittedAt: "2026-04-23T01:31:00.000Z",
         acceptedAt: "2026-04-23T01:32:00.000Z",
         failedAt: "2026-04-23T01:33:00.000Z",
-        deliveryEvents: [
+        deliveryEvents: expect.arrayContaining([
           expect.objectContaining({
             providerEventId: "event-bounced-1",
             outcome: "bounced",
             bodySafeSummary: "ACS delivery report Bounced for ari@mendelow.me",
           }),
-        ],
+          expect.objectContaining({
+            providerEventId: "event-expanded-unknown-recipient",
+            recipient: null,
+            providerStatus: null,
+            bodySafeSummary: "ACS delivery report Expanded for unknown recipient",
+          }),
+        ]),
       }),
     ]))
     const serializedOutbound = JSON.stringify(mailbox.outbound)

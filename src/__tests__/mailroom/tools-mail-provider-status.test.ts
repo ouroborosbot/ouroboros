@@ -102,6 +102,16 @@ describe("mail_send provider status rendering", () => {
       createdAt: "2026-04-23T01:30:00.000Z",
       updatedAt: "2026-04-23T01:31:00.000Z",
       sendMode: "confirmed",
+      policyDecision: {
+        schemaVersion: 1,
+        allowed: true,
+        mode: "confirmed",
+        code: "explicit-confirmation",
+        reason: "Explicit confirmation authorized this native-agent send",
+        evaluatedAt: "2026-04-23T01:31:00.000Z",
+        recipients: ["ari@mendelow.me"],
+        fallback: "none",
+      },
       provider: "azure-communication-services",
       providerMessageId: "acs-operation-1",
       submittedAt: "2026-04-23T01:31:00.000Z",
@@ -118,6 +128,9 @@ describe("mail_send provider status rendering", () => {
       "Mail submitted: draft_1",
       "status: submitted",
       "mode: confirmed",
+      "send authority: native agent mailbox",
+      "policy decision: explicit-confirmation",
+      "policy fallback: none",
       "transport: azure-communication-services",
       "time: 2026-04-23T01:31:00.000Z",
       "to: ari@mendelow.me",
@@ -142,6 +155,27 @@ describe("mail_send provider status rendering", () => {
 
     confirmMailDraftSendMock.mockResolvedValueOnce({
       ...submitted,
+      id: "draft_legacy_policyless",
+      policyDecision: undefined,
+    })
+    await expect(sendTool.handler({
+      draft_id: "draft_legacy_policyless",
+      confirmation: "CONFIRM_SEND",
+      reason: "legacy policyless status",
+    }, trustedContext())).resolves.toContain([
+      "Mail submitted: draft_legacy_policyless",
+      "status: submitted",
+      "mode: confirmed",
+      "send authority: native agent mailbox",
+      "policy decision: unknown",
+      "policy fallback: unknown",
+      "transport: azure-communication-services",
+      "time: 2026-04-23T01:31:00.000Z",
+      "to: ari@mendelow.me",
+    ].join("\n"))
+
+    confirmMailDraftSendMock.mockResolvedValueOnce({
+      ...submitted,
       id: "draft_3",
       status: "delivered",
       sentAt: undefined,
@@ -158,6 +192,9 @@ describe("mail_send provider status rendering", () => {
       "Mail sent: draft_3",
       "status: delivered",
       "mode: confirmed",
+      "send authority: native agent mailbox",
+      "policy decision: explicit-confirmation",
+      "policy fallback: none",
       "transport: unknown",
       "time: 2026-04-23T01:40:00.000Z",
       "to: ari@mendelow.me",

@@ -357,7 +357,7 @@ function MessageRow({ message, selected, onSelect }: {
 }
 
 function OutboundRow({ record }: { record: OutlookMailOutboundRecord }) {
-  const latestDeliveryEvent = record.deliveryEvents.at(-1)
+  const latestDeliveryEvent = record.deliveryEvents[record.deliveryEvents.length - 1]
   return (
     <div className="border-b border-[#d8e2d4] px-4 py-3">
       <div className="flex items-start justify-between gap-3">
