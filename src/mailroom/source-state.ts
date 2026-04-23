@@ -1,3 +1,4 @@
+import { emitNervesEvent } from "../nerves/runtime"
 import { normalizeMailAddress } from "./core"
 
 export type DelegatedMailSourceSetupStatus =
@@ -84,7 +85,7 @@ function normalizedAgentId(agentId: string): string {
 
 export function createDelegatedMailSourceState(input: DelegatedMailSourceIdentityInput): DelegatedMailSourceState {
   const aliasAddress = normalizeMailAddress(input.aliasAddress)
-  return {
+  const state: DelegatedMailSourceState = {
     schemaVersion: 1,
     agentId: normalizedAgentId(input.agentId),
     ownerEmail: normalizeMailAddress(input.ownerEmail),
@@ -100,13 +101,25 @@ export function createDelegatedMailSourceState(input: DelegatedMailSourceIdentit
       humanRequired: [...HUMAN_REQUIRED],
     },
   }
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.mail_delegated_source_state_created",
+    message: "delegated mail source setup state created",
+    meta: {
+      agentId: state.agentId,
+      source: state.source,
+      forwardingStatus: state.forwarding.status,
+      backfillStatus: state.backfill.status,
+    },
+  })
+  return state
 }
 
 export function markMboxBackfillComplete(
   state: DelegatedMailSourceState,
   input: MboxBackfillCompleteInput,
 ): DelegatedMailSourceState {
-  return {
+  const nextState: DelegatedMailSourceState = {
     ...state,
     backfill: {
       status: "ready",
@@ -117,6 +130,20 @@ export function markMboxBackfillComplete(
       completedAt: input.completedAt,
     },
   }
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.mail_delegated_source_backfill_ready",
+    message: "delegated mail source archive backfill marked ready",
+    meta: {
+      agentId: nextState.agentId,
+      source: nextState.source,
+      scanned: input.scanned,
+      imported: input.imported,
+      duplicates: input.duplicates,
+      sourceFreshThroughKnown: input.sourceFreshThrough !== null,
+    },
+  })
+  return nextState
 }
 
 export function markForwardingProbeResult(
@@ -125,7 +152,7 @@ export function markForwardingProbeResult(
 ): DelegatedMailSourceState {
   const expectedRecipient = normalizeMailAddress(state.forwarding.targetAlias)
   if (!input.observedRecipient) {
-    return {
+    const nextState: DelegatedMailSourceState = {
       ...state,
       forwarding: {
         ...state.forwarding,
@@ -135,11 +162,25 @@ export function markForwardingProbeResult(
         recoveryAction: "Wait briefly, then have Slugger re-check the delegated source alias before asking the human to change HEY again.",
       },
     }
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.mail_delegated_source_forwarding_probe",
+      message: "delegated mail source forwarding probe checked",
+      meta: {
+        agentId: nextState.agentId,
+        source: nextState.source,
+        status: nextState.forwarding.status,
+        observedRecipientPresent: false,
+        expectedRecipientDomain: expectedRecipient.split("@")[1],
+        messageIdPresent: Boolean(input.messageId),
+      },
+    })
+    return nextState
   }
 
   const observedRecipient = normalizeMailAddress(input.observedRecipient)
   if (observedRecipient !== expectedRecipient) {
-    return {
+    const nextState: DelegatedMailSourceState = {
       ...state,
       forwarding: {
         ...state.forwarding,
@@ -150,9 +191,25 @@ export function markForwardingProbeResult(
         recoveryAction: `HEY is forwarding to ${observedRecipient}. Slugger must correct the HEY forwarding target to ${expectedRecipient}; do not import or label that probe as delegated Ari HEY mail.`,
       },
     }
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.mail_delegated_source_forwarding_probe",
+      message: "delegated mail source forwarding probe checked",
+      meta: {
+        agentId: nextState.agentId,
+        source: nextState.source,
+        status: nextState.forwarding.status,
+        observedRecipientPresent: true,
+        observedRecipientMatches: false,
+        expectedRecipientDomain: expectedRecipient.split("@")[1],
+        observedRecipientDomain: observedRecipient.split("@")[1],
+        messageIdPresent: Boolean(input.messageId),
+      },
+    })
+    return nextState
   }
 
-  return {
+  const nextState: DelegatedMailSourceState = {
     ...state,
     forwarding: {
       ...state.forwarding,
@@ -163,6 +220,22 @@ export function markForwardingProbeResult(
       ...(input.messageId ? { lastProbeMessageId: input.messageId } : {}),
     },
   }
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.mail_delegated_source_forwarding_probe",
+    message: "delegated mail source forwarding probe checked",
+    meta: {
+      agentId: nextState.agentId,
+      source: nextState.source,
+      status: nextState.forwarding.status,
+      observedRecipientPresent: true,
+      observedRecipientMatches: true,
+      expectedRecipientDomain: expectedRecipient.split("@")[1],
+      observedRecipientDomain: observedRecipient.split("@")[1],
+      messageIdPresent: Boolean(input.messageId),
+    },
+  })
+  return nextState
 }
 
 export function renderDelegatedMailSourceNextStep(state: DelegatedMailSourceState): string {

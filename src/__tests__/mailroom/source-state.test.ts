@@ -69,6 +69,42 @@ describe("delegated mail source setup state", () => {
     expect(completed.forwarding.status).toBe("blocked_by_human")
   })
 
+  it("uses safe defaults and records forwarding probes that have no message id", () => {
+    const state = createDelegatedMailSourceState({
+      agentId: " Slugger ",
+      ownerEmail: "ARI@MENDELOW.ME",
+      source: "   ",
+      aliasAddress: ALIAS,
+    })
+
+    expect(state.agentId).toBe("slugger")
+    expect(state.ownerEmail).toBe("ari@mendelow.me")
+    expect(state.source).toBe("hey")
+
+    const ready = markForwardingProbeResult(state, {
+      observedRecipient: ALIAS,
+      checkedAt: "2026-04-22T21:08:00.000Z",
+    })
+    expect(ready.forwarding).toEqual(expect.objectContaining({
+      status: "ready",
+      observedRecipient: ALIAS,
+      expectedRecipient: ALIAS,
+      verifiedAt: "2026-04-22T21:08:00.000Z",
+    }))
+    expect(ready.forwarding).not.toHaveProperty("lastProbeMessageId")
+
+    const wrongAlias = markForwardingProbeResult(state, {
+      observedRecipient: "slugger@ouro.bot",
+      checkedAt: "2026-04-22T21:09:00.000Z",
+    })
+    expect(wrongAlias.forwarding).toEqual(expect.objectContaining({
+      status: "failed_recoverable",
+      observedRecipient: "slugger@ouro.bot",
+      expectedRecipient: ALIAS,
+    }))
+    expect(wrongAlias.forwarding).not.toHaveProperty("lastProbeMessageId")
+  })
+
   it("distinguishes verified, pending, and wrong-alias forwarding probes", () => {
     const state = createDelegatedMailSourceState({
       agentId: "slugger",
@@ -87,6 +123,7 @@ describe("delegated mail source setup state", () => {
       verifiedAt: "2026-04-22T21:05:00.000Z",
       lastProbeMessageId: "mail_forwarding_probe",
     }))
+    expect(renderDelegatedMailSourceNextStep(ready)).toBe(`${ready.source} forwarding is verified for ${ALIAS}.`)
 
     const pending = markForwardingProbeResult(state, {
       observedRecipient: null,
