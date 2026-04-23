@@ -2,7 +2,16 @@ import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { emitNervesEvent } from "../nerves/runtime"
-import { normalizeMailAddress, type MailDecisionActor, type MailOutboundRecord } from "./core"
+import {
+  buildConfirmedMailSendDecision,
+  evaluateNativeMailSendPolicy,
+} from "./autonomy"
+import {
+  normalizeMailAddress,
+  type MailAutonomyPolicy,
+  type MailDecisionActor,
+  type MailOutboundRecord,
+} from "./core"
 import type { MailroomStore } from "./file-store"
 
 export type MailOutboundTransport =
@@ -32,6 +41,7 @@ export interface ConfirmMailDraftSendInput {
   actor: MailDecisionActor
   reason: string
   autonomous?: boolean
+  autonomyPolicy?: MailAutonomyPolicy
   now?: () => Date
 }
 
@@ -131,6 +141,8 @@ function appendLocalSink(transport: Extract<MailOutboundTransport, { kind: "loca
     bcc: record.bcc,
     subject: record.subject,
     text: record.text,
+    sendMode: record.sendMode ?? null,
+    policyId: record.policyDecision?.policyId ?? null,
     sentAt,
   })}\n`, "utf-8")
   return transportMessageId
@@ -142,25 +154,54 @@ function transportSend(transport: MailOutboundTransport, record: MailOutboundRec
 }
 
 export async function confirmMailDraftSend(input: ConfirmMailDraftSendInput): Promise<MailOutboundRecord> {
-  if (input.autonomous) {
-    throw new Error("Autonomous mail sending is disabled; create a draft and require explicit confirmation instead")
-  }
-  if (input.confirmation !== "CONFIRM_SEND") {
-    throw new Error("mail_send requires confirmation=CONFIRM_SEND before any outbound mail leaves the agent")
-  }
   const draft = await input.store.getMailOutbound(input.draftId)
   if (!draft || draft.agentId !== input.agentId) throw new Error(`No draft found for ${input.draftId}`)
   if (draft.status !== "draft") throw new Error(`Draft ${input.draftId} is already ${draft.status}`)
 
   const sentAt = (input.now ?? (() => new Date()))().toISOString()
-  const transportMessageId = transportSend(input.transport, draft, sentAt)
-  const sent: MailOutboundRecord = {
+  const recentOutbound = await input.store.listMailOutbound(input.agentId)
+  const policyDecision = input.autonomous
+    ? (() => {
+        if (!input.autonomyPolicy) {
+          throw new Error("Autonomous mail sending requires an enabled native-agent policy")
+        }
+        const decision = evaluateNativeMailSendPolicy({
+          policy: input.autonomyPolicy,
+          draft,
+          recentOutbound,
+          now: new Date(sentAt),
+        })
+        if (!decision.allowed) {
+          if (decision.mode === "confirmation-required") {
+            throw new Error(`Autonomous mail send ${decision.code} requires confirmation=CONFIRM_SEND: ${decision.reason}`)
+          }
+          throw new Error(`${decision.code}: ${decision.reason}`)
+        }
+        return decision
+      })()
+    : (() => {
+        if (input.confirmation !== "CONFIRM_SEND") {
+          throw new Error("mail_send requires confirmation=CONFIRM_SEND before any outbound mail leaves the agent")
+        }
+        return buildConfirmedMailSendDecision({
+          draft,
+          policy: input.autonomyPolicy,
+          now: new Date(sentAt),
+        })
+      })()
+  const pendingSent: MailOutboundRecord = {
     ...draft,
     status: "sent",
     actor: input.actor,
     reason: input.reason,
     updatedAt: sentAt,
+    sendMode: input.autonomous ? "autonomous" : "confirmed",
+    policyDecision,
     sentAt,
+  }
+  const transportMessageId = transportSend(input.transport, pendingSent, sentAt)
+  const sent: MailOutboundRecord = {
+    ...pendingSent,
     transport: input.transport.kind,
     transportMessageId,
   }

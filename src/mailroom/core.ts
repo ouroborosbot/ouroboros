@@ -27,7 +27,22 @@ export type MailScreenerCandidateStatus = "pending" | "allowed" | "discarded" | 
 export type MailOutboundStatus = "draft" | "sent" | "failed"
 export type MailboxRole = "agent-native-mailbox" | "delegated-human-mailbox"
 export type MailSendAuthority = "agent-native"
+export type MailSendMode = "confirmed" | "autonomous"
 export type MailIngestKind = "smtp" | "mbox-import"
+export type MailAutonomyDecisionMode = "autonomous" | "confirmation-required" | "blocked" | "confirmed"
+export type MailAutonomyDecisionFallback = "CONFIRM_SEND" | "none"
+export type MailAutonomyDecisionCode =
+  | "allowed"
+  | "explicit-confirmation"
+  | "autonomy-policy-disabled"
+  | "autonomy-kill-switch"
+  | "recipient-not-allowed"
+  | "recipient-limit-exceeded"
+  | "autonomous-rate-limit"
+  | "delegated-send-as-human-not-authorized"
+  | "agent-mismatch"
+  | "native-mailbox-mismatch"
+  | "draft-not-sendable"
 
 export interface MailAuthenticationSummary {
   spf: MailAuthenticationState
@@ -100,6 +115,40 @@ export interface MailScreenerCandidate {
   resolvedByDecisionId?: string
 }
 
+export interface MailAutonomyRateLimit {
+  maxSends: number
+  windowMs: number
+}
+
+export interface MailAutonomyPolicy {
+  schemaVersion: 1
+  policyId: string
+  agentId: string
+  mailboxAddress: string
+  enabled: boolean
+  killSwitch: boolean
+  allowedRecipients: string[]
+  allowedDomains: string[]
+  maxRecipientsPerMessage: number
+  rateLimit: MailAutonomyRateLimit
+  actor?: MailDecisionActor
+  reason?: string
+  updatedAt?: string
+}
+
+export interface MailAutonomyDecision {
+  schemaVersion: 1
+  allowed: boolean
+  mode: MailAutonomyDecisionMode
+  code: MailAutonomyDecisionCode
+  reason: string
+  evaluatedAt: string
+  recipients: string[]
+  fallback: MailAutonomyDecisionFallback
+  policyId?: string
+  remainingSendsInWindow?: number
+}
+
 export interface MailOutboundRecord {
   schemaVersion: 1
   id: string
@@ -119,6 +168,8 @@ export interface MailOutboundRecord {
   reason: string
   createdAt: string
   updatedAt: string
+  sendMode?: MailSendMode
+  policyDecision?: MailAutonomyDecision
   sentAt?: string
   transport?: string
   transportMessageId?: string

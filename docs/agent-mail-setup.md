@@ -20,7 +20,7 @@ Hard rule: the agent must not tell the human to run `ouro account ensure`, `ouro
 
 ## Completion States
 
-- **Implemented in the harness:** `ouro account ensure`, `ouro connect mail`, `ouro mail import-mbox`, Mail sense readiness checks, bounded mail read tools, confirmed outbound drafts, and Outlook read-only mailbox views.
+- **Implemented in the harness:** `ouro account ensure`, `ouro connect mail`, `ouro mail import-mbox`, Mail sense readiness checks, bounded mail read tools, guarded native autonomous send policy evaluation, confirmed outbound drafts/sends, and Outlook read-only mailbox views.
 - **Hosted service source:** production-oriented Mail ingress, Vault control, shared work protocol, and Azure infra live in [`ouroborosbot/ouro-work-substrate`](https://github.com/ouroborosbot/ouro-work-substrate). This harness keeps local runtime, agent setup, sense orchestration, tools, and Outlook.
 - **Agent-runnable:** provisioning Mailroom, storing private keys in the agent vault, enabling `senses.mail.enabled`, importing a human-provided MBOX, verifying the Mail sense, and managing Screener decisions after family authorization.
 - **Human-required:** HEY browser export, HEY forwarding/extension changes, DNS changes at the registrar, provider/browser auth, secret entry, final production MX cutover, and final autonomous-send enablement.
@@ -168,7 +168,7 @@ Before live forwarding:
 
 - Do not publish production MX records.
 - Do not claim `@ouro.bot` live delivery is active.
-- Do not enable autonomous sending.
+- Do not enable autonomous native-agent sending until the human explicitly approves the policy and the live delivery path.
 - Wait for a final explicit human confirmation after a port-25 production ingress path is proven.
 
 Human-only DNS/MX later:
@@ -201,10 +201,35 @@ Forwarding status can be `blocked_by_human`, `pending_propagation`, `ready`, or 
 Outbound is draft-first:
 
 - `mail_compose` writes a draft in the agent mailbox.
-- `mail_send` sends only with family/self trust and `confirmation=CONFIRM_SEND`.
-- `mail_send` refuses `autonomous=true`.
+- `mail_send` sends with family/self trust and `confirmation=CONFIRM_SEND`.
+- `mail_send autonomous=true` is only for native agent mail, never delegated human mail.
+- autonomous native-agent sending is policy-governed through `mailroom.autonomousSendPolicy` in `runtime/config`.
+- The policy should name allowed recipients or domains, a kill switch, and recipient and rate limits.
+- new or risky recipients fall back to `CONFIRM_SEND` instead of silently sending.
+- Delegated human mail still never grants send-as-human authority.
 
-Local proof uses the local-sink transport. Production sending needs a separately confirmed outbound transport and domain-authentication setup. Do not enable autonomous sending without final explicit confirmation.
+Suggested policy shape:
+
+```json
+{
+  "mailroom": {
+    "autonomousSendPolicy": {
+      "schemaVersion": 1,
+      "policyId": "mail_auto_<stable-id>",
+      "agentId": "<agent>",
+      "mailboxAddress": "<agent>@ouro.bot",
+      "enabled": true,
+      "killSwitch": false,
+      "allowedRecipients": ["person@example.com"],
+      "allowedDomains": ["trusted.example"],
+      "maxRecipientsPerMessage": 3,
+      "rateLimit": { "maxSends": 2, "windowMs": 60000 }
+    }
+  }
+}
+```
+
+Local proof still uses the local-sink transport. Production sending needs a separately confirmed outbound transport and domain-authentication setup. Do not enable autonomous native-agent sending without final explicit human confirmation.
 
 ## Ouro Outlook
 
@@ -273,7 +298,7 @@ Human/UI check, guided by the agent:
 - Couple mailbox access to vault access.
 - Keep family/friend/stranger as the single trust model; use mail provenance to explain where a message came from.
 - Do not bulk-export human mail as the normal assistance path; use export only for explicit bootstrap, migration, archive, recovery, or legal/discovery-style review.
-- Do not enable autonomous sending, destructive actions, DNS/MX cutover, or HEY forwarding without explicit human confirmation.
+- Do not enable autonomous native-agent sending, destructive actions, DNS/MX cutover, or HEY forwarding without explicit human confirmation.
 
 ## References
 

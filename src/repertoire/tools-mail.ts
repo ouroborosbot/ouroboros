@@ -477,11 +477,11 @@ export const mailToolDefinitions: ToolDefinition[] = [
           type: "object",
           properties: {
             draft_id: { type: "string", description: "Draft id from mail_compose." },
-            confirmation: { type: "string", description: "Must be exactly CONFIRM_SEND." },
+            confirmation: { type: "string", description: "Required for explicit confirmation sends; must be exactly CONFIRM_SEND." },
             reason: { type: "string", description: "Why this send is authorized. Logged for audit." },
-            autonomous: { type: "string", enum: ["true", "false"], description: "Must not be true; autonomous sends are refused." },
+            autonomous: { type: "string", enum: ["true", "false"], description: "Use true only for native-agent mail when a configured autonomy policy allows the recipients." },
           },
-          required: ["draft_id", "confirmation", "reason"],
+          required: ["draft_id", "reason"],
         },
       },
     },
@@ -501,6 +501,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
           transport: resolveOutboundTransport(resolved.config),
           confirmation: args.confirmation ?? "",
           autonomous: args.autonomous === "true",
+          autonomyPolicy: resolved.config.autonomousSendPolicy,
           actor: actorFromContext(ctx, resolved.agentName),
           reason: args.reason ?? "confirmed outbound send",
         })
@@ -511,6 +512,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
         })
         return [
           `Mail sent: ${sent.id}`,
+          `mode: ${sent.sendMode ?? "confirmed"}`,
           `transport: ${sent.transport}`,
           `sentAt: ${sent.sentAt}`,
           `to: ${sent.to.join(", ")}`,
