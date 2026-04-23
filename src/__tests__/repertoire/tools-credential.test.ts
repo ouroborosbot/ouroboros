@@ -56,6 +56,21 @@ describe("credential_get", () => {
     expect(mockGet).toHaveBeenCalledWith("airbnb.com")
   })
 
+  it("accepts item name/path as the preferred lookup argument", async () => {
+    mockGet.mockResolvedValue({
+      domain: "ops/custom/service",
+      username: "agent@test.com",
+      notes: "stored outside workflow binding",
+      createdAt: "2026-04-05T00:00:00Z",
+    })
+
+    const tool = findTool("credential_get")
+    const result = await tool.handler({ item: "ops/custom/service", domain: "ignored.example" })
+
+    expect(result).toContain("ops/custom/service")
+    expect(mockGet).toHaveBeenCalledWith("ops/custom/service")
+  })
+
   it("returns not-found message for unknown domain", async () => {
     mockGet.mockResolvedValue(null)
 
@@ -117,6 +132,24 @@ describe("credential_store", () => {
       username: "agent@test.com",
       password: "secret123",
       notes: "test",
+    })
+  })
+
+  it("stores under item name/path when provided", async () => {
+    mockStore.mockResolvedValue(undefined)
+
+    const tool = findTool("credential_store")
+    const result = await tool.handler({
+      item: "ops/custom/service",
+      domain: "ignored.example",
+      username: "agent@test.com",
+      password: "secret123",
+    })
+
+    expect(result).toContain("ops/custom/service")
+    expect(mockStore).toHaveBeenCalledWith("ops/custom/service", {
+      username: "agent@test.com",
+      password: "secret123",
     })
   })
 
@@ -415,6 +448,16 @@ describe("credential_delete", () => {
     expect(result).toContain("deleted")
     expect(result).toContain("airbnb.com")
     expect(mockDelete).toHaveBeenCalledWith("airbnb.com")
+  })
+
+  it("deletes by item name/path when provided", async () => {
+    mockDelete.mockResolvedValue(true)
+
+    const tool = findTool("credential_delete")
+    const result = await tool.handler({ item: "ops/custom/service", domain: "ignored.example" })
+
+    expect(result).toContain("ops/custom/service")
+    expect(mockDelete).toHaveBeenCalledWith("ops/custom/service")
   })
 
   it("reports when domain not found", async () => {

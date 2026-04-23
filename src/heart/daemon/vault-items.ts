@@ -28,9 +28,8 @@ export function normalizeVaultItemFieldName(field: string | undefined): string {
   return normalized
 }
 
-export function vaultItemTemplateSecretFields(template: VaultItemTemplate): string[] {
-  if (template === "porkbun-api") return ["apiKey", "secretApiKey"]
-  return []
+export function vaultItemTemplateSecretFields(_template: VaultItemTemplate): string[] {
+  return ["apiKey", "secretApiKey"]
 }
 
 export function normalizePorkbunOpsAccount(account: string | undefined): string {

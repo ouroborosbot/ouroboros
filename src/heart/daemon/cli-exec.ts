@@ -2546,9 +2546,6 @@ function parseVaultItemPublicFields(fields: string[] | undefined): Record<string
   const parsed: Record<string, string> = {}
   for (const field of fields ?? []) {
     const separator = field.indexOf("=")
-    if (separator <= 0 || separator === field.length - 1) {
-      throw new Error("vault item public fields must use key=value")
-    }
     const key = normalizeVaultItemFieldName(field.slice(0, separator))
     parsed[key] = field.slice(separator + 1)
   }
@@ -2568,24 +2565,46 @@ function vaultItemCompatibilityNotice(command: { compatibilityAlias?: string }):
   return ["deprecated compatibility alias: use ouro vault item set --template porkbun-api"]
 }
 
-function porkbunAccountForCompatibility(command: Extract<ResolvedOuroCliCommand, { kind: "vault.item.set" | "vault.item.status" }>): string | undefined {
-  if (command.compatibilityAlias !== PORKBUN_OPS_COMPATIBILITY_ALIAS) return undefined
-  const account = porkbunOpsAccountFromItemName(command.item)
-  return account ? normalizePorkbunOpsAccount(account) : undefined
+function freeformVaultItemReservedMessage(itemName: string): string | undefined {
+  if (itemName.startsWith("providers/")) {
+    return `Vault item "${itemName}" is reserved for harness-managed workflows. Use ouro auth or ouro connect for provider credentials.`
+  }
+  if (itemName === "runtime/config" || /^runtime\/machines\/[^/]+\/config$/.test(itemName)) {
+    return `Vault item "${itemName}" is reserved for harness-managed workflows. Use ouro connect or ouro vault config for runtime and sense configuration.`
+  }
+  return undefined
 }
 
+function assertFreeformVaultItemWritable(itemName: string): void {
+  const reservedMessage = freeformVaultItemReservedMessage(itemName)
+  if (reservedMessage) throw new Error(reservedMessage)
+}
+
+function porkbunAccountForCompatibility(command: Extract<ResolvedOuroCliCommand, { kind: "vault.item.set" | "vault.item.status" }>): string | undefined {
+  if (command.compatibilityAlias !== PORKBUN_OPS_COMPATIBILITY_ALIAS) return undefined
+  return normalizePorkbunOpsAccount(porkbunOpsAccountFromItemName(command.item))
+}
+
+const PORKBUN_OPS_PROMPT_LABELS = {
+  apiKey: (account: string) => `Porkbun API key for ${account}: `,
+  secretApiKey: (account: string) => `Porkbun Secret API key for ${account}: `,
+} as const
+
+const PORKBUN_OPS_VALIDATION_LABELS = {
+  apiKey: "Porkbun API key",
+  secretApiKey: "Porkbun Secret API key",
+} as const
+
 function vaultItemTemplatePromptLabel(command: Extract<ResolvedOuroCliCommand, { kind: "vault.item.set" }>, field: string, account?: string): string {
-  if (command.compatibilityAlias === PORKBUN_OPS_COMPATIBILITY_ALIAS && account) {
-    if (field === "apiKey") return `Porkbun API key for ${account}: `
-    if (field === "secretApiKey") return `Porkbun Secret API key for ${account}: `
+  if (command.compatibilityAlias === PORKBUN_OPS_COMPATIBILITY_ALIAS) {
+    return PORKBUN_OPS_PROMPT_LABELS[field as keyof typeof PORKBUN_OPS_PROMPT_LABELS](account!)
   }
   return `Secret field ${field} for ${command.item}: `
 }
 
 function vaultItemSecretValidationLabel(command: Extract<ResolvedOuroCliCommand, { kind: "vault.item.set" }>, field: string): string {
   if (command.compatibilityAlias === PORKBUN_OPS_COMPATIBILITY_ALIAS) {
-    if (field === "apiKey") return "Porkbun API key"
-    if (field === "secretApiKey") return "Porkbun Secret API key"
+    return PORKBUN_OPS_VALIDATION_LABELS[field as keyof typeof PORKBUN_OPS_VALIDATION_LABELS]
   }
   return `Secret field ${field}`
 }
@@ -2597,12 +2616,10 @@ async function executeVaultItemSet(
   if (command.agent === "SerpentGuide") {
     throw new Error("SerpentGuide has no persistent credential vault. Store vault items in the owning agent vault.")
   }
+  if (!command.compatibilityAlias) assertFreeformVaultItemWritable(command.item)
   const account = porkbunAccountForCompatibility(command)
   const promptSecret = requirePromptSecret(deps, command.compatibilityAlias === PORKBUN_OPS_COMPATIBILITY_ALIAS ? "Porkbun ops credential entry" : "Vault item secret entry")
   const secretFieldNames = uniqueVaultItemSecretFields(command)
-  if (secretFieldNames.length === 0) {
-    throw new Error("ouro vault item set requires at least one secret field or template.")
-  }
   const publicFields = parseVaultItemPublicFields(command.publicFields)
   if (account && !publicFields.account) publicFields.account = account
   const secretFields: Record<string, string> = {}
