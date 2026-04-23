@@ -455,6 +455,27 @@ describe("mail tools", () => {
     await ingestRawMailToStore({
       registry,
       store,
+      envelope: { mailFrom: "quarantine@example.com", rcptTo: ["slugger@ouro.bot"] },
+      rawMime: Buffer.from([
+        "From: Quarantine Sender <quarantine@example.com>",
+        "To: slugger@ouro.bot",
+        "Subject: Quarantine decision",
+        "",
+        "quarantine body",
+      ].join("\r\n")),
+    })
+    const quarantineScreener = await tool("mail_screener").handler({ reason: "quarantine sender" }, trustedContext())
+    const quarantineCandidate = /candidate_mail_[a-f0-9]+/.exec(String(quarantineScreener))?.[0]
+    expect(quarantineCandidate).toBeTruthy()
+    await expect(tool("mail_decide").handler({
+      candidate_id: quarantineCandidate!,
+      action: "quarantine",
+      reason: "family wants this sender quarantined",
+    }, trustedContext())).resolves.toContain("sender policy: quarantine email quarantine@example.com")
+
+    await ingestRawMailToStore({
+      registry,
+      store,
       envelope: { mailFrom: "source@example.com", rcptTo: ["slugger@ouro.bot"] },
       rawMime: Buffer.from([
         "From: Source <source@example.com>",

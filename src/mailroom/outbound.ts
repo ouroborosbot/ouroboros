@@ -141,7 +141,7 @@ function appendLocalSink(transport: Extract<MailOutboundTransport, { kind: "loca
     bcc: record.bcc,
     subject: record.subject,
     text: record.text,
-    sendMode: record.sendMode ?? null,
+    sendMode: record.sendMode,
     policyId: record.policyDecision?.policyId ?? null,
     sentAt,
   })}\n`, "utf-8")

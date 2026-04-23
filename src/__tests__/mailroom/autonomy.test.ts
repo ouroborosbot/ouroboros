@@ -2,7 +2,12 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { buildNativeMailAutonomyPolicy, type BuildNativeMailAutonomyPolicyInput } from "../../mailroom/autonomy"
+import {
+  buildConfirmedMailSendDecision,
+  buildNativeMailAutonomyPolicy,
+  evaluateNativeMailSendPolicy,
+  type BuildNativeMailAutonomyPolicyInput,
+} from "../../mailroom/autonomy"
 import { FileMailroomStore } from "../../mailroom/file-store"
 import { confirmMailDraftSend, createMailDraft } from "../../mailroom/outbound"
 
@@ -47,6 +52,26 @@ afterEach(() => {
 
 describe("native mail autonomy", () => {
   it("sends autonomously only when the native-agent policy allows and writes audit state", async () => {
+    const minimalPolicy = buildNativeMailAutonomyPolicy({
+      agentId: "!!!",
+      mailboxAddress: "Agent@OURO.bot",
+      enabled: true,
+      killSwitch: false,
+      maxRecipientsPerMessage: 0,
+      rateLimit: { maxSends: -1, windowMs: 0 },
+    })
+    expect(minimalPolicy).toEqual(expect.objectContaining({
+      agentId: "agent",
+      mailboxAddress: "agent@ouro.bot",
+      allowedRecipients: [],
+      allowedDomains: [],
+      maxRecipientsPerMessage: 1,
+      rateLimit: { maxSends: 0, windowMs: 1 },
+    }))
+    expect(minimalPolicy).not.toHaveProperty("actor")
+    expect(minimalPolicy).not.toHaveProperty("reason")
+    expect(minimalPolicy).not.toHaveProperty("updatedAt")
+
     const root = tempDir()
     const store = new FileMailroomStore({ rootDir: path.join(root, "mailroom") })
     const sinkPath = path.join(root, "outbound-sink.jsonl")
@@ -284,5 +309,107 @@ describe("native mail autonomy", () => {
     })).rejects.toThrow("delegated-send-as-human-not-authorized")
 
     expect(sinkEntries(sinkPath)).toHaveLength(1)
+  })
+
+  it("blocks non-draft, wrong-agent, wrong-mailbox, and disabled-policy sends and records confirmed decisions", () => {
+    const currentPolicy = nativePolicy()
+    const baseDraft = {
+      schemaVersion: 1 as const,
+      id: "draft_1",
+      agentId: "slugger",
+      status: "draft" as const,
+      mailboxRole: "agent-native-mailbox" as const,
+      sendAuthority: "agent-native" as const,
+      ownerEmail: null,
+      source: null,
+      from: "slugger@ouro.bot",
+      to: ["ari@mendelow.me"],
+      cc: [],
+      bcc: [],
+      subject: "Check in",
+      text: "Hello.",
+      actor: { kind: "agent" as const, agentId: "slugger" },
+      reason: "test",
+      createdAt: "2026-04-23T00:01:00.000Z",
+      updatedAt: "2026-04-23T00:01:00.000Z",
+    }
+
+    expect(evaluateNativeMailSendPolicy({
+      policy: currentPolicy,
+      draft: { ...baseDraft, status: "sent", sentAt: "2026-04-23T00:02:00.000Z" },
+      recentOutbound: [],
+      now: new Date("2026-04-23T00:03:00.000Z"),
+    })).toEqual(expect.objectContaining({ allowed: false, code: "draft-not-sendable" }))
+
+    expect(evaluateNativeMailSendPolicy({
+      policy: currentPolicy,
+      draft: { ...baseDraft, agentId: "clio" },
+      recentOutbound: [],
+      now: new Date("2026-04-23T00:03:00.000Z"),
+    })).toEqual(expect.objectContaining({ allowed: false, code: "agent-mismatch" }))
+
+    expect(evaluateNativeMailSendPolicy({
+      policy: currentPolicy,
+      draft: { ...baseDraft, from: "other@ouro.bot" },
+      recentOutbound: [],
+      now: new Date("2026-04-23T00:03:00.000Z"),
+    })).toEqual(expect.objectContaining({ allowed: false, code: "native-mailbox-mismatch" }))
+
+    expect(evaluateNativeMailSendPolicy({
+      policy: nativePolicy({ enabled: false }),
+      draft: baseDraft,
+      recentOutbound: [],
+      now: new Date("2026-04-23T00:03:00.000Z"),
+    })).toEqual(expect.objectContaining({
+      allowed: false,
+      mode: "confirmation-required",
+      code: "autonomy-policy-disabled",
+    }))
+
+    expect(buildConfirmedMailSendDecision({
+      draft: baseDraft,
+      policy: currentPolicy,
+      now: new Date("2026-04-23T00:03:30.000Z"),
+    })).toEqual(expect.objectContaining({
+      allowed: true,
+      mode: "confirmed",
+      code: "explicit-confirmation",
+      policyId: currentPolicy.policyId,
+    }))
+
+    expect(evaluateNativeMailSendPolicy({
+      policy: currentPolicy,
+      draft: baseDraft,
+      recentOutbound: [
+        { ...baseDraft, id: "draft_not_sent" },
+        { ...baseDraft, id: "draft_confirmed", status: "sent", sendMode: "confirmed", updatedAt: "2026-04-23T00:01:10.000Z" },
+        { ...baseDraft, id: "draft_bad_date", status: "sent", sendMode: "autonomous", updatedAt: "not-a-date" },
+        { ...baseDraft, id: "draft_autonomous_no_sent_at", status: "sent", sendMode: "autonomous", updatedAt: "2026-04-23T00:01:30.000Z" },
+      ],
+      now: new Date("2026-04-23T00:02:00.000Z"),
+    })).toEqual(expect.objectContaining({
+      allowed: true,
+      remainingSendsInWindow: 0,
+    }))
+
+    expect(evaluateNativeMailSendPolicy({
+      policy: currentPolicy,
+      draft: baseDraft,
+      recentOutbound: [],
+    })).toEqual(expect.objectContaining({
+      allowed: true,
+      evaluatedAt: expect.any(String),
+    }))
+
+    const confirmedWithoutPolicy = buildConfirmedMailSendDecision({
+      draft: baseDraft,
+    })
+    expect(confirmedWithoutPolicy).toEqual(expect.objectContaining({
+      allowed: true,
+      mode: "confirmed",
+      code: "explicit-confirmation",
+      evaluatedAt: expect.any(String),
+    }))
+    expect(confirmedWithoutPolicy).not.toHaveProperty("policyId")
   })
 })

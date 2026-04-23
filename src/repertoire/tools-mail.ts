@@ -512,7 +512,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
         })
         return [
           `Mail sent: ${sent.id}`,
-          `mode: ${sent.sendMode ?? "confirmed"}`,
+          `mode: ${sent.sendMode}`,
           `transport: ${sent.transport}`,
           `sentAt: ${sent.sentAt}`,
           `to: ${sent.to.join(", ")}`,
