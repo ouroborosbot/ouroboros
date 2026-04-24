@@ -278,6 +278,7 @@ describe("mail sense runtime", () => {
     expect(result.queued).toBe(true)
     expect(result.candidatePaths).toEqual([mboxPath])
     expect(pendingBodies(agentRoot)[0]).toContain(mboxPath)
+    expect(pendingBodies(agentRoot)[0]).toContain("browser sandbox (.playwright-mcp)")
     expect(readJson<{ lastNotifiedFingerprint: string; updatedAt: string }>(statePath)).toEqual(expect.objectContaining({
       lastNotifiedFingerprint: expect.stringContaining(mboxPath),
       updatedAt: expect.any(String),
