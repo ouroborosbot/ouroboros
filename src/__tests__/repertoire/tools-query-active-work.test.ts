@@ -532,6 +532,7 @@ describe("query_active_work tool", () => {
     expect(result).toContain("[running] mail import")
     expect(result).toContain("importing Ari's HEY archive")
     expect(result).toContain("scanned 500 of 16616 messages")
-    expect(result).not.toContain("imported Ari's HEY archive")
+    expect(result).toContain("[succeeded] mail import")
+    expect(result).toContain("imported Ari's HEY archive")
   })
 })

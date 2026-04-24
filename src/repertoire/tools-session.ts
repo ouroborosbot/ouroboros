@@ -267,9 +267,7 @@ async function buildToolActiveWorkFrame(ctx?: ToolContext): Promise<ActiveWorkFr
     agentName: getAgentName(),
     agentRoot,
     limit: 5,
-  }).filter((operation) =>
-    operation.status === "queued" || operation.status === "running" || operation.status === "failed",
-  )
+  })
 
   return buildActiveWorkFrame({
     currentSession,
