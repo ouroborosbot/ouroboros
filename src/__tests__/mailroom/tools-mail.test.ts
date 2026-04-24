@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { provisionMailboxRegistry } from "../../mailroom/core"
 import { buildNativeMailAutonomyPolicy } from "../../mailroom/autonomy"
 import { FileMailroomStore, ingestRawMailToStore } from "../../mailroom/file-store"
+import type { BackgroundOperationRecord } from "../../heart/background-operations"
 import type { DiscoveredMboxCandidate } from "../../heart/mail-import-discovery"
 import { cacheRuntimeCredentialConfig, resetRuntimeCredentialConfigCache } from "../../heart/runtime-credentials"
 import { resetIdentity, setAgentName } from "../../heart/identity"
@@ -508,6 +509,45 @@ describe("mail tools", () => {
       "not-an-email",
       "hey",
     )).toBe("")
+  })
+
+  it("omits fresh-through text for older imported snapshots without sourceFreshThrough metadata", () => {
+    const olderSnapshot = {
+      path: "/tmp/HEY-emails-ari-mendelow-me-older.mbox",
+      name: "HEY-emails-ari-mendelow-me-older.mbox",
+      mtimeMs: Date.parse("2026-04-24T17:40:00.000Z"),
+      originKind: "downloads",
+      originLabel: "Downloads",
+    } satisfies DiscoveredMboxCandidate
+    const importRecord = {
+      schemaVersion: 1,
+      id: "op_mail_import_older_snapshot_no_fresh_through",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated archive",
+      createdAt: "2026-04-24T17:41:00.000Z",
+      updatedAt: "2026-04-24T17:42:00.000Z",
+      finishedAt: "2026-04-24T17:42:00.000Z",
+      spec: {
+        filePath: olderSnapshot.path,
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T17:40:00.000Z",
+      },
+      result: {
+        scanned: 90,
+        imported: 90,
+        duplicates: 0,
+      },
+    } satisfies BackgroundOperationRecord
+
+    expect(__mailStatusTestOnly.archiveFreshnessNote(
+      olderSnapshot,
+      importRecord,
+      Date.parse("2026-04-24T18:05:00.000Z"),
+    )).toBe("freshness: current older snapshot (older imported snapshot for this delegated lane; newest known archive is listed separately)")
   })
 
   it("lists, searches, opens, and audits bounded mail reads", async () => {

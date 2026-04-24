@@ -219,6 +219,116 @@ describe("hosted mail tools", () => {
     expect(readMailroomRegistry).toHaveBeenCalled()
   })
 
+  it("distinguishes the newest current archive from older imported snapshots for the same delegated lane", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const agentRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const downloadsDir = path.join(homeRoot, "Downloads")
+    const sandboxDir = path.join(homeRoot, ".playwright-mcp")
+    const olderPath = path.join(downloadsDir, "HEY-emails-arimendelow@hey.com.mbox")
+    const newestPath = path.join(sandboxDir, "HEY-emails-ari-mendelow-me.mbox")
+    fs.mkdirSync(downloadsDir, { recursive: true })
+    fs.mkdirSync(sandboxDir, { recursive: true })
+    fs.mkdirSync(path.join(agentRoot, "state", "background-operations"), { recursive: true })
+    fs.writeFileSync(olderPath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    fs.writeFileSync(newestPath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    const olderAt = new Date("2026-04-24T17:40:00.000Z")
+    const newestAt = new Date("2026-04-24T18:05:00.000Z")
+    fs.utimesSync(olderPath, olderAt, olderAt)
+    fs.utimesSync(newestPath, newestAt, newestAt)
+    fs.writeFileSync(path.join(agentRoot, "state", "background-operations", "op_mail_import_older_snapshot.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_older_snapshot",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 90; imported 90; duplicates 0",
+      createdAt: "2026-04-24T17:41:00.000Z",
+      updatedAt: "2026-04-24T17:42:00.000Z",
+      finishedAt: "2026-04-24T17:42:00.000Z",
+      spec: {
+        filePath: olderPath,
+        fileOriginLabel: "Downloads",
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T17:40:00.000Z",
+      },
+      result: {
+        scanned: 90,
+        imported: 90,
+        duplicates: 0,
+        sourceFreshThrough: "2026-04-24T17:39:00.000Z",
+      },
+    }, null, 2)}\n`, "utf-8")
+    fs.writeFileSync(path.join(agentRoot, "state", "background-operations", "op_mail_import_newest_snapshot.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_newest_snapshot",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 120; imported 120; duplicates 0",
+      createdAt: "2026-04-24T18:06:00.000Z",
+      updatedAt: "2026-04-24T18:07:00.000Z",
+      finishedAt: "2026-04-24T18:07:00.000Z",
+      spec: {
+        filePath: newestPath,
+        fileOriginLabel: "browser sandbox (.playwright-mcp)",
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T18:05:00.000Z",
+      },
+      result: {
+        scanned: 120,
+        imported: 120,
+        duplicates: 0,
+        sourceFreshThrough: "2026-04-24T18:04:00.000Z",
+      },
+    }, null, 2)}\n`, "utf-8")
+
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    const store = new FileMailroomStore({ rootDir: tempDir() })
+
+    vi.doMock("../../mailroom/reader", () => ({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          azureAccountUrl: "https://mail.blob.core.windows.net",
+          azureContainer: "mailroom",
+          registryAzureAccountUrl: "https://registry.blob.core.windows.net",
+          registryContainer: "mailroom",
+          registryBlob: "registry/mailroom.json",
+          privateKeys: keys,
+        },
+        store,
+        storeKind: "file",
+        storeLabel: "/tmp/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const statusTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_status")
+    expect(statusTool).toBeTruthy()
+
+    const status = await statusTool!.handler({}, trustedContext())
+    expect(status).toContain(newestPath)
+    expect(status).toContain("freshness: current (newest known archive for this delegated lane; re-import unnecessary)")
+    expect(status).toContain(olderPath)
+    expect(status).toContain("freshness: current older snapshot (older imported snapshot for this delegated lane; newest known archive is listed separately)")
+  })
+
   it("renders imported archive status from summary-only operations and ignores records without archive paths", async () => {
     const homeRoot = tempDir()
     process.env.HOME = homeRoot

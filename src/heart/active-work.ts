@@ -400,6 +400,21 @@ function formatBackgroundOperationNextAction(operation: BackgroundOperationRecor
   if (operation.kind === "mail.import-mbox") {
     switch (operation.status) {
       case "failed":
+        switch (operation.failure?.class?.trim()) {
+          case "transient-storage-read":
+            return "retry-safe once the transient storage/network issue clears"
+          case "mailroom-auth":
+          case "mailroom-config":
+            return "repair mail auth/config access, then retry"
+          case "source-grant-missing":
+          case "source-grant-ambiguous":
+            return "repair the delegated owner/source lane, then retry"
+          case "archive-discovery":
+          case "archive-ambiguity":
+          case "archive-missing":
+          case "archive-access":
+            return "materialize or point at the correct local archive, then retry"
+        }
         if (operation.failure?.retryDisposition === "retry-safe") {
           return "retry the failed mail import once the transient issue clears or the dependency answers again"
         }
@@ -408,11 +423,11 @@ function formatBackgroundOperationNextAction(operation: BackgroundOperationRecor
         }
         return "inspect the failed mail import, fix the issue, and retry it"
       case "queued":
-        return "let the queued mail import start; failure or completion will wake me, so i only re-check if i need status or it looks stalled"
+        return "queued — no action unless it stalls or i need live status"
       case "running":
-        return "let the background mail import run; failure or completion will wake me, so i only check again if i need status or it looks stalled"
+        return "in flight — no action unless it stalls or i need live status"
       case "succeeded":
-        return "review the completed mail import and continue from the updated mailbox state; i only rerun if a newer archive appears"
+        return "caught up — no rerun needed unless a newer archive appears"
     }
   }
   switch (operation.status) {
@@ -420,6 +435,28 @@ function formatBackgroundOperationNextAction(operation: BackgroundOperationRecor
     case "queued": return `let the queued ${operation.title} operation start, then re-check progress`
     case "running": return `monitor the ${operation.title} operation and react when it changes`
     case "succeeded": return `review the completed ${operation.title} operation and continue`
+  }
+}
+
+function formatMailImportRecoveryUniverse(operation: BackgroundOperationRecord): string | null {
+  const failureClass = operation.failure?.class?.trim()
+  if (!failureClass) return null
+  switch (failureClass) {
+    case "transient-storage-read":
+      return "transient dependency/read issue — safe to retry once storage/network answers again"
+    case "mailroom-auth":
+    case "mailroom-config":
+      return "mail auth/config issue — repair mail access or runtime config before retrying"
+    case "source-grant-missing":
+    case "source-grant-ambiguous":
+      return "delegated lane/registry issue — inspect owner/source linking before retrying"
+    case "archive-discovery":
+    case "archive-ambiguity":
+    case "archive-missing":
+    case "archive-access":
+      return "local archive/file issue — materialize or point at the right archive before retrying"
+    default:
+      return "unclassified import issue — inspect the recorded error before retrying"
   }
 }
 
@@ -439,6 +476,8 @@ function formatBackgroundOperationMeta(operation: BackgroundOperationRecord): st
   if (operation.failure?.class?.trim()) lines.push(`failure class: ${operation.failure.class}`)
   if (operation.failure?.retryDisposition?.trim()) lines.push(`retry: ${operation.failure.retryDisposition}`)
   if (operation.failure?.hint?.trim()) lines.push(`recovery: ${operation.failure.hint}`)
+  const recoveryUniverse = operation.kind === "mail.import-mbox" ? formatMailImportRecoveryUniverse(operation) : null
+  if (recoveryUniverse) lines.push(`recovery universe: ${recoveryUniverse}`)
   if (operation.startedAt?.trim()) lines.push(`started: ${operation.startedAt}`)
   if (operation.finishedAt?.trim()) lines.push(`finished: ${operation.finishedAt}`)
   else if (operation.updatedAt?.trim()) lines.push(`updated: ${operation.updatedAt}`)

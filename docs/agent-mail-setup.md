@@ -156,9 +156,11 @@ Once a specific archive has already been imported successfully, the same file sh
 
 When an import is queued, running, failed, or finished, `query_active_work` should expose the exact operation id, the archive path, the candidate origin label, the relevant timestamps, and any remediation hints. Failed imports should also name a `failure class`, a `retry` disposition, and a short `recovery` hint so Slugger does not have to infer whether the next move is retry-safe or a real repair.
 
-`mail_status` is the first compact truth surface for this operating model. It should answer, in one place: what Slugger's native mailbox is, which delegated aliases exist, which browser/download archives are sitting around, whether a discovered archive was already imported or is newer than the last import, whether that means `freshness: current` or `freshness: stale-risky`, and what the most recent import operations actually did.
+`mail_status` is the first compact truth surface for this operating model. It should answer, in one place: what Slugger's native mailbox is, which delegated aliases exist, which browser/download archives are sitting around, whether a discovered archive was already imported or is newer than the last import, whether that means `freshness: current`, `freshness: current older snapshot`, or `freshness: stale-risky`, and what the most recent import operations actually did.
 
 When `mail_status` shows a delegated archive whose local filename suggests one account label but the recorded delegated binding says another, trust the delegated binding. The delegated owner/source comes from the explicit import lane, not from the local filename. `mail_status` should explain that mapping inline instead of making the agent infer whether the file is cross-wired.
+
+When more than one imported archive exists for the same delegated lane, only the newest known archive for that lane should read as `freshness: current`. Older already-imported snapshots for that same lane should stay visible, but as `freshness: current older snapshot`, so the operator does not have to mentally diff two equally "current" lines.
 
 Fallback agent command after the human provides the file path:
 
@@ -353,6 +355,8 @@ For the full recovery map, use the repo path `docs/agent-mail-recovery.md` ([Age
 - `AUTH_REQUIRED:mailroom`: unlock or repair the agent vault if prompted, then the agent should run `ouro account ensure --agent <agent> --owner-email <email> --source hey` or `ouro connect mail --agent <agent> --owner-email <email> --source hey`.
 - Hosted key drift: if setup says hosted Mail Control references private key ids that are absent from `runtime/config`, rerun with `--rotate-missing-mail-keys` and record that rotation cannot recover mail already encrypted to a lost private key.
 - Missing `registryPath` or `storePath`: the agent should rerun `ouro connect mail --agent <agent> --owner-email <email> --source hey` after vault unlock.
+- Malformed local audit log: `mail_access_log` must keep readable audit rows and surface `warning: skipped N malformed file-backed mail access log line(s)` instead of throwing parser noise.
+- Missing-key mail: `mail_recent` and `mail_search` must keep decryptable mail visible and say `N mail message(s) could not be decrypted`. `No matching mail.` plus that warning means "no readable match," not "mail never existed."
 - No Mail sense: confirm `senses.mail.enabled = true` in `agent.json`, then `ouro up`.
 - Screener body leakage: stop and fix; Screener lists must show sender/context, not message bodies.
 - Expected mail missing: check Mailbox Discarded/Quarantine, then `mail_screener`, then source-forwarding/DNS status.

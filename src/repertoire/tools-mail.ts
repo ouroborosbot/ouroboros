@@ -492,9 +492,17 @@ function matchingMailImportOperation(
   return operations[0] ?? null
 }
 
+function archiveLaneKey(ownerEmail: string, source: string): string | null {
+  const owner = ownerEmail.trim().toLowerCase()
+  const provider = source.trim().toLowerCase()
+  if (!owner && !provider) return null
+  return `${owner || "unknown"}::${provider || "unknown"}`
+}
+
 function archiveFreshnessNote(
   candidate: DiscoveredMboxCandidate,
   operation: BackgroundOperationRecord | null,
+  newestCurrentLaneArchiveMtimeMs: number | null = null,
 ): string {
   if (!operation) {
     return "freshness: unimported (no prior import recorded; import needed)"
@@ -503,6 +511,12 @@ function archiveFreshnessNote(
   if (operation.status === "succeeded") {
     const operationTimestamp = latestComparableOperationTimestamp(operation)
     if (operationTimestamp !== null && candidate.mtimeMs <= operationTimestamp + 1_000) {
+      if (newestCurrentLaneArchiveMtimeMs !== null && candidate.mtimeMs + 1_000 < newestCurrentLaneArchiveMtimeMs) {
+        return [
+          "freshness: current older snapshot (older imported snapshot for this delegated lane; newest known archive is listed separately)",
+          ...(sourceFreshThrough ? [`fresh through: ${sourceFreshThrough}`] : []),
+        ].join("; ")
+      }
       return [
         "freshness: current (newest known archive for this delegated lane; re-import unnecessary)",
         ...(sourceFreshThrough ? [`fresh through: ${sourceFreshThrough}`] : []),
@@ -551,22 +565,43 @@ function archiveIdentityNote(
 
 export const __mailStatusTestOnly = {
   archiveFilenameBoundEmail,
+  archiveFreshnessNote,
   archiveIdentityNote,
 }
 
+function newestCurrentLaneArchiveMtimes(
+  candidates: DiscoveredMboxCandidate[],
+  operationsByPath: Map<string, BackgroundOperationRecord>,
+): Map<string, number> {
+  const newestByLane = new Map<string, number>()
+  for (const candidate of candidates) {
+    const operation = operationsByPath.get(candidate.path)
+    if (!operation || operation.status !== "succeeded") continue
+    const ownerEmail = typeof operation.spec?.ownerEmail === "string" ? operation.spec.ownerEmail : ""
+    const source = typeof operation.spec?.source === "string" ? operation.spec.source : ""
+    const laneKey = archiveLaneKey(ownerEmail, source)
+    if (!laneKey) continue
+    const operationTimestamp = latestComparableOperationTimestamp(operation)
+    if (operationTimestamp === null || candidate.mtimeMs > operationTimestamp + 1_000) continue
+    const previous = newestByLane.get(laneKey) ?? 0
+    if (candidate.mtimeMs > previous) newestByLane.set(laneKey, candidate.mtimeMs)
+  }
+  return newestByLane
+}
+
 function renderArchiveStatus(
-  agentId: string,
   candidate: DiscoveredMboxCandidate,
+  operation: BackgroundOperationRecord | null,
+  newestCurrentLaneArchiveMtimeMs: number | null,
 ): string {
-  const operation = matchingMailImportOperation(agentId, candidate)
   if (!operation) {
-    return `- [${candidate.originLabel}] ${candidate.path} :: status: ready; ${archiveFreshnessNote(candidate, null)}`
+    return `- [${candidate.originLabel}] ${candidate.path} :: status: ready; ${archiveFreshnessNote(candidate, null, newestCurrentLaneArchiveMtimeMs)}`
   }
   const operationTimestamp = latestComparableOperationTimestamp(operation)
   const ownerEmail = typeof operation.spec?.ownerEmail === "string" ? operation.spec.ownerEmail : ""
   const source = typeof operation.spec?.source === "string" ? operation.spec.source : ""
   const provenance = ownerEmail || source ? `; owner/source: ${ownerEmail || "unknown"} / ${source || "unknown"}` : ""
-  const freshness = `; ${archiveFreshnessNote(candidate, operation)}`
+  const freshness = `; ${archiveFreshnessNote(candidate, operation, newestCurrentLaneArchiveMtimeMs)}`
   const identity = archiveIdentityNote(candidate, ownerEmail, source)
   const identityNote = identity ? `; ${identity}` : ""
   if (operation.status === "succeeded" && operationTimestamp !== null && candidate.mtimeMs <= operationTimestamp + 1_000) {
@@ -591,7 +626,19 @@ function renderRecentArchiveStatus(agentId: string): string[] {
     .sort((left, right) => right.mtimeMs - left.mtimeMs)
     .slice(0, 5)
   if (candidates.length === 0) return ["- none discovered in browser sandboxes or Downloads"]
-  return candidates.map((candidate) => renderArchiveStatus(agentId, candidate))
+  const operationsByPath = new Map<string, BackgroundOperationRecord>()
+  for (const candidate of candidates) {
+    const operation = matchingMailImportOperation(agentId, candidate)
+    if (operation) operationsByPath.set(candidate.path, operation)
+  }
+  const newestByLane = newestCurrentLaneArchiveMtimes(candidates, operationsByPath)
+  return candidates.map((candidate) => {
+    const operation = operationsByPath.get(candidate.path) ?? null
+    const ownerEmail = typeof operation?.spec?.ownerEmail === "string" ? operation.spec.ownerEmail : ""
+    const source = typeof operation?.spec?.source === "string" ? operation.spec.source : ""
+    const laneKey = archiveLaneKey(ownerEmail, source)
+    return renderArchiveStatus(candidate, operation, laneKey ? (newestByLane.get(laneKey) ?? null) : null)
+  })
 }
 
 function renderRecentImportOperations(agentId: string): string[] {

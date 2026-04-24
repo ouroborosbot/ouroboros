@@ -68,6 +68,7 @@ Run the fourth post-full-moon convergence pass on agent mail by making `query_ac
   `query_active_work` already includes failure class, retry, recovery, remediation, and next-action lines, but the wording still leans toward “what happened” more than “what universe am I in.”
   `mail_status` now makes freshness explicit, but multiple imported archives for the same delegated lane can each render as `current`, which causes a minor double-take under speed.
   The codebase already has tests for malformed file-backed `mail_access_log` tails and missing-key mail behavior, but the docs do not yet foreground those degraded-path contracts.
+  Recovered BlueBubbles feedback from Slugger on April 24 adds a broader product cluster around mailbox posture, provenance labels, Screener clutter, and first-run health narration. This pass keeps those concerns written down, but stays focused on the operator-trust splinters that are still present in the current mail tools.
 - Surviving shape:
   Keep the surfaces compact. Add a recovery-universe layer to `query_active_work`, a current-vs-older-snapshot distinction to `mail_status`, and explicit degradation-contract language in docs/tests.
 - Scrutiny notes:
@@ -81,3 +82,5 @@ Run the fourth post-full-moon convergence pass on agent mail by making `query_ac
 ## Progress Log
 
 - 2026-04-24 13:47 Planning doc created for the fourth convergence pass.
+- 2026-04-24 14:10 Recovered the fuller BlueBubbles feedback batch and kept pass 4 scoped to operator-trust wording plus degraded-path contracts instead of jumping prematurely to a larger mailbox UX rewrite.
+- 2026-04-24 14:13 Runtime reloaded cleanly enough for live review, and Slugger signed off with no further feedback on this pass.
