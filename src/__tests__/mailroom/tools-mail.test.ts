@@ -5,9 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { provisionMailboxRegistry } from "../../mailroom/core"
 import { buildNativeMailAutonomyPolicy } from "../../mailroom/autonomy"
 import { FileMailroomStore, ingestRawMailToStore } from "../../mailroom/file-store"
+import type { DiscoveredMboxCandidate } from "../../heart/mail-import-discovery"
 import { cacheRuntimeCredentialConfig, resetRuntimeCredentialConfigCache } from "../../heart/runtime-credentials"
 import { resetIdentity, setAgentName } from "../../heart/identity"
-import { mailToolDefinitions } from "../../repertoire/tools-mail"
+import { __mailStatusTestOnly, mailToolDefinitions } from "../../repertoire/tools-mail"
 import * as credentialAccess from "../../repertoire/credential-access"
 import type { ToolContext } from "../../repertoire/tools-base"
 
@@ -24,6 +25,16 @@ function tool(name: string) {
   const found = mailToolDefinitions.find((definition) => definition.tool.function.name === name)
   if (!found) throw new Error(`missing tool ${name}`)
   return found
+}
+
+function archiveCandidate(name: string): DiscoveredMboxCandidate {
+  return {
+    path: `/tmp/${name}`,
+    name,
+    mtimeMs: Date.parse("2026-04-24T18:01:00.000Z"),
+    originKind: "downloads",
+    originLabel: "Downloads",
+  }
 }
 
 function trustedContext(): ToolContext {
@@ -350,6 +361,153 @@ describe("mail tools", () => {
       .resolves.toContain("mail screener decisions require family trust")
     await expect(tool("mail_access_log").handler({}, friendContext()))
       .resolves.toContain("delegated human mail requires family trust")
+  })
+
+  it("explains archive identity from the explicit delegated lane in file-backed mail_status", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const bundleRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const downloadsDir = path.join(homeRoot, "Downloads")
+    const storePath = path.join(homeRoot, "mailroom")
+    const registryPath = path.join(homeRoot, "registry.json")
+    const archivePath = path.join(downloadsDir, "HEY-emails-arimendelow@hey.com.mbox")
+    fs.mkdirSync(downloadsDir, { recursive: true })
+    fs.mkdirSync(path.join(bundleRoot, "state", "background-operations"), { recursive: true })
+    fs.writeFileSync(archivePath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    fs.writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf-8")
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: {
+        mailboxAddress: "slugger@ouro.bot",
+        storePath,
+        registryPath,
+        privateKeys: keys,
+      },
+    })
+    fs.writeFileSync(path.join(bundleRoot, "state", "background-operations", "op_mail_import_identity_local.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_identity_local",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 3; imported 3; duplicates 0",
+      createdAt: "2026-04-24T18:00:00.000Z",
+      updatedAt: "2026-04-24T18:02:00.000Z",
+      finishedAt: "2026-04-24T18:02:00.000Z",
+      spec: {
+        filePath: archivePath,
+        fileOriginLabel: "Downloads",
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T18:01:00.000Z",
+      },
+      result: {
+        scanned: 3,
+        imported: 3,
+        duplicates: 0,
+      },
+    }, null, 2)}\n`, "utf-8")
+
+    const status = await tool("mail_status").handler({}, trustedContext())
+    expect(status).toContain("op_mail_import_identity_local")
+    expect(status).toContain("mapping: filename suggests arimendelow@hey.com, but this archive is bound to ari@mendelow.me / hey because delegated owner/source comes from the explicit import lane, not the local filename")
+  })
+
+  it("ignores malformed delegated owner bindings when computing archive identity notes", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const bundleRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const downloadsDir = path.join(homeRoot, "Downloads")
+    const storePath = path.join(homeRoot, "mailroom")
+    const registryPath = path.join(homeRoot, "registry.json")
+    const archivePath = path.join(downloadsDir, "HEY-emails-arimendelow@hey.com.mbox")
+    fs.mkdirSync(downloadsDir, { recursive: true })
+    fs.mkdirSync(path.join(bundleRoot, "state", "background-operations"), { recursive: true })
+    fs.writeFileSync(archivePath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    fs.writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf-8")
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: {
+        mailboxAddress: "slugger@ouro.bot",
+        storePath,
+        registryPath,
+        privateKeys: keys,
+      },
+    })
+    fs.writeFileSync(path.join(bundleRoot, "state", "background-operations", "op_mail_import_identity_local_invalid_owner.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_identity_local_invalid_owner",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 3; imported 3; duplicates 0",
+      createdAt: "2026-04-24T18:00:00.000Z",
+      updatedAt: "2026-04-24T18:02:00.000Z",
+      finishedAt: "2026-04-24T18:02:00.000Z",
+      spec: {
+        filePath: archivePath,
+        fileOriginLabel: "Downloads",
+        ownerEmail: "not-an-email",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T18:01:00.000Z",
+      },
+      result: {
+        scanned: 3,
+        imported: 3,
+        duplicates: 0,
+      },
+    }, null, 2)}\n`, "utf-8")
+
+    const status = await tool("mail_status").handler({}, trustedContext())
+    expect(status).toContain("op_mail_import_identity_local_invalid_owner")
+    expect(status).toContain("owner/source: not-an-email / hey")
+    expect(status).not.toContain("mapping:")
+  })
+
+  it("omits archive identity notes when the filename already matches the delegated owner", () => {
+    expect(__mailStatusTestOnly.archiveIdentityNote(
+      archiveCandidate("HEY-emails-ari@mendelow.me.mbox"),
+      "ari@mendelow.me",
+      "hey",
+    )).toBe("")
+  })
+
+  it("returns an archive identity note when the filename and delegated owner diverge", () => {
+    expect(__mailStatusTestOnly.archiveIdentityNote(
+      archiveCandidate("HEY-emails-arimendelow@hey.com.mbox"),
+      "ari@mendelow.me",
+      "hey",
+    )).toContain("mapping: filename suggests arimendelow@hey.com, but this archive is bound to ari@mendelow.me / hey")
+  })
+
+  it("falls back to unknown source in archive identity notes when no delegated source label exists", () => {
+    expect(__mailStatusTestOnly.archiveIdentityNote(
+      archiveCandidate("HEY-emails-arimendelow@hey.com.mbox"),
+      "ari@mendelow.me",
+      "",
+    )).toContain("mapping: filename suggests arimendelow@hey.com, but this archive is bound to ari@mendelow.me / unknown")
+  })
+
+  it("suppresses archive identity notes when the delegated owner email is malformed", () => {
+    expect(__mailStatusTestOnly.archiveIdentityNote(
+      archiveCandidate("HEY-emails-arimendelow@hey.com.mbox"),
+      "not-an-email",
+      "hey",
+    )).toBe("")
   })
 
   it("lists, searches, opens, and audits bounded mail reads", async () => {

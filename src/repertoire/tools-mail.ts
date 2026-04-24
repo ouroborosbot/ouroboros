@@ -471,6 +471,11 @@ function latestComparableOperationTimestamp(record: BackgroundOperationRecord): 
   return null
 }
 
+function operationResultText(record: BackgroundOperationRecord, key: string): string {
+  const value = record.result?.[key]
+  return typeof value === "string" ? value.trim() : ""
+}
+
 function comparableOperationTimestamp(record: BackgroundOperationRecord): number {
   return Number(latestComparableOperationTimestamp(record)) || 0
 }
@@ -487,26 +492,93 @@ function matchingMailImportOperation(
   return operations[0] ?? null
 }
 
+function archiveFreshnessNote(
+  candidate: DiscoveredMboxCandidate,
+  operation: BackgroundOperationRecord | null,
+): string {
+  if (!operation) {
+    return "freshness: unimported (no prior import recorded; import needed)"
+  }
+  const sourceFreshThrough = operationResultText(operation, "sourceFreshThrough")
+  if (operation.status === "succeeded") {
+    const operationTimestamp = latestComparableOperationTimestamp(operation)
+    if (operationTimestamp !== null && candidate.mtimeMs <= operationTimestamp + 1_000) {
+      return [
+        "freshness: current (newest known archive for this delegated lane; re-import unnecessary)",
+        ...(sourceFreshThrough ? [`fresh through: ${sourceFreshThrough}`] : []),
+      ].join("; ")
+    }
+    if (operationTimestamp !== null) {
+      return [
+        "freshness: stale-risky (newer archive discovered after the last import; re-import needed)",
+        ...(sourceFreshThrough ? [`fresh through: ${sourceFreshThrough}`] : []),
+      ].join("; ")
+    }
+    return "freshness: stale-risky (last successful import has no comparable timestamp; verify the archive before relying on it)"
+  }
+  if (operation.status === "failed") {
+    return "freshness: blocked (last import failed; current freshness is not yet trustworthy)"
+  }
+  return "freshness: pending (import still in progress; current freshness will settle when the operation finishes)"
+}
+
+function archiveFilenameBoundEmail(candidate: DiscoveredMboxCandidate): string | null {
+  const stem = candidate.name.replace(/\.mbox$/i, "")
+  const matches = stem.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig)
+  const match = matches?.at(-1)
+  if (!match) return null
+  try {
+    return normalizeMailAddress(match.replace(/^hey-emails-/i, "").replace(/^emails-/i, ""))
+  } catch {
+    return null
+  }
+}
+
+function archiveIdentityNote(
+  candidate: DiscoveredMboxCandidate,
+  ownerEmail: string,
+  source: string,
+): string {
+  const fileEmail = archiveFilenameBoundEmail(candidate)
+  if (!fileEmail || !ownerEmail) return ""
+  try {
+    if (normalizeMailAddress(ownerEmail) === fileEmail) return ""
+  } catch {
+    return ""
+  }
+  return `mapping: filename suggests ${fileEmail}, but this archive is bound to ${ownerEmail} / ${source || "unknown"} because delegated owner/source comes from the explicit import lane, not the local filename`
+}
+
+export const __mailStatusTestOnly = {
+  archiveFilenameBoundEmail,
+  archiveIdentityNote,
+}
+
 function renderArchiveStatus(
   agentId: string,
   candidate: DiscoveredMboxCandidate,
 ): string {
   const operation = matchingMailImportOperation(agentId, candidate)
-  if (!operation) return `- [${candidate.originLabel}] ${candidate.path} :: status: ready`
+  if (!operation) {
+    return `- [${candidate.originLabel}] ${candidate.path} :: status: ready; ${archiveFreshnessNote(candidate, null)}`
+  }
   const operationTimestamp = latestComparableOperationTimestamp(operation)
   const ownerEmail = typeof operation.spec?.ownerEmail === "string" ? operation.spec.ownerEmail : ""
   const source = typeof operation.spec?.source === "string" ? operation.spec.source : ""
   const provenance = ownerEmail || source ? `; owner/source: ${ownerEmail || "unknown"} / ${source || "unknown"}` : ""
+  const freshness = `; ${archiveFreshnessNote(candidate, operation)}`
+  const identity = archiveIdentityNote(candidate, ownerEmail, source)
+  const identityNote = identity ? `; ${identity}` : ""
   if (operation.status === "succeeded" && operationTimestamp !== null && candidate.mtimeMs <= operationTimestamp + 1_000) {
-    return `- [${candidate.originLabel}] ${candidate.path} :: status: imported via ${operation.id}${provenance}; ${operation.detail ?? operation.summary}`
+    return `- [${candidate.originLabel}] ${candidate.path} :: status: imported via ${operation.id}${provenance}${freshness}; ${operation.detail ?? operation.summary}${identityNote}`
   }
   if (operation.status === "succeeded") {
-    return `- [${candidate.originLabel}] ${candidate.path} :: status: ready (newer than last import via ${operation.id})${provenance}; ${operation.detail ?? operation.summary}`
+    return `- [${candidate.originLabel}] ${candidate.path} :: status: ready (newer than last import via ${operation.id})${provenance}${freshness}; ${operation.detail ?? operation.summary}${identityNote}`
   }
   if (operation.status === "failed") {
-    return `- [${candidate.originLabel}] ${candidate.path} :: status: failed via ${operation.id}${provenance}; ${operation.failure?.class ?? "unknown failure"}`
+    return `- [${candidate.originLabel}] ${candidate.path} :: status: failed via ${operation.id}${provenance}${freshness}; ${operation.failure?.class ?? "unknown failure"}${identityNote}`
   }
-  return `- [${candidate.originLabel}] ${candidate.path} :: status: ${operation.status} via ${operation.id}${provenance}; ${operation.summary}`
+  return `- [${candidate.originLabel}] ${candidate.path} :: status: ${operation.status} via ${operation.id}${provenance}${freshness}; ${operation.summary}${identityNote}`
 }
 
 function renderRecentArchiveStatus(agentId: string): string[] {

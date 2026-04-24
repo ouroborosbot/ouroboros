@@ -99,7 +99,7 @@ Expected addresses:
 
 Agents read mail through bounded, access-logged tools:
 
-- `mail_status` shows the current mail operating model: native mailbox, delegated aliases, recent browser/download archives, and recent import operations.
+- `mail_status` shows the current mail operating model: native mailbox, delegated aliases, recent browser/download archives, recent import operations, and explicit archive freshness truth.
 - `mail_recent` lists summaries.
 - `mail_search` searches summaries and snippets by explicit query.
 - `mail_thread` opens a specific message body for a stated reason.
@@ -156,7 +156,9 @@ Once a specific archive has already been imported successfully, the same file sh
 
 When an import is queued, running, failed, or finished, `query_active_work` should expose the exact operation id, the archive path, the candidate origin label, the relevant timestamps, and any remediation hints. Failed imports should also name a `failure class`, a `retry` disposition, and a short `recovery` hint so Slugger does not have to infer whether the next move is retry-safe or a real repair.
 
-`mail_status` is the first compact truth surface for this operating model. It should answer, in one place: what Slugger's native mailbox is, which delegated aliases exist, which browser/download archives are sitting around, whether a discovered archive was already imported or is newer than the last import, and what the most recent import operations actually did.
+`mail_status` is the first compact truth surface for this operating model. It should answer, in one place: what Slugger's native mailbox is, which delegated aliases exist, which browser/download archives are sitting around, whether a discovered archive was already imported or is newer than the last import, whether that means `freshness: current` or `freshness: stale-risky`, and what the most recent import operations actually did.
+
+When `mail_status` shows a delegated archive whose local filename suggests one account label but the recorded delegated binding says another, trust the delegated binding. The delegated owner/source comes from the explicit import lane, not from the local filename. `mail_status` should explain that mapping inline instead of making the agent infer whether the file is cross-wired.
 
 Fallback agent command after the human provides the file path:
 

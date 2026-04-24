@@ -167,6 +167,7 @@ describe("hosted mail tools", () => {
         scanned: 100,
         imported: 20,
         duplicates: 80,
+        sourceFreshThrough: "2026-04-24T17:55:00.000Z",
       },
     }, null, 2)}\n`, "utf-8")
 
@@ -212,6 +213,8 @@ describe("hosted mail tools", () => {
     expect(status).toContain("recent archives:")
     expect(status).toContain("[browser sandbox (.playwright-mcp)]")
     expect(status).toContain("status: imported via op_mail_import_status")
+    expect(status).toContain("freshness: current (newest known archive for this delegated lane; re-import unnecessary)")
+    expect(status).toContain("fresh through: 2026-04-24T17:55:00.000Z")
     expect(status).toContain("scanned 100; imported 20; duplicates 80")
     expect(readMailroomRegistry).toHaveBeenCalled()
   })
@@ -262,6 +265,7 @@ describe("hosted mail tools", () => {
         scanned: 100,
         imported: 20,
         duplicates: 80,
+        sourceFreshThrough: "2026-04-24T17:55:00.000Z",
       },
     }, null, 2)}\n`, "utf-8")
 
@@ -298,7 +302,8 @@ describe("hosted mail tools", () => {
     expect(statusTool).toBeTruthy()
 
     const status = await statusTool!.handler({}, trustedContext())
-    expect(status).toContain("status: imported via op_mail_import_summary_only_imported; delegated mail archive already imported earlier")
+    expect(status).toContain("status: imported via op_mail_import_summary_only_imported")
+    expect(status).toContain("delegated mail archive already imported earlier")
     expect(status).not.toContain("op_mail_import_irrelevant_missing_path;")
   })
 
@@ -385,6 +390,7 @@ describe("hosted mail tools", () => {
         scanned: 100,
         imported: 20,
         duplicates: 80,
+        sourceFreshThrough: "2026-04-24T17:55:00.000Z",
       },
     }, null, 2)}\n`, "utf-8")
 
@@ -422,7 +428,236 @@ describe("hosted mail tools", () => {
 
     const status = await statusTool!.handler({}, trustedContext())
     expect(status).toContain("status: ready (newer than last import via op_mail_import_status)")
+    expect(status).toContain("freshness: stale-risky (newer archive discovered after the last import; re-import needed)")
+    expect(status).toContain("fresh through: 2026-04-24T17:55:00.000Z")
     expect(status).toContain("scanned 100; imported 20; duplicates 80")
+  })
+
+  it("explains delegated archive identity when the filename and owner binding diverge", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const agentRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const downloadsDir = path.join(homeRoot, "Downloads")
+    const archivePath = path.join(downloadsDir, "HEY-emails-arimendelow@hey.com.mbox")
+    fs.mkdirSync(downloadsDir, { recursive: true })
+    fs.writeFileSync(archivePath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    const importedAt = new Date("2026-04-24T18:01:00.000Z")
+    fs.utimesSync(archivePath, importedAt, importedAt)
+    fs.mkdirSync(path.join(agentRoot, "state", "background-operations"), { recursive: true })
+    fs.writeFileSync(path.join(agentRoot, "state", "background-operations", "op_mail_import_identity_note.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_identity_note",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 12; imported 12; duplicates 0",
+      createdAt: "2026-04-24T18:00:00.000Z",
+      updatedAt: "2026-04-24T18:02:00.000Z",
+      finishedAt: "2026-04-24T18:02:00.000Z",
+      spec: {
+        filePath: archivePath,
+        fileOriginLabel: "Downloads",
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T18:01:00.000Z",
+      },
+      result: {
+        scanned: 12,
+        imported: 12,
+        duplicates: 0,
+        sourceFreshThrough: "2026-04-24T17:40:00.000Z",
+      },
+    }, null, 2)}\n`, "utf-8")
+
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    const store = new FileMailroomStore({ rootDir: tempDir() })
+
+    vi.doMock("../../mailroom/reader", () => ({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          azureAccountUrl: "https://mail.blob.core.windows.net",
+          azureContainer: "mailroom",
+          registryAzureAccountUrl: "https://registry.blob.core.windows.net",
+          registryContainer: "mailroom",
+          registryBlob: "registry/mailroom.json",
+          privateKeys: keys,
+        },
+        store,
+        storeKind: "file",
+        storeLabel: "/tmp/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const statusTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_status")
+    expect(statusTool).toBeTruthy()
+
+    const status = await statusTool!.handler({}, trustedContext())
+    expect(status).toContain("status: imported via op_mail_import_identity_note")
+    expect(status).toContain("mapping: filename suggests arimendelow@hey.com, but this archive is bound to ari@mendelow.me / hey because delegated owner/source comes from the explicit import lane, not the local filename")
+  })
+
+  it("ignores malformed filename email hints instead of crashing mail_status", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const agentRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const downloadsDir = path.join(homeRoot, "Downloads")
+    const archivePath = path.join(downloadsDir, "HEY-emails-@hey.com.mbox")
+    fs.mkdirSync(downloadsDir, { recursive: true })
+    fs.writeFileSync(archivePath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    const importedAt = new Date("2026-04-24T18:01:00.000Z")
+    fs.utimesSync(archivePath, importedAt, importedAt)
+    fs.mkdirSync(path.join(agentRoot, "state", "background-operations"), { recursive: true })
+    fs.writeFileSync(path.join(agentRoot, "state", "background-operations", "op_mail_import_identity_invalid_filename.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_identity_invalid_filename",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 4; imported 4; duplicates 0",
+      createdAt: "2026-04-24T18:00:00.000Z",
+      updatedAt: "2026-04-24T18:02:00.000Z",
+      finishedAt: "2026-04-24T18:02:00.000Z",
+      spec: {
+        filePath: archivePath,
+        fileOriginLabel: "Downloads",
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T18:01:00.000Z",
+      },
+      result: {
+        scanned: 4,
+        imported: 4,
+        duplicates: 0,
+      },
+    }, null, 2)}\n`, "utf-8")
+
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    const store = new FileMailroomStore({ rootDir: tempDir() })
+
+    vi.doMock("../../mailroom/reader", () => ({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          azureAccountUrl: "https://mail.blob.core.windows.net",
+          azureContainer: "mailroom",
+          registryAzureAccountUrl: "https://registry.blob.core.windows.net",
+          registryContainer: "mailroom",
+          registryBlob: "registry/mailroom.json",
+          privateKeys: keys,
+        },
+        store,
+        storeKind: "file",
+        storeLabel: "/tmp/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const statusTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_status")
+    expect(statusTool).toBeTruthy()
+
+    const status = await statusTool!.handler({}, trustedContext())
+    expect(status).toContain("status: imported via op_mail_import_identity_invalid_filename")
+    expect(status).not.toContain("mapping:")
+  })
+
+  it("ignores malformed owner bindings while still rendering archive status", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const agentRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const downloadsDir = path.join(homeRoot, "Downloads")
+    const archivePath = path.join(downloadsDir, "HEY-emails-arimendelow@hey.com.mbox")
+    fs.mkdirSync(downloadsDir, { recursive: true })
+    fs.writeFileSync(archivePath, "From MAILER-DAEMON Thu Jan  1 00:00:00 1970\n", "utf-8")
+    const importedAt = new Date("2026-04-24T18:01:00.000Z")
+    fs.utimesSync(archivePath, importedAt, importedAt)
+    fs.mkdirSync(path.join(agentRoot, "state", "background-operations"), { recursive: true })
+    fs.writeFileSync(path.join(agentRoot, "state", "background-operations", "op_mail_import_identity_invalid_owner.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      id: "op_mail_import_identity_invalid_owner",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "imported delegated mail archive",
+      detail: "scanned 5; imported 5; duplicates 0",
+      createdAt: "2026-04-24T18:00:00.000Z",
+      updatedAt: "2026-04-24T18:02:00.000Z",
+      finishedAt: "2026-04-24T18:02:00.000Z",
+      spec: {
+        filePath: archivePath,
+        fileOriginLabel: "Downloads",
+        ownerEmail: "not-an-email",
+        source: "hey",
+        fileModifiedAt: "2026-04-24T18:01:00.000Z",
+      },
+      result: {
+        scanned: 5,
+        imported: 5,
+        duplicates: 0,
+      },
+    }, null, 2)}\n`, "utf-8")
+
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    const store = new FileMailroomStore({ rootDir: tempDir() })
+
+    vi.doMock("../../mailroom/reader", () => ({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          azureAccountUrl: "https://mail.blob.core.windows.net",
+          azureContainer: "mailroom",
+          registryAzureAccountUrl: "https://registry.blob.core.windows.net",
+          registryContainer: "mailroom",
+          registryBlob: "registry/mailroom.json",
+          privateKeys: keys,
+        },
+        store,
+        storeKind: "file",
+        storeLabel: "/tmp/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const statusTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_status")
+    expect(statusTool).toBeTruthy()
+
+    const status = await statusTool!.handler({}, trustedContext())
+    expect(status).toContain("status: imported via op_mail_import_identity_invalid_owner")
+    expect(status).toContain("owner/source: not-an-email / hey")
+    expect(status).not.toContain("mapping:")
   })
 
   it("uses the operation summary when a newer successful archive import has no detail text", async () => {
@@ -495,7 +730,9 @@ describe("hosted mail tools", () => {
     expect(statusTool).toBeTruthy()
 
     const status = await statusTool!.handler({}, trustedContext())
-    expect(status).toContain("status: ready (newer than last import via op_mail_import_summary_only); owner/source: ari@mendelow.me / unknown; delegated mail archive already imported earlier")
+    expect(status).toContain("status: ready (newer than last import via op_mail_import_summary_only); owner/source: ari@mendelow.me / unknown")
+    expect(status).toContain("freshness: stale-risky (newer archive discovered after the last import; re-import needed)")
+    expect(status).toContain("delegated mail archive already imported earlier")
   })
 
   it("renders source-only provenance when a newer successful archive import needs re-import attention", async () => {
@@ -568,7 +805,9 @@ describe("hosted mail tools", () => {
     expect(statusTool).toBeTruthy()
 
     const status = await statusTool!.handler({}, trustedContext())
-    expect(status).toContain("status: ready (newer than last import via op_mail_import_source_only_summary); owner/source: unknown / hey; delegated source archive was imported earlier")
+    expect(status).toContain("status: ready (newer than last import via op_mail_import_source_only_summary); owner/source: unknown / hey")
+    expect(status).toContain("freshness: stale-risky (newer archive discovered after the last import; re-import needed)")
+    expect(status).toContain("delegated source archive was imported earlier")
   })
 
   it("renders registry repair guidance and unknown failures in hosted mail status", async () => {
@@ -634,7 +873,9 @@ describe("hosted mail tools", () => {
     const status = await statusTool!.handler({}, trustedContext())
     expect(status).toContain("- delegated: unreadable registry (registry offline)")
     expect(status).toContain("- agent-runnable repair: run ouro connect mail --agent slugger --owner-email <human-email> --source hey.")
-    expect(status).toContain("status: failed via op_mail_import_unknown_failure; unknown failure")
+    expect(status).toContain("status: failed via op_mail_import_unknown_failure")
+    expect(status).toContain("freshness: blocked (last import failed; current freshness is not yet trustworthy)")
+    expect(status).toContain("unknown failure")
     expect(status).toContain("- op_mail_import_unknown_failure [failed] :: file: unresolved archive")
   })
 
@@ -864,8 +1105,12 @@ describe("hosted mail tools", () => {
     expect(statusTool).toBeTruthy()
 
     const status = await statusTool!.handler({}, trustedContext())
-    expect(status).toContain(`status: failed via op_mail_import_failed; owner/source: ari@mendelow.me / hey; archive-access`)
-    expect(status).toContain(`status: running via op_mail_import_running; owner/source: ari@mendelow.me / hey; importing delegated mail`)
+    expect(status).toContain("status: failed via op_mail_import_failed; owner/source: ari@mendelow.me / hey")
+    expect(status).toContain("freshness: blocked (last import failed; current freshness is not yet trustworthy)")
+    expect(status).toContain("archive-access")
+    expect(status).toContain("status: running via op_mail_import_running; owner/source: ari@mendelow.me / hey")
+    expect(status).toContain("freshness: pending (import still in progress; current freshness will settle when the operation finishes)")
+    expect(status).toContain("importing delegated mail")
     expect(status.indexOf("op_mail_import_running [running]")).toBeLessThan(status.indexOf("op_mail_import_failed [failed]"))
   })
 
@@ -1009,6 +1254,77 @@ describe("hosted mail tools", () => {
     expect(decision).not.toContain("registryPath missing")
     expect(writtenRegistries).toHaveLength(1)
     expect(JSON.stringify(writtenRegistries[0])).toContain("travel@example.com")
+  })
+
+  it("persists sender policy through hosted registry coordinates on the exact hosted link-friend path", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    registry.sourceGrants[0].defaultPlacement = "screener"
+    const store = new FileMailroomStore({ rootDir: tempDir() })
+    await ingestRawMailToStore({
+      registry,
+      store,
+      envelope: {
+        mailFrom: "link@example.com",
+        rcptTo: ["me.mendelow.ari.slugger@ouro.bot"],
+      },
+      rawMime: Buffer.from([
+        "From: Link Friend <link@example.com>",
+        "To: Slugger <me.mendelow.ari.slugger@ouro.bot>",
+        "Subject: Hosted delegated link-friend",
+        "",
+        "delegated body",
+      ].join("\r\n")),
+    })
+    const writtenRegistries: unknown[] = []
+
+    vi.doMock("../../mailroom/reader", () => ({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          azureAccountUrl: "https://mail.blob.core.windows.net",
+          azureContainer: "mailroom",
+          registryAzureAccountUrl: "https://registry.blob.core.windows.net",
+          registryContainer: "mailroom",
+          registryBlob: "registry/mailroom.json",
+          privateKeys: keys,
+        },
+        store,
+        storeKind: "file",
+        storeLabel: "/tmp/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async (_config: unknown, nextRegistry: unknown) => {
+        writtenRegistries.push(nextRegistry)
+      },
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const screener = await mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_screener")!
+      .handler({ reason: "hosted delegated link-friend proof" }, trustedContext())
+    const candidateId = /candidate_mail_[a-f0-9]+/.exec(String(screener))?.[0]
+    expect(candidateId).toBeTruthy()
+
+    const decision = await mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_decide")!
+      .handler({
+        candidate_id: candidateId!,
+        action: "link-friend",
+        friend_id: "friend_link",
+        reason: "family linked this delegated sender to a friend",
+      }, trustedContext())
+
+    expect(decision).toContain("sender policy: allow email link@example.com")
+    expect(decision).not.toContain("registryPath missing")
+    expect(writtenRegistries).toHaveLength(1)
+    expect(JSON.stringify(writtenRegistries[0])).toContain("link@example.com")
   })
 
   it("surfaces hosted registry write failures without pretending the sender policy persisted", async () => {

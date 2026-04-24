@@ -50,6 +50,9 @@ describe("agent mail setup documentation contract", () => {
     expect(guide).toContain("failure class")
     expect(guide).toContain("retry")
     expect(guide).toContain("recovery")
+    expect(guide).toContain("freshness: current")
+    expect(guide).toContain("freshness: stale-risky")
+    expect(guide).toContain("The delegated owner/source comes from the explicit import lane, not from the local filename")
     expect(guide).toContain("Only if discovery cannot find a unique file")
     expect(guide).toContain("Fallback agent command after the human provides the file path")
   })
@@ -134,6 +137,9 @@ describe("agent mail setup documentation contract", () => {
       "failure class",
       "retry",
       "ready (newer than last import via <op>)",
+      "freshness: current",
+      "freshness: stale-risky",
+      "owner/source mapping note",
       "Do not parse vault item notes",
       "Treat cached `runtime.json` files as hints, not truth.",
     ]) {
