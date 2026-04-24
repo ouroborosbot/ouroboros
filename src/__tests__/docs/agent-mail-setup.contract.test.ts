@@ -47,6 +47,9 @@ describe("agent mail setup documentation contract", () => {
     expect(guide).toContain("browser sandbox (.playwright-mcp)")
     expect(guide).toContain("query_active_work")
     expect(guide).toContain("the exact operation id")
+    expect(guide).toContain("failure class")
+    expect(guide).toContain("retry")
+    expect(guide).toContain("recovery")
     expect(guide).toContain("Only if discovery cannot find a unique file")
     expect(guide).toContain("Fallback agent command after the human provides the file path")
   })
@@ -65,6 +68,7 @@ describe("agent mail setup documentation contract", () => {
   it("documents Screener recovery, human-only external actions, and Mailbox audit expectations", () => {
     const guide = readGuide()
 
+    expect(guide).toContain("mail_status")
     expect(guide).toContain("discard")
     expect(guide).toContain("persist a discard policy for that sender")
     expect(guide).toContain("Discard does not reject, bounce, or return mail to sender")
@@ -113,6 +117,8 @@ describe("agent mail setup documentation contract", () => {
 
     for (const term of [
       "Agent-runnable",
+      "mail_status",
+      "import state is unclear",
       "Human-required",
       "DNS/MX drift",
       "HEY forwarding missing or stale",
@@ -125,6 +131,9 @@ describe("agent mail setup documentation contract", () => {
       "delivery event missing",
       "autonomy kill switch",
       "wrong mailbox provenance",
+      "failure class",
+      "retry",
+      "ready (newer than last import via <op>)",
       "Do not parse vault item notes",
       "Treat cached `runtime.json` files as hints, not truth.",
     ]) {

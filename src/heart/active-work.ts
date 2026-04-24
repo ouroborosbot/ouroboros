@@ -400,6 +400,12 @@ function formatBackgroundOperationNextAction(operation: BackgroundOperationRecor
   if (operation.kind === "mail.import-mbox") {
     switch (operation.status) {
       case "failed":
+        if (operation.failure?.retryDisposition === "retry-safe") {
+          return "retry the failed mail import once the transient issue clears or the dependency answers again"
+        }
+        if (operation.failure?.retryDisposition === "investigate-first") {
+          return "inspect the failed mail import carefully, confirm the root cause, and then decide whether to retry"
+        }
         return "inspect the failed mail import, fix the issue, and retry it"
       case "queued":
         return "let the queued mail import start; failure or completion will wake me, so i only re-check if i need status or it looks stalled"
@@ -430,6 +436,9 @@ function formatBackgroundOperationMeta(operation: BackgroundOperationRecord): st
   if (ownerEmail || source) {
     lines.push(`owner/source: ${ownerEmail || "unknown"} / ${source || "unknown"}`)
   }
+  if (operation.failure?.class?.trim()) lines.push(`failure class: ${operation.failure.class}`)
+  if (operation.failure?.retryDisposition?.trim()) lines.push(`retry: ${operation.failure.retryDisposition}`)
+  if (operation.failure?.hint?.trim()) lines.push(`recovery: ${operation.failure.hint}`)
   if (operation.startedAt?.trim()) lines.push(`started: ${operation.startedAt}`)
   if (operation.finishedAt?.trim()) lines.push(`finished: ${operation.finishedAt}`)
   else if (operation.updatedAt?.trim()) lines.push(`updated: ${operation.updatedAt}`)
