@@ -36,6 +36,8 @@ export interface MailAccessLogEntry {
   accessedAt: string
 }
 
+export type MailAccessLogListing = MailAccessLogEntry[] & { malformedEntriesSkipped?: number }
+
 export interface MailListFilters {
   agentId: string
   placement?: MailPlacement
@@ -73,7 +75,7 @@ export interface MailroomStore {
   getMailOutbound(id: string): Promise<MailOutboundRecord | null>
   listMailOutbound(agentId: string): Promise<MailOutboundRecord[]>
   recordAccess(entry: Omit<MailAccessLogEntry, "id" | "accessedAt">): Promise<MailAccessLogEntry>
-  listAccessLog(agentId: string): Promise<MailAccessLogEntry[]>
+  listAccessLog(agentId: string): Promise<MailAccessLogListing>
 }
 
 export interface FileMailroomStoreOptions {
@@ -405,7 +407,7 @@ export class FileMailroomStore implements MailroomStore {
     return complete
   }
 
-  async listAccessLog(agentId: string): Promise<MailAccessLogEntry[]> {
+  async listAccessLog(agentId: string): Promise<MailAccessLogListing> {
     const filePath = this.accessLogPath(agentId)
     if (!fs.existsSync(filePath)) {
       emitNervesEvent({
@@ -416,15 +418,33 @@ export class FileMailroomStore implements MailroomStore {
       })
       return []
     }
-    const entries = fs.readFileSync(filePath, "utf-8")
+    const lines = fs.readFileSync(filePath, "utf-8")
       .split(/\r?\n/)
       .filter(Boolean)
-      .map((line) => JSON.parse(line) as MailAccessLogEntry)
+    const entries = [] as MailAccessLogListing
+    let malformedEntriesSkipped = 0
+    for (const line of lines) {
+      try {
+        entries.push(JSON.parse(line) as MailAccessLogEntry)
+      } catch {
+        malformedEntriesSkipped += 1
+      }
+    }
+    if (malformedEntriesSkipped > 0) {
+      entries.malformedEntriesSkipped = malformedEntriesSkipped
+      emitNervesEvent({
+        level: "warn",
+        component: "senses",
+        event: "senses.mail_access_log_malformed_lines_skipped",
+        message: "skipped malformed file-backed mail access log lines",
+        meta: { agentId, malformedEntriesSkipped },
+      })
+    }
     emitNervesEvent({
       component: "senses",
       event: "senses.mail_access_log_listed",
       message: "mail access log listed",
-      meta: { agentId, count: entries.length },
+      meta: { agentId, count: entries.length, malformedEntriesSkipped },
     })
     return entries
   }

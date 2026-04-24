@@ -149,9 +149,11 @@ Preferred agent command after a browser download:
 ouro mail import-mbox --discover --owner-email <human-email> --source hey --agent <agent>
 ```
 
-The discovery path searches the current repo's `.playwright-mcp`, worktree-local `.playwright-mcp` sandboxes (including common `_worktrees` pools and agent-owned workspaces), the home-directory `.playwright-mcp`, and `~/Downloads` for recent `.mbox` files. It prefers filenames that match the requested owner/source, including normalized Playwright names such as `HEY-emails-ari-mendelow-me.mbox`. If discovery finds more than one equally plausible export, it stops and asks for the path instead of guessing.
+The discovery path searches the current repo's `.playwright-mcp`, worktree-local `.playwright-mcp` sandboxes (including common `_worktrees` pools and agent-owned workspaces), the home-directory `.playwright-mcp`, and `~/Downloads` for recent `.mbox` files. It prefers filenames that match the requested owner/source, including normalized Playwright names such as `HEY-emails-ari-mendelow-me.mbox`. Ambient import-ready state should label browser-sandbox files explicitly as `browser sandbox (.playwright-mcp)` instead of making the agent infer that from the path alone. If discovery finds more than one equally plausible export, it stops and asks for the path instead of guessing.
 
 Once a specific archive has already been imported successfully, the same file should stop surfacing as "mail import ready" and `ouro mail import-mbox --discover ...` should refuse to start it again until a newer export appears on disk.
+
+When an import is queued, running, failed, or finished, `query_active_work` should expose the exact operation id, the archive path, the candidate origin label, the relevant timestamps, and any remediation hints. Slugger should not have to infer which import is which from timing alone.
 
 Fallback agent command after the human provides the file path:
 

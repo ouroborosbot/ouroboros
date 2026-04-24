@@ -44,6 +44,9 @@ describe("agent mail setup documentation contract", () => {
     expect(guide).toContain("The agent verifies each step before asking for the next one")
     expect(guide).toContain("Preferred agent command after a browser download")
     expect(guide).toContain("The discovery path searches the current repo's `.playwright-mcp`")
+    expect(guide).toContain("browser sandbox (.playwright-mcp)")
+    expect(guide).toContain("query_active_work")
+    expect(guide).toContain("the exact operation id")
     expect(guide).toContain("Only if discovery cannot find a unique file")
     expect(guide).toContain("Fallback agent command after the human provides the file path")
   })
@@ -114,6 +117,7 @@ describe("agent mail setup documentation contract", () => {
       "DNS/MX drift",
       "HEY forwarding missing or stale",
       "daemon stopped or worker state stale",
+      "malformed file-backed access log",
       "hosted registry/vault key drift",
       "ouro account ensure --rotate-missing-mail-keys",
       "rotation cannot recover mail already encrypted to a lost private key",

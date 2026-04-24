@@ -1288,6 +1288,26 @@ describe("mail tools", () => {
     expect(accessLog).toContain("warning: skipped 1 malformed file-backed mail access log line")
   })
 
+  it("pluralizes the malformed file-backed audit log warning when more than one line is skipped", async () => {
+    setAgentName("slugger")
+    const storePath = tempDir()
+    const seeded = await seedNativeMail(storePath)
+
+    await seeded.store.recordAccess({
+      agentId: "slugger",
+      messageId: seeded.longId,
+      tool: "mail_thread",
+      reason: "baseline audit",
+    })
+    const accessLogPath = path.join(storePath, "access-log", "slugger.jsonl")
+    fs.appendFileSync(accessLogPath, "{\"id\":\"broken\"", "utf-8")
+    fs.appendFileSync(accessLogPath, "\n{\"id\":\"also-broken\"", "utf-8")
+
+    const accessLog = await tool("mail_access_log").handler({}, trustedContext())
+    expect(accessLog).toContain(`message=${seeded.longId}`)
+    expect(accessLog).toContain("warning: skipped 2 malformed file-backed mail access log lines")
+  })
+
   it("keeps mailbox tools usable when one visible message was encrypted to a missing key", async () => {
     setAgentName("slugger")
     const recovered = await seedNativeMailWithLostKey(tempDir())

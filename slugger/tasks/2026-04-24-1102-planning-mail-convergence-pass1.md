@@ -25,11 +25,11 @@ Run the first post-full-moon convergence pass on agent mail by closing the highe
 
 ## Completion Criteria
 
-- [ ] Ambient import readiness clearly distinguishes browser-sandbox `.mbox` artifacts from ordinary `~/Downloads` files in the agent-facing state it produces.
-- [ ] `query_active_work` / active-work formatting exposes enough mail-import metadata that Slugger can identify the exact import without inferring from timing alone.
-- [ ] Failed mail imports surface concrete remediation hints in active-work output when available.
-- [ ] File-backed `mail_access_log` survives malformed/truncated lines without throwing `Unexpected end of JSON input`.
-- [ ] Automated tests cover all new or changed behavior at 100% for modified files.
+- [x] Ambient import readiness clearly distinguishes browser-sandbox `.mbox` artifacts from ordinary `~/Downloads` files in the agent-facing state it produces.
+- [x] `query_active_work` / active-work formatting exposes enough mail-import metadata that Slugger can identify the exact import without inferring from timing alone.
+- [x] Failed mail imports surface concrete remediation hints in active-work output when available.
+- [x] File-backed `mail_access_log` survives malformed/truncated lines without throwing `Unexpected end of JSON input`.
+- [x] Automated tests cover all new or changed behavior at 100% for modified files.
 - [ ] Runtime is rebuilt/reloaded locally and the new behavior is verified against the live Slugger setup.
 - [ ] Slugger reviews the post-change system and either signs off or produces the next convergence feedback set.
 
@@ -87,3 +87,4 @@ Run the first post-full-moon convergence pass on agent mail by closing the highe
 ## Progress Log
 
 - 2026-04-24 11:03 Planning doc created for the first convergence pass.
+- 2026-04-24 11:31 Discovery provenance, active-work detail, access-log hardening, docs, and 100% coverage gate all landed; live runtime reload and Slugger review remain.

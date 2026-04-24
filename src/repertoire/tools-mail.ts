@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
 import type { ToolDefinition } from "./tools-base"
 import { isTrustedLevel } from "../mind/friends/types"
-import { decryptMessages, type MailAccessLogEntry, type MailroomStore } from "../mailroom/file-store"
+import { decryptMessages, type MailAccessLogEntry, type MailAccessLogListing, type MailroomStore } from "../mailroom/file-store"
 import { resolveMailroomReader, type MailroomRuntimeConfig } from "../mailroom/reader"
 import { confirmMailDraftSend, createMailDraft, resolveOutboundProviderClient, resolveOutboundTransport, type MailOutboundTransport } from "../mailroom/outbound"
 import { applyMailDecision, buildSenderPolicy, type MailDecisionAction, type MailDecisionActor, type MailScreenerCandidateStatus } from "../mailroom/policy"
@@ -205,9 +205,12 @@ function renderScreenerCandidate(candidate: {
   ].join("\n")
 }
 
-function renderAccessLog(entries: MailAccessLogEntry[]): string {
-  if (entries.length === 0) return "No mail access records yet."
-  return entries
+function renderAccessLog(entries: MailAccessLogListing): string {
+  const warning = typeof entries.malformedEntriesSkipped === "number" && entries.malformedEntriesSkipped > 0
+    ? `warning: skipped ${entries.malformedEntriesSkipped} malformed file-backed mail access log line${entries.malformedEntriesSkipped === 1 ? "" : "s"}`
+    : ""
+  if (entries.length === 0) return warning || "No mail access records yet."
+  const rendered = entries
     .slice(-20)
     .reverse()
     .map((entry) => {
@@ -216,6 +219,7 @@ function renderAccessLog(entries: MailAccessLogEntry[]): string {
       return `- ${entry.accessedAt} ${entry.tool} ${target}${provenance} reason="${entry.reason}"`
     })
     .join("\n")
+  return warning ? `${warning}\n${rendered}` : rendered
 }
 
 function renderAccessLogProvenance(entry: MailAccessLogEntry): string {

@@ -378,6 +378,11 @@ function backgroundOperationPriority(operation: BackgroundOperationRecord): numb
   }
 }
 
+function backgroundOperationSpecText(spec: Record<string, unknown> | undefined, key: string): string {
+  const value = spec?.[key]
+  return typeof value === "string" ? value.trim() : ""
+}
+
 function selectPrimaryBackgroundOperation(frame: ActiveWorkFrame): BackgroundOperationRecord | null {
   const operations = frame.backgroundOperations ?? []
   if (operations.length === 0) return null
@@ -410,6 +415,30 @@ function formatBackgroundOperationNextAction(operation: BackgroundOperationRecor
     case "running": return `monitor the ${operation.title} operation and react when it changes`
     case "succeeded": return `review the completed ${operation.title} operation and continue`
   }
+}
+
+function formatBackgroundOperationMeta(operation: BackgroundOperationRecord): string[] {
+  const lines: string[] = [`operation: ${operation.id}`]
+  const filePath = backgroundOperationSpecText(operation.spec, "filePath")
+    || backgroundOperationSpecText(operation.spec, "newestCandidatePath")
+  if (filePath) lines.push(`file: ${filePath}`)
+  const originLabel = backgroundOperationSpecText(operation.spec, "fileOriginLabel")
+    || backgroundOperationSpecText(operation.spec, "newestCandidateOriginLabel")
+  if (originLabel) lines.push(`origin: ${originLabel}`)
+  const ownerEmail = backgroundOperationSpecText(operation.spec, "ownerEmail")
+  const source = backgroundOperationSpecText(operation.spec, "source")
+  if (ownerEmail || source) {
+    lines.push(`owner/source: ${ownerEmail || "unknown"} / ${source || "unknown"}`)
+  }
+  if (operation.startedAt?.trim()) lines.push(`started: ${operation.startedAt}`)
+  if (operation.finishedAt?.trim()) lines.push(`finished: ${operation.finishedAt}`)
+  else if (operation.updatedAt?.trim()) lines.push(`updated: ${operation.updatedAt}`)
+  const nextAction = formatBackgroundOperationNextAction(operation)
+  if (nextAction.trim().length > 0) lines.push(`next: ${nextAction}`)
+  if (operation.remediation?.length) {
+    lines.push(...operation.remediation.map((step) => `remediation: ${step}`))
+  }
+  return lines
 }
 
 function formatNextAction(frame: ActiveWorkFrame, obligation: Obligation | null): string | null {
@@ -899,6 +928,7 @@ export function formatActiveWorkFrame(frame: ActiveWorkFrame, options?: { obliga
       if (operation.summary.trim().length > 0) {
         line += `: ${operation.summary}`
       }
+      line += `\n  ${formatBackgroundOperationMeta(operation).join("\n  ")}`
       if (operation.detail?.trim()) {
         line += `\n  ${operation.detail.trim()}`
       }

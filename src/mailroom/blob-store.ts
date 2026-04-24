@@ -14,7 +14,7 @@ import {
   type MailScreenerCandidate,
   type StoredMailMessage,
 } from "./core"
-import type { MailAccessLogEntry, MailListFilters, MailroomStore, MailScreenerCandidateFilters } from "./file-store"
+import type { MailAccessLogEntry, MailAccessLogListing, MailListFilters, MailroomStore, MailScreenerCandidateFilters } from "./file-store"
 
 const MESSAGE_INDEX_PREFIX = "message-index"
 const MESSAGE_INDEX_SORT_MAX_MS = 9_999_999_999_999
@@ -662,10 +662,10 @@ export class AzureBlobMailroomStore implements MailroomStore {
     return complete
   }
 
-  async listAccessLog(agentId: string): Promise<MailAccessLogEntry[]> {
+  async listAccessLog(agentId: string): Promise<MailAccessLogListing> {
     await this.ensureContainer()
     const entries = await downloadJson<MailAccessLogEntry[]>(this.accessLogBlob(agentId), this.blobOperationTimeoutMs)
-    const safeEntries = Array.isArray(entries) ? entries : []
+    const safeEntries = (Array.isArray(entries) ? entries : []) as MailAccessLogListing
     emitNervesEvent({
       component: "senses",
       event: "senses.mail_blob_access_log_listed",
