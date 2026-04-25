@@ -204,6 +204,9 @@ export function renderCachedMessageSummary(message: MailSearchCacheDocument, que
     `  from: ${from}`,
     `  subject: ${subject}`,
   ]
+  if (typeof message.attachmentCount === "number" && message.attachmentCount > 0) {
+    lines.push(`  attachments: ${message.attachmentCount}`)
+  }
   if (queryTerms.length > 0) {
     const hint = formatRelevanceHint(scoreMailSearchDocument(message, queryTerms))
     if (hint) lines.push(`  matched on: ${hint}`)

@@ -22,6 +22,9 @@ export interface MailSearchCacheDocument {
   textExcerpt: string
   untrustedContentWarning: string
   searchText: string
+  // Optional fields populated on cache write but absent on docs cached before
+  // these fields were introduced. Always treat as may-be-undefined on read.
+  attachmentCount?: number
 }
 
 export interface MailSearchCacheFilters {
@@ -109,6 +112,7 @@ export function buildMailSearchCacheDocument(message: StoredMailMessage, private
     textExcerpt: privateEnvelope.text.slice(0, SEARCH_TEXT_EXCERPT_LIMIT),
     untrustedContentWarning: privateEnvelope.untrustedContentWarning,
     searchText: normalizeSearchText(privateEnvelope),
+    attachmentCount: privateEnvelope.attachments.length,
   }
 }
 

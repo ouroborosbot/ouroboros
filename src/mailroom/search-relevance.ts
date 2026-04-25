@@ -19,6 +19,12 @@ export interface RelevanceSignal {
   bookingTokens: string[]
   confirmationTokens: string[]
   currencyTokens: string[]
+  // Decisive-state tokens — confirmed/cancelled/changed/refunded/pending/etc.
+  // Surfaced for triage; do not score on top of bookingTokens (mostly overlap).
+  statusTokens: string[]
+  // ISO-8601 dates and "Month day[ year]"-shaped tokens. Helpful for the agent
+  // to triage a hit without opening the body.
+  dateTokens: string[]
   travelSenderHint?: string
 }
 
@@ -127,6 +133,30 @@ const LONG_DIGIT_RE = /\b\d{8,}\b/g
 // (or following) a number. Catches "$420", "€189.50", "CHF 320", "USD 199".
 const CURRENCY_RE = /(?:[$£€¥₣]\s?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?|\b(?:USD|EUR|GBP|CHF|JPY|CAD|AUD|SEK|NOK|DKK)\s?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?)/g
 
+// ISO-8601 dates and "January 2[, 2026]" / "2 January 2026" forms.
+const ISO_DATE_RE = /\b\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b/g
+const MONTH_DAY_RE = /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?\b/gi
+const DAY_MONTH_RE = /\b\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:,?\s+\d{4})?\b/gi
+
+// Status tokens — decisive truth signals. These often determine whether a
+// "this trip is on" reading is correct. Lowercased substring match.
+const STATUS_TOKENS = [
+  "confirmed",
+  "booked",
+  "cancelled",
+  "canceled",
+  "changed",
+  "rescheduled",
+  "refunded",
+  "refund",
+  "pending",
+  "tentative",
+  "waitlist",
+  "no longer",
+  "rebooked",
+  "modified",
+] as const
+
 function uniqueLowercaseHits(text: string, regex: RegExp): string[] {
   const hits = text.match(regex)
   if (!hits) return []
@@ -228,6 +258,7 @@ export function scoreMailSearchDocument(
   }
 
   const subjectAndBody = `${document.subject}\n${document.textExcerpt}`
+  const subjectAndBodyLower = subjectAndBody.toLowerCase()
   const confirmationTokens = [
     ...uniqueLowercaseHits(subjectAndBody, ALPHANUM_CONF_RE),
     ...uniqueLowercaseHits(subjectAndBody, LONG_DIGIT_RE),
@@ -236,6 +267,17 @@ export function scoreMailSearchDocument(
 
   const currencyTokens = uniqueLowercaseHits(subjectAndBody, CURRENCY_RE)
   if (currencyTokens.length > 0) score += 3
+
+  const dateTokens = [
+    ...uniqueLowercaseHits(subjectAndBody, ISO_DATE_RE),
+    ...uniqueLowercaseHits(subjectAndBody, MONTH_DAY_RE),
+    ...uniqueLowercaseHits(subjectAndBody, DAY_MONTH_RE),
+  ]
+
+  const statusTokens: string[] = []
+  for (const token of STATUS_TOKENS) {
+    if (subjectAndBodyLower.includes(token)) statusTokens.push(token)
+  }
 
   const travelSenderHint = findKnownTravelSender(document.from)
   if (travelSenderHint) score += 6
@@ -246,6 +288,8 @@ export function scoreMailSearchDocument(
     bookingTokens: Array.from(bookingHits),
     confirmationTokens,
     currencyTokens,
+    statusTokens,
+    dateTokens,
   }
   if (travelSenderHint) signal.travelSenderHint = travelSenderHint
   return signal
@@ -278,11 +322,17 @@ export function formatRelevanceHint(signal: RelevanceSignal): string {
     const preview = signal.bookingTokens.slice(0, 3).join(", ")
     parts.push(`booking signals: ${preview}`)
   }
+  if (signal.statusTokens.length > 0) {
+    parts.push(`status: ${signal.statusTokens.slice(0, 3).join(", ")}`)
+  }
   if (signal.confirmationTokens.length > 0) {
     parts.push(`conf token: ${signal.confirmationTokens[0]}`)
   }
   if (signal.currencyTokens.length > 0) {
     parts.push(`amount: ${signal.currencyTokens[0]}`)
+  }
+  if (signal.dateTokens.length > 0) {
+    parts.push(`dates: ${signal.dateTokens.slice(0, 3).join(", ")}`)
   }
   if (signal.travelSenderHint) {
     parts.push(`sender: ${signal.travelSenderHint}`)

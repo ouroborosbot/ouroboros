@@ -32,6 +32,8 @@ describe("scoreMailSearchDocument", () => {
     expect(signal.bookingTokens).toEqual([])
     expect(signal.confirmationTokens).toEqual([])
     expect(signal.currencyTokens).toEqual([])
+    expect(signal.statusTokens).toEqual([])
+    expect(signal.dateTokens).toEqual([])
     expect(signal.travelSenderHint).toBeUndefined()
   })
 
@@ -92,6 +94,40 @@ describe("scoreMailSearchDocument", () => {
     expect(signal.score).toBeGreaterThanOrEqual(6)
   })
 
+  it("extracts status tokens (confirmed / cancelled / etc.) without double-scoring booking-token overlap", () => {
+    const confirmed = scoreMailSearchDocument(doc({
+      subject: "Booking Confirmation",
+      textExcerpt: "your reservation is confirmed.",
+    }), [])
+    expect(confirmed.statusTokens).toContain("confirmed")
+    const cancelled = scoreMailSearchDocument(doc({
+      subject: "Reservation Cancelled",
+      textExcerpt: "your booking has been cancelled and refunded.",
+    }), [])
+    expect(cancelled.statusTokens).toEqual(expect.arrayContaining(["cancelled", "refunded"]))
+  })
+
+  it("extracts ISO and natural-language date tokens", () => {
+    const signal = scoreMailSearchDocument(doc({
+      subject: "Stay 2026-08-02 to 2026-08-05",
+      textExcerpt: "Check-in: August 2, 2026. Check-out: 5 August 2026.",
+    }), [])
+    expect(signal.dateTokens).toEqual(expect.arrayContaining([
+      "2026-08-02",
+      "2026-08-05",
+    ]))
+    // At least one of the natural-language matches should also be present.
+    expect(signal.dateTokens.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("ignores date-shaped noise like file timestamps without month names", () => {
+    const signal = scoreMailSearchDocument(doc({
+      subject: "Backup",
+      textExcerpt: "saved at 12:34:56 file size 4096 bytes",
+    }), [])
+    expect(signal.dateTokens).toEqual([])
+  })
+
   it("composes signals additively for a strong booking confirmation", () => {
     const strong = scoreMailSearchDocument(doc({
       from: ["noreply@booking.com"],
@@ -143,22 +179,28 @@ describe("formatRelevanceHint", () => {
       bookingTokens: [],
       confirmationTokens: [],
       currencyTokens: [],
+      statusTokens: [],
+      dateTokens: [],
     })).toBe("")
   })
 
-  it("renders fields, booking tokens, and conf+amount+sender in one line", () => {
+  it("renders all surfaced signals in one line for a strong booking confirmation", () => {
     const hint = formatRelevanceHint({
-      score: 20,
+      score: 30,
       matchedFields: ["subject", "from"],
       bookingTokens: ["confirmation", "your stay"],
+      statusTokens: ["confirmed"],
       confirmationTokens: ["BSL47291"],
       currencyTokens: ["$420.00"],
+      dateTokens: ["2026-08-02", "August 2, 2026"],
       travelSenderHint: "booking.com",
     })
     expect(hint).toContain("fields: subject+from")
     expect(hint).toContain("booking signals: confirmation, your stay")
+    expect(hint).toContain("status: confirmed")
     expect(hint).toContain("conf token: BSL47291")
     expect(hint).toContain("amount: $420.00")
+    expect(hint).toContain("dates: 2026-08-02, August 2, 2026")
     expect(hint).toContain("sender: booking.com")
   })
 })
