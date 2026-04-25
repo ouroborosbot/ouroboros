@@ -183,6 +183,20 @@ describe("mail search cache", () => {
     expect(searchMailSearchCache({ agentId: "slugger" })).toHaveLength(0)
   })
 
+  it("sorts results by recency desc when no query terms are provided", () => {
+    process.env.HOME = tempDir()
+    upsertMailSearchCacheDocument(
+      message({ id: "mail_older", receivedAt: "2026-04-01T08:00:00.000Z" }),
+      privateEnvelope({ subject: "older" }),
+    )
+    upsertMailSearchCacheDocument(
+      message({ id: "mail_newer", receivedAt: "2026-04-24T18:00:00.000Z" }),
+      privateEnvelope({ subject: "newer" }),
+    )
+    const matches = searchMailSearchCache({ agentId: "slugger" })
+    expect(matches.map((m) => m.messageId)).toEqual(["mail_newer", "mail_older"])
+  })
+
   it("excludes cached docs whose source is undefined when a source filter is applied", () => {
     process.env.HOME = tempDir()
     // Native mail has no source — should be excluded when a source filter is set.
