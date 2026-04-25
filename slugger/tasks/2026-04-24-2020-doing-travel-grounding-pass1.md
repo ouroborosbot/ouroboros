@@ -39,6 +39,18 @@ Branch: `slugger/mail-convergence-pass1`
 - That means quoted-printable / HTML-heavy booking mail could be present in the archive yet fail fallback discovery unless it had already been cached from some previous successful read.
 - This is a plausible root cause for "mail clearly exists but Slugger can't recover it" failures around travel confirmations.
 
+## Follow-on Friction Observed After The Fix
+
+- Live diagnostic queries against the real HEY archive still show two UX/perf problems:
+  1. vague hotel/travel terms produce noisy matches because archive search semantics are broad OR-style substring matches without stronger date/ranking guidance;
+  2. archive fallback can become slow on a huge HEY export when it has to parse too much of the file to answer an underspecified query.
+- One real diagnostic query against the live archive had to be manually killed after it pegged CPU as a bare `node` process for multiple minutes. So this is not theoretical perf anxiety; it is a real operator-footgun.
+- Narrow counting shows only **376** `mail-search` cache docs under `~/AgentBundles`, far below the previously observed `28352` imported-message count. So archive fallback is compensating for a cache/index surface that is much smaller than the imported corpus.
+- That suggests the next step is not just "fix missing results" but "make archive search behave like a work tool":
+  - better ranking,
+  - tighter query semantics,
+  - or a durable parsed index for imported archives.
+
 ## Actions Taken
 
 - Sent an audited Messages prompt to Slugger asking for a no-hints re-audit of delegated mail and travel artifacts, with a clean closeout format.
@@ -63,3 +75,47 @@ Branch: `slugger/mail-convergence-pass1`
    - stronger mail-grounding retrieval,
    - a travel-grounding helper/service,
    - or both.
+
+## Work-Ideator Sketch: What This Probably Wants To Become
+
+### Spark
+
+Make "update my travel plans from my mail" feel like agent work, not like manually spelunking receipts and hoping the right detail sticks.
+
+### Observed Terrain
+
+- Agent Mail already proves the lane boundary, provenance model, import flow, and explicit read tools.
+- `tools-flight.ts` exists for flight shopping/booking primitives, but there is no canonical reservation/trip object that unifies flight, hotel, and itinerary evidence.
+- Current trip updates are doc edits plus freeform retrieval strategy.
+- Search correctness and search usability are currently entangled.
+
+### Surviving Shape
+
+- The primitive should not be "travel AI."
+- The primitive should be a **reservation ledger / trip work object**:
+  - reservations with typed kind (`flight`, `hotel`, `rail`, `car`, `event`);
+  - normalized date/time/location fields;
+  - confidence + provenance links back to mail message ids;
+  - explicit contradictions / superseded states;
+  - a human-readable itinerary view generated from the ledger.
+
+### Why This Is Not Theater
+
+- It separates evidence retrieval from planning output.
+- It gives Slugger a canonical place to represent "there are conflicting flight times" or "there is a booked stay here but I have low confidence on the check-out date."
+- It makes later tools possible without re-parsing docs:
+  - "what changed since yesterday?"
+  - "show all reservations between Basel and Italy"
+  - "which bookings are only supported by one weak piece of evidence?"
+
+### Thin Slice
+
+- Add a reservation-ledger file format in the bundle.
+- Add a helper that can append/update reservation entries from mail evidence with message-id provenance.
+- Keep `bookings.md` / `itinerary.md` as rendered/operator-facing views, not the only canonical substrate.
+
+### Non-Goals
+
+- Do not build a full OTA/travel CRM.
+- Do not auto-book or auto-cancel anything from this slice.
+- Do not pretend search/ranking problems disappear just because a ledger exists.
