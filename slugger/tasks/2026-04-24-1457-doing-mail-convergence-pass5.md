@@ -49,7 +49,7 @@ What:
 Acceptance:
 - The literal-only implementation fails until the disjunction support lands.
 
-### ⬜ Unit 2b: Natural-query implementation and coverage closeout
+### ✅ Unit 2b: Natural-query implementation and coverage closeout
 
 What:
 - Implement small, literal `OR` disjunction support, remove any unreachable helper branches, and close the remaining coverage gap honestly.
@@ -57,7 +57,17 @@ What:
 Acceptance:
 - The changed retrieval logic is fully covered at 100% without fake branches or fake tests.
 
-### ⬜ Unit 3: Runtime reload and watched Slugger retry
+### ✅ Unit 3a: BlueBubbles stranded-inbound recovery fix
+
+What:
+- Separate BlueBubbles inbound capture from handled-message truth so a captured iMessage is not silently treated as completed work, then add honest recovery for captured-but-unprocessed messages.
+
+Acceptance:
+- The inbound sidecar remains audit truth only.
+- Duplicate suppression still blocks expensive double-processing.
+- A captured but unhandled iMessage can be recovered without a human resend or mechanic nudge.
+
+### ⬜ Unit 3b: Runtime reload and watched Slugger retry
 
 What:
 - Reload the runtime from this worktree, verify live health, and watch the audited iMessage lane while Slugger retries the summer travel update from mail.
@@ -76,3 +86,22 @@ Acceptance:
 
 - 2026-04-24 14:57 Doing doc created for the fifth convergence pass.
 - 2026-04-24 14:57 Units 1a, 1b, and 2a were already substantially underway in the live pass and were captured here to preserve the paper trail before closing the remaining coverage/runtime/retry work.
+- 2026-04-24 17:03 Convergence resumed after the audited travel-update lane stalled again. The real runtime bug was not "Slugger needs nudging"; BlueBubbles was treating the inbound sidecar as both capture log and completion marker, which let a live iMessage be stranded after capture.
+- 2026-04-24 17:25 The current live blocker is delegated `mail_search`, not BlueBubbles. Slugger searched for exact travel identifiers (`9FLJTF`, `24LEBB`, `2433516539`) from the audited iMessage lane and hit hosted Mailroom failures like `download messages/... timed out after 20000ms` and `RestError: Error reading response as text: aborted`.
+- 2026-04-24 17:25 Live evidence check:
+  - the primary HEY archive `.playwright-mcp/HEY-emails-ari-mendelow-me.mbox` definitely contains the missing Aer Lingus / hotel identifiers;
+  - local mail-search cache only has a small warm subset instead of the full historical corpus;
+  - successful import operations exist and point at the right `.playwright-mcp` archive;
+  - therefore the repair target is the delegated historical search lane, not Slugger's behavior.
+- 2026-04-24 17:25 Patch shape for Unit 3b:
+  - make archive-hydrated delegated search cheap enough to use on real HEY exports instead of reconstructing every message before the first text match;
+  - avoid letting a partial cached result block imported-archive search when the search scope still includes delegated mail;
+  - reload runtime and watch the audited lane until Slugger updates the travel artifacts from mail evidence.
+- 2026-04-24 18:10 Unit 3a is now honestly green:
+  - `npm test -- --run src/__tests__/mailroom/mbox-import.test.ts src/__tests__/mailroom/tools-mail-hosted.test.ts src/__tests__/senses/bluebubbles/index.test.ts` passed during the tightening loop;
+  - `npm run test:coverage` passed with the repo's 100% code-coverage gate and `nerves audit: pass`;
+  - the last residue was not another mail bug, but two impossible-for-webhook guard branches in `src/senses/bluebubbles/index.ts` plus one real guidless-sidecar recovery path, which are now captured by the code/tests instead of left as murky defensive ghosts.
+- 2026-04-24 18:10 Next live step:
+  - commit this convergence unit;
+  - reload the daemon from this worktree so Slugger is no longer on the stale 14:57 runtime;
+  - then watch the audited iMessage lane for either autonomous resumption or the next concrete blocker.

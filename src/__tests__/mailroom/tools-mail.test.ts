@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { provisionMailboxRegistry } from "../../mailroom/core"
 import { buildNativeMailAutonomyPolicy } from "../../mailroom/autonomy"
 import { FileMailroomStore, ingestRawMailToStore } from "../../mailroom/file-store"
+import { resetMailSearchCacheForTests } from "../../mailroom/search-cache"
 import type { BackgroundOperationRecord } from "../../heart/background-operations"
 import type { DiscoveredMboxCandidate } from "../../heart/mail-import-discovery"
 import { cacheRuntimeCredentialConfig, resetRuntimeCredentialConfigCache } from "../../heart/runtime-credentials"
@@ -291,6 +292,7 @@ afterEach(() => {
   if (originalHome === undefined) delete process.env.HOME
   else process.env.HOME = originalHome
   resetIdentity()
+  resetMailSearchCacheForTests()
   resetRuntimeCredentialConfigCache()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -1370,6 +1372,7 @@ describe("mail tools", () => {
   })
 
   it("orients the agent when delegated HEY mail has not been imported yet", async () => {
+    process.env.HOME = tempDir()
     setAgentName("slugger")
     const root = tempDir()
     const storePath = path.join(root, "mailroom")

@@ -1,9 +1,12 @@
+import fs from "node:fs"
 import type { ToolDefinition } from "./tools-base"
 import { isTrustedLevel } from "../mind/friends/types"
 import { decryptMessages, type MailAccessLogEntry, type MailAccessLogListing, type MailroomStore } from "../mailroom/file-store"
 import { resolveMailroomReader, readMailroomRegistry, writeMailroomRegistry, type MailroomRuntimeConfig } from "../mailroom/reader"
 import { confirmMailDraftSend, createMailDraft, resolveOutboundProviderClient, resolveOutboundTransport, type MailOutboundTransport } from "../mailroom/outbound"
 import { applyMailDecision, buildSenderPolicy, type MailDecisionAction, type MailDecisionActor, type MailScreenerCandidateStatus } from "../mailroom/policy"
+import { searchMailSearchCache, upsertMailSearchCacheDocument, type MailSearchCacheDocument } from "../mailroom/search-cache"
+import { cacheMatchingMailSearchDocumentsFromMboxFile } from "../mailroom/mbox-import"
 import {
   describeMailProvenance,
   normalizeMailAddress,
@@ -83,6 +86,13 @@ function parseScope(value: string | undefined): "native" | "delegated" | undefin
 function parseMailList(value: string | undefined): string[] {
   return (value ?? "")
     .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function mailSearchTerms(query: string): string[] {
+  return query
+    .split(/\s+OR\s+/i)
     .map((entry) => entry.trim())
     .filter(Boolean)
 }
@@ -181,6 +191,37 @@ function renderMessageSummary(message: DecryptedMailMessage): string {
   ].join("\n")
 }
 
+export function renderCachedMessageSummary(message: MailSearchCacheDocument): string {
+  const scope = message.compartmentKind === "delegated"
+    ? `delegated:${message.ownerEmail ?? "unknown"}:${message.source ?? "source"}`
+    : "native"
+  const from = message.from.join(", ") || "(unknown sender)"
+  const subject = message.subject || "(no subject)"
+  return [
+    `- ${message.messageId} [${message.placement}; ${scope}]`,
+    `  from: ${from}`,
+    `  subject: ${subject}`,
+    `  snippet: ${message.snippet}`,
+    `  warning: ${message.untrustedContentWarning}`,
+  ].join("\n")
+}
+
+export function mergeCachedMailSearchDocuments(
+  cached: MailSearchCacheDocument[],
+  imported: MailSearchCacheDocument[],
+  limit: number,
+): MailSearchCacheDocument[] {
+  const merged: MailSearchCacheDocument[] = []
+  const seen = new Set<string>()
+  for (const message of [...cached, ...imported].sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))) {
+    if (seen.has(message.messageId)) continue
+    seen.add(message.messageId)
+    merged.push(message)
+    if (merged.length >= limit) break
+  }
+  return merged
+}
+
 function renderScreenerCandidate(candidate: {
   id: string
   messageId: string
@@ -232,6 +273,12 @@ function renderAccessLogProvenance(entry: MailAccessLogEntry): string {
     return " native agent mailbox"
   }
   return ""
+}
+
+function cacheDecryptedMessages(messages: DecryptedMailMessage[]): void {
+  for (const message of messages) {
+    upsertMailSearchCacheDocument(message, message.private)
+  }
 }
 
 function accessProvenance(message: StoredMailMessage): Pick<MailAccessLogEntry, "mailboxRole" | "compartmentKind" | "ownerEmail" | "source"> {
@@ -663,6 +710,56 @@ function renderRecentImportOperations(agentId: string): string[] {
   })
 }
 
+export async function searchSuccessfulImportArchives(input: {
+  agentId: string
+  config: MailroomRuntimeConfig
+  queryTerms: string[]
+  limit: number
+  source?: string
+}): Promise<MailSearchCacheDocument[]> {
+  if (input.limit <= 0 || input.queryTerms.length === 0) return []
+  let registry: MailroomRegistry
+  try {
+    registry = await readMailroomRegistry(input.config)
+  } catch {
+    return []
+  }
+  const operations = listBackgroundOperations({
+    agentName: input.agentId,
+    agentRoot: getAgentRoot(input.agentId),
+    limit: 20,
+  })
+    .filter((record) => record.kind === "mail.import-mbox" && record.status === "succeeded")
+    .sort((left, right) => comparableOperationTimestamp(right) - comparableOperationTimestamp(left))
+  const seenPaths = new Set<string>()
+  const matches: MailSearchCacheDocument[] = []
+  const seenMessages = new Set<string>()
+  for (const operation of operations) {
+    const filePath = typeof operation.spec?.filePath === "string" ? operation.spec.filePath.trim() : ""
+    if (!filePath || seenPaths.has(filePath) || !fs.existsSync(filePath)) continue
+    seenPaths.add(filePath)
+    const source = typeof operation.spec?.source === "string" ? operation.spec.source : ""
+    if (input.source && source.toLowerCase() !== input.source.toLowerCase()) continue
+    const ownerEmail = typeof operation.spec?.ownerEmail === "string" ? operation.spec.ownerEmail : undefined
+    const found = await cacheMatchingMailSearchDocumentsFromMboxFile({
+      registry,
+      agentId: input.agentId,
+      filePath,
+      ownerEmail,
+      source: source || input.source,
+      queryTerms: input.queryTerms,
+      limit: input.limit - matches.length,
+    })
+    for (const document of found) {
+      if (seenMessages.has(document.messageId)) continue
+      seenMessages.add(document.messageId)
+      matches.push(document)
+    }
+    if (matches.length >= input.limit) break
+  }
+  return matches.sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
+}
+
 async function renderMailStatus(agentId: string, config: MailroomRuntimeConfig, storeLabel: string): Promise<string> {
   const sourceGrantStatus = await renderSourceGrantStatus(config, agentId)
   const delegatedLines = sourceGrantStatus
@@ -773,6 +870,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
       if (result.decrypted.length === 0) {
         return appendDecryptSkips("No decryptable mail to show.", result.skipped)
       }
+      cacheDecryptedMessages(result.decrypted)
       return appendDecryptSkips(result.decrypted.map(renderMessageSummary).join("\n\n"), result.skipped)
     },
     summaryKeys: ["scope", "placement", "source", "limit"],
@@ -923,6 +1021,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
       if (!trustAllowsMailRead(ctx)) return "mail is private; this tool is only available in trusted contexts."
       const query = (args.query ?? "").trim().toLowerCase()
       if (!query) return "query is required."
+      const terms = mailSearchTerms(query)
       const requestedScope = args.scope === "all" ? "all" : parseScope(args.scope)
       const explicitScope = (args.scope ?? "").trim().length > 0
       if (!familyOrAgentSelf(ctx) && explicitScope && requestedScope !== "native") {
@@ -933,22 +1032,64 @@ export const mailToolDefinitions: ToolDefinition[] = [
       const scope = requestedScope === "all"
         ? undefined
         : requestedScope ?? (familyOrAgentSelf(ctx) ? undefined : "native")
+      const limit = numberArg(args.limit, 10, 1, 20)
+      const cachedMatches = searchMailSearchCache({
+        agentId: resolved.agentName,
+        placement: parsePlacement(args.placement),
+        compartmentKind: scope,
+        source: args.source,
+        queryTerms: terms,
+        limit,
+      })
+      if (cachedMatches.length > 0 && cachedMatches.every((message) => message.compartmentKind === "delegated")) {
+        await resolved.store.recordAccess({
+          agentId: resolved.agentName,
+          tool: "mail_search",
+          reason: args.reason || `search: ${query}`,
+        })
+        return cachedMatches.map(renderCachedMessageSummary).join("\n\n")
+      }
+      if (
+        scope !== "native"
+        && resolved.storeKind === "azure-blob"
+        && (cachedMatches.length === 0 || cachedMatches.some((message) => message.compartmentKind !== "delegated"))
+      ) {
+        const importedMatches = await searchSuccessfulImportArchives({
+          agentId: resolved.agentName,
+          config: resolved.config,
+          queryTerms: terms,
+          limit,
+          ...(args.source ? { source: args.source } : {}),
+        })
+        if (importedMatches.length > 0) {
+          const mergedMatches = mergeCachedMailSearchDocuments(cachedMatches, importedMatches, limit)
+          await resolved.store.recordAccess({
+            agentId: resolved.agentName,
+            tool: "mail_search",
+            reason: args.reason || `search: ${query}`,
+          })
+          return mergedMatches.map(renderCachedMessageSummary).join("\n\n")
+        }
+      }
       const all = await resolved.store.listMessages({
         agentId: resolved.agentName,
         placement: parsePlacement(args.placement),
         compartmentKind: scope,
         source: args.source,
-        limit: 200,
       })
       const result = decryptVisibleMessages(all, resolved.config.privateKeys)
+      cacheDecryptedMessages(result.decrypted)
       const matching = result.decrypted
-        .filter((message) => [
-          message.private.subject,
-          message.private.snippet,
-          message.private.text,
-          message.private.from.join(" "),
-        ].join("\n").toLowerCase().includes(query))
-        .slice(0, numberArg(args.limit, 10, 1, 20))
+        .filter((message) => {
+          const haystack = [
+            message.private.subject,
+            message.private.snippet,
+            message.private.text,
+            message.private.from.join(" "),
+          ].join("\n").toLowerCase()
+          return terms.some((term) => haystack.includes(term))
+        })
+        .slice(0, limit)
       await resolved.store.recordAccess({
         agentId: resolved.agentName,
         tool: "mail_search",
@@ -1012,6 +1153,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
         if (!keyId) throw error
         return renderUndecryptableThread(message, keyId)
       }
+      upsertMailSearchCacheDocument(message, decrypted.private)
       const maxChars = numberArg(args.max_chars, 2000, 200, 6000)
       const body = decrypted.private.text.length > maxChars
         ? `${decrypted.private.text.slice(0, maxChars - 3)}...`
