@@ -145,12 +145,9 @@ function maybeSurfaceAutoCreatedGroup(input: TrustGateInput, bundleRoot: string,
   if (!input.isGroupChat) return false
   if (input.friend.trustLevel !== "stranger") return false
   if (!input.friend.notes?.["autoCreatedGroup"]) return false
-  let state: AcknowledgedGroupsState
-  try {
-    state = loadAcknowledgedGroupsState(bundleRoot)
-  } catch {
-    return false
-  }
+  // loadAcknowledgedGroupsState is defensive (its own try/catch returns {})
+  // so we don't wrap it in another try here.
+  const state = loadAcknowledgedGroupsState(bundleRoot)
   if (state[input.friend.id]) return false
 
   const noticeContent =
@@ -178,8 +175,8 @@ function maybeSurfaceAutoCreatedGroup(input: TrustGateInput, bundleRoot: string,
       },
     })
     return true
+  /* v8 ignore start -- defensive: surfacing failure must not block the gate decision @preserve */
   } catch (error) {
-    /* v8 ignore next 8 -- defensive: surfacing failure must not block the gate decision @preserve */
     emitNervesEvent({
       level: "error",
       component: "senses",
@@ -192,6 +189,7 @@ function maybeSurfaceAutoCreatedGroup(input: TrustGateInput, bundleRoot: string,
     })
     return false
   }
+  /* v8 ignore stop */
 }
 
 export function enforceTrustGate(input: TrustGateInput): TrustGateResult {
