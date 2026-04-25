@@ -1748,13 +1748,11 @@ describe("handleInboundTurn", () => {
           currentProvider: "openai-codex" as const,
           currentLane: "outward" as const,
           agentName: "slugger",
-          workingProviders: ["anthropic" as const],
-          readyProviders: [{
-            provider: "anthropic" as const,
-            model: "claude-opus-4-6",
-            credentialRevision: "cred_anthropic",
-            source: "auth-flow" as const,
-          }],
+          workingProviders: ["anthropic" as const, "minimax" as const],
+          readyProviders: [
+            { provider: "anthropic" as const, model: "claude-opus-4-6", credentialRevision: "cred_anthropic", source: "auth-flow" as const },
+            { provider: "minimax" as const, model: "MiniMax-M2.7", credentialRevision: "cred_minimax", source: "auth-flow" as const },
+          ],
           unconfiguredProviders: [],
           userMessage: "switch available",
         },
@@ -1783,14 +1781,72 @@ describe("handleInboundTurn", () => {
         const passedMessages = mockRunAgent.mock.calls[0][0] as Array<{ role: string; content: string }>
         const lastUserMsg = [...passedMessages].reverse().find((m) => m.role === "user")
         expect(lastUserMsg?.content).not.toBe("switch to anthropic")
+        // Operational refusal shape: refused / reason / current lane unchanged / alternatives / next move.
         expect(lastUserMsg?.content).toContain("refused")
         expect(lastUserMsg?.content).toContain("anthropic")
         expect(lastUserMsg?.content).toContain("401 token expired")
+        expect(lastUserMsg?.content).toContain("current lane unchanged: openai-codex")
+        // The minimax alternative is listed; the just-refused anthropic is excluded.
+        expect(lastUserMsg?.content).toContain("minimax (MiniMax-M2.7)")
+        expect(lastUserMsg?.content).toMatch(/available verified alternatives/)
+        expect(lastUserMsg?.content).toMatch(/next move/)
         // We did call ping with the candidate.
         expect(mockPingProvider).toHaveBeenCalled()
         const [pingProvider, , pingOptions] = mockPingProvider.mock.calls[0]
         expect(pingProvider).toBe("anthropic")
         expect(pingOptions).toEqual(expect.objectContaining({ model: "claude-opus-4-6" }))
+      } finally {
+        agentRootSpy.mockRestore()
+        fs.rmSync(tmp, { recursive: true, force: true })
+      }
+    })
+
+    it("refuses failover switch with operator-repair next move when no alternatives remain ready", async () => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-pipeline-failover-no-alt-"))
+      const agentRoot = path.join(tmp, "slugger.ouro")
+      fs.mkdirSync(agentRoot, { recursive: true })
+      writeProviderState(agentRoot, providerState())
+      const agentRootSpy = vi.spyOn(identity, "getAgentRoot" as any).mockReturnValue(agentRoot)
+
+      mockPingProvider.mockResolvedValueOnce({
+        ok: false,
+        classification: "auth-failure",
+        message: "401 token expired",
+      })
+      const mockRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
+      // Only anthropic was ready; once it's refused there are no alternatives.
+      const failoverState = {
+        pending: {
+          errorSummary: "openai-codex hit its usage limit",
+          classification: "usage-limit" as const,
+          currentProvider: "openai-codex" as const,
+          currentLane: "outward" as const,
+          agentName: "slugger",
+          workingProviders: ["anthropic" as const],
+          readyProviders: [{
+            provider: "anthropic" as const,
+            model: "claude-opus-4-6",
+            credentialRevision: "cred_anthropic",
+            source: "auth-flow" as const,
+          }],
+          unconfiguredProviders: [],
+          userMessage: "switch available",
+        },
+      }
+      const input = makeInput({
+        failoverState,
+        messages: [{ role: "user", content: "switch to anthropic" }],
+        runAgent: mockRunAgent,
+      })
+
+      try {
+        await handleInboundTurn(input)
+
+        const passedMessages = mockRunAgent.mock.calls[0][0] as Array<{ role: string; content: string }>
+        const lastUserMsg = [...passedMessages].reverse().find((m) => m.role === "user")
+        expect(lastUserMsg?.content).toContain("no other verified alternatives")
+        // The next move steers the agent to ask the operator to repair creds.
+        expect(lastUserMsg?.content).toContain("repair credentials")
       } finally {
         agentRootSpy.mockRestore()
         fs.rmSync(tmp, { recursive: true, force: true })

@@ -155,6 +155,35 @@ function formatFailoverSwitchLabel(action: Extract<FailoverAction, { action: "sw
   return `${action.provider} (${action.model}${provenance ? `; ${provenance}` : ""})`
 }
 
+/**
+ * Build the operational refusal context message handed back to the agent when
+ * a failover switch is rejected by the preflight ping. Slugger-tested format:
+ * lead with the refusal + reason, restate the lane that's still standing, then
+ * list remaining ready alternatives so the next turn doesn't have to re-enter
+ * discovery mode.
+ */
+function buildFailoverSwitchRefusedMessage(
+  pendingContext: FailoverContext,
+  refusedAction: Extract<FailoverAction, { action: "switch" }>,
+  refusal: { classification: import("../heart/core").ProviderErrorClassification; message: string },
+): string {
+  const refusedLabel = formatFailoverSwitchLabel(refusedAction)
+  const remaining = pendingContext.readyProviders.filter((candidate) => candidate.provider !== refusedAction.provider)
+  const alternativesLine = remaining.length > 0
+    ? `available verified alternatives right now: ${remaining.map((c) => `${c.provider} (${c.model})`).join(", ")}.`
+    : "no other verified alternatives are ready right now."
+  const nextMove = remaining.length > 0
+    ? `next move: reply "switch to <provider>" picking one of the alternatives above, or tell the user you cannot continue and why.`
+    : `next move: ask the operator to repair credentials for ${refusedAction.provider} (or another provider), or tell the user you cannot continue and why.`
+  return [
+    `[provider switch refused: tried to switch ${refusedAction.lane} lane to ${refusedLabel}.`,
+    `reason: preflight ping failed (${refusal.classification}: ${refusal.message}).`,
+    `current lane unchanged: ${pendingContext.currentProvider} on the ${pendingContext.currentLane} lane.`,
+    alternativesLine,
+    nextMove + "]",
+  ].join(" ")
+}
+
 
 // ── Input / Output types ──────────────────────────────────────────
 
@@ -363,10 +392,9 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
             error: switchOutcome.message,
           },
         })
-        const refusedLabel = formatFailoverSwitchLabel(failoverAction)
         input.messages = [{
           role: "user" as const,
-          content: `[provider switch refused: tried to switch ${failoverAction.lane} lane to ${refusedLabel} but the preflight ping failed (${switchOutcome.classification}: ${switchOutcome.message}). The lane is unchanged — still on ${pendingContext.currentProvider}. Pick a different ready provider, or tell the user why you cannot continue.]`,
+          content: buildFailoverSwitchRefusedMessage(pendingContext, failoverAction, switchOutcome),
         }]
       }
       // Switch failed OR succeeded — either way, fall through to normal processing.
