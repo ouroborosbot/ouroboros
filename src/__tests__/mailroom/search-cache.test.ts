@@ -183,6 +183,37 @@ describe("mail search cache", () => {
     expect(searchMailSearchCache({ agentId: "slugger" })).toHaveLength(0)
   })
 
+  it("excludes cached docs whose source is undefined when a source filter is applied", () => {
+    process.env.HOME = tempDir()
+    // Native mail has no source — should be excluded when a source filter is set.
+    upsertMailSearchCacheDocument(
+      message({
+        id: "mail_native_no_source",
+        compartmentKind: "native",
+        compartmentId: "mailbox_slugger",
+        grantId: undefined,
+        ownerEmail: undefined,
+        source: undefined,
+        placement: "sent",
+      }),
+      privateEnvelope({
+        from: ["slugger@ouro.bot"],
+        subject: "Native sent",
+        text: "x",
+        snippet: "x",
+      }),
+    )
+    upsertMailSearchCacheDocument(message(), privateEnvelope())
+
+    const matches = searchMailSearchCache({
+      agentId: "slugger",
+      source: "hey",
+      queryTerms: [],
+      limit: 5,
+    })
+    expect(matches.map((m) => m.messageId)).toEqual(["mail_trip_1"])
+  })
+
   describe("booking-aware ranking benchmark", () => {
     // Synthetic corpus that mirrors the failure shape Slugger named: an older
     // decisive booking confirmation buried under newer travel-ish noise
