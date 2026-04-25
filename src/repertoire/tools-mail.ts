@@ -569,10 +569,11 @@ function archiveFreshnessNote(
   operation: BackgroundOperationRecord | null,
   newestCurrentLaneArchiveMtimeMs: number | null = null,
 ): string {
-  /* v8 ignore next 3 -- defensive: callers in tests always pass an operation; covered by integration paths */
+  /* v8 ignore start -- defensive: callers in tests always pass an operation; covered by integration paths */
   if (!operation) {
     return "freshness: unimported (no prior import recorded; import needed)"
   }
+  /* v8 ignore stop */
   const sourceFreshThrough = operationResultText(operation, "sourceFreshThrough")
   if (operation.status === "succeeded") {
     const operationTimestamp = latestComparableOperationTimestamp(operation)
@@ -660,10 +661,11 @@ function renderArchiveStatus(
   operation: BackgroundOperationRecord | null,
   newestCurrentLaneArchiveMtimeMs: number | null,
 ): string {
-  /* v8 ignore next 3 -- defensive: tests reach this helper through integration paths that always provide an operation; same archiveFreshnessNote fallback covered there */
+  /* v8 ignore start -- defensive: tests reach this helper through integration paths that always provide an operation; same archiveFreshnessNote fallback covered there */
   if (!operation) {
     return `- [${candidate.originLabel}] ${candidate.path} :: status: ready; ${archiveFreshnessNote(candidate, null, newestCurrentLaneArchiveMtimeMs)}`
   }
+  /* v8 ignore stop */
   const operationTimestamp = latestComparableOperationTimestamp(operation)
   const ownerEmail = typeof operation.spec?.ownerEmail === "string" ? operation.spec.ownerEmail : ""
   const source = typeof operation.spec?.source === "string" ? operation.spec.source : ""

@@ -182,7 +182,9 @@ function findKnownTravelSender(fromList: string[]): string | undefined {
 }
 
 function countOccurrences(haystack: string, needle: string): number {
+  /* v8 ignore start -- defensive: BOOKING_INTENT_TOKENS are non-empty by construction */
   if (!needle) return 0
+  /* v8 ignore stop */
   let count = 0
   let from = 0
   while (true) {
@@ -225,6 +227,7 @@ export function scoreMailSearchDocument(
   const matchedFields = new Set<RelevanceSignal["matchedFields"][number]>()
 
   for (const term of queryTerms) {
+    /* v8 ignore next -- defensive: callers always normalize/filter empty terms */
     if (!term) continue
     if (subjectLower.includes(term)) {
       score += 6

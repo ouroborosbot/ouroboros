@@ -194,6 +194,20 @@ describe("formatRelevanceHint", () => {
     })).toBe("")
   })
 
+  it("renders a hint without the fields line when matchedFields is empty but other signals fired", () => {
+    const hint = formatRelevanceHint({
+      score: 10,
+      matchedFields: [],
+      bookingTokens: ["confirmation"],
+      confirmationTokens: [],
+      currencyTokens: [],
+      statusTokens: [],
+      dateTokens: [],
+    })
+    expect(hint).not.toContain("fields:")
+    expect(hint).toContain("booking signals: confirmation")
+  })
+
   it("renders all surfaced signals in one line for a strong booking confirmation", () => {
     const hint = formatRelevanceHint({
       score: 30,
