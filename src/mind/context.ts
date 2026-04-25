@@ -384,11 +384,13 @@ function enqueueSessionPersist<T>(sessPath: string, fn: () => Promise<T>): Promi
   // Chain on the previous tail. fn runs whether previous resolved or rejected,
   // so one failed turn cannot block subsequent turns on the same session.
   const next: Promise<T> = previous.then(fn, fn)
-  // Save a swallowed-rejection version as the new tail so the next caller's
-  // `previous.then(fn, fn)` sees a clean resolution sentinel; the original
-  // `next` still propagates rejection to its own caller as expected.
-  /* v8 ignore next -- swallow handler only runs if fn rejects, which is the failure path covered separately */
-  sessionPersistQueues.set(sessPath, next.then(() => undefined, () => undefined))
+  // Save a swallowed-rejection sentinel as the new tail so the next caller's
+  // `previous.then(fn, fn)` sees a clean resolution; the original `next` still
+  // propagates rejection to its own caller as expected.
+  /* v8 ignore start -- the swallow only matters when fn rejects, which is the failure path covered separately */
+  const sentinel = next.then(() => undefined, () => undefined)
+  /* v8 ignore stop */
+  sessionPersistQueues.set(sessPath, sentinel)
   return next
 }
 

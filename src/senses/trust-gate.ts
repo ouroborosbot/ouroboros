@@ -142,7 +142,8 @@ function persistAcknowledgedGroupsState(bundleRoot: string, state: AcknowledgedG
  * Returns true if a notice was written so callers can emit a telemetry event.
  */
 function maybeSurfaceAutoCreatedGroup(input: TrustGateInput, bundleRoot: string, nowIso: string): boolean {
-  if (!input.isGroupChat) return false
+  // Caller guarantees isGroupChat = true (only invoked from the family-member
+  // bypass branch); skip a redundant guard here.
   if (input.friend.trustLevel !== "stranger") return false
   if (!input.friend.notes?.["autoCreatedGroup"]) return false
   // loadAcknowledgedGroupsState is defensive (its own try/catch returns {})
@@ -214,9 +215,10 @@ export function enforceTrustGate(input: TrustGateInput): TrustGateResult {
   // gets a chance to categorize / rename / dismiss the relationship instead
   // of accumulating activity invisibly.
   if (input.isGroupChat && input.groupHasFamilyMember) {
-    /* v8 ignore next 2 -- input.bundleRoot / input.now defaults shared with the rest of the gate; tested via the stranger-trust path above */
+    /* v8 ignore start -- defaults shared with the rest of the gate; tested via the stranger-trust path */
     const bundleRoot = input.bundleRoot ?? getAgentRoot()
     const nowIso = (input.now ?? (() => new Date()))().toISOString()
+    /* v8 ignore stop */
     maybeSurfaceAutoCreatedGroup(input, bundleRoot, nowIso)
     return { allowed: true }
   }
