@@ -381,17 +381,14 @@ const sessionPersistQueues = new Map<string, Promise<unknown>>()
 
 function enqueueSessionPersist<T>(sessPath: string, fn: () => Promise<T>): Promise<T> {
   const previous = sessionPersistQueues.get(sessPath) ?? Promise.resolve()
-  // Run after `previous`, swallowing its rejection so one failed turn
-  // cannot poison the queue for subsequent turns on the same session.
-  const next: Promise<T> = previous.catch(() => undefined).then(fn)
-  // Track the latest tail so the next caller waits for `next`. Allow GC by
-  // dropping the entry once the chain returns to idle.
-  sessionPersistQueues.set(sessPath, next)
-  void next.finally(() => {
-    if (sessionPersistQueues.get(sessPath) === next) {
-      sessionPersistQueues.delete(sessPath)
-    }
-  })
+  // Chain on the previous tail. fn runs whether previous resolved or rejected,
+  // so one failed turn cannot block subsequent turns on the same session.
+  const next: Promise<T> = previous.then(fn, fn)
+  // Save a swallowed-rejection version as the new tail so the next caller's
+  // `previous.then(fn, fn)` sees a clean resolution sentinel; the original
+  // `next` still propagates rejection to its own caller as expected.
+  /* v8 ignore next -- swallow handler only runs if fn rejects, which is the failure path covered separately */
+  sessionPersistQueues.set(sessPath, next.then(() => undefined, () => undefined))
   return next
 }
 

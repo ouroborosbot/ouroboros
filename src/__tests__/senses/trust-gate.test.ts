@@ -548,6 +548,86 @@ describe("trust gate", () => {
       expect(fs.existsSync(innerPendingDir)).toBe(false)
     })
 
+    it("treats an empty acknowledged-auto-groups.json file as no prior surfaces (still surfaces once)", () => {
+      const friend = makeFriend({
+        id: "friend-empty-state-1",
+        name: "Empty State Group",
+        trustLevel: "stranger",
+        notes: { autoCreatedGroup: { value: "true", savedAt: "2026-03-14T23:12:21.302Z" } },
+      })
+      // Pre-create an empty state file
+      const stateDir = path.join(bundleRoot, "state")
+      fs.mkdirSync(stateDir, { recursive: true })
+      fs.writeFileSync(path.join(stateDir, "acknowledged-auto-groups.json"), "", "utf-8")
+
+      const result = enforceTrustGate(makeInput({
+        bundleRoot,
+        senseType: "open",
+        channel: "bluebubbles",
+        provider: "imessage-handle",
+        externalId: "group:any;+;empty-1",
+        friend,
+        isGroupChat: true,
+        groupHasFamilyMember: true,
+      }))
+      expect(result).toEqual({ allowed: true })
+
+      const innerPendingDir = path.join(bundleRoot, "state", "pending", "self", "inner", "dialog")
+      expect(fs.readdirSync(innerPendingDir)).toHaveLength(1)
+    })
+
+    it("treats malformed acknowledged-auto-groups.json content as no prior surfaces", () => {
+      const friend = makeFriend({
+        id: "friend-malformed-state-1",
+        name: "Malformed State Group",
+        trustLevel: "stranger",
+        notes: { autoCreatedGroup: { value: "true", savedAt: "2026-03-14T23:12:21.302Z" } },
+      })
+      const stateDir = path.join(bundleRoot, "state")
+      fs.mkdirSync(stateDir, { recursive: true })
+      fs.writeFileSync(path.join(stateDir, "acknowledged-auto-groups.json"), "{ not valid json", "utf-8")
+
+      enforceTrustGate(makeInput({
+        bundleRoot,
+        senseType: "open",
+        channel: "bluebubbles",
+        provider: "imessage-handle",
+        externalId: "group:any;+;malformed-1",
+        friend,
+        isGroupChat: true,
+        groupHasFamilyMember: true,
+      }))
+
+      const innerPendingDir = path.join(bundleRoot, "state", "pending", "self", "inner", "dialog")
+      expect(fs.readdirSync(innerPendingDir)).toHaveLength(1)
+    })
+
+    it("treats acknowledged-auto-groups.json containing an array as no prior surfaces", () => {
+      const friend = makeFriend({
+        id: "friend-array-state-1",
+        name: "Array State Group",
+        trustLevel: "stranger",
+        notes: { autoCreatedGroup: { value: "true", savedAt: "2026-03-14T23:12:21.302Z" } },
+      })
+      const stateDir = path.join(bundleRoot, "state")
+      fs.mkdirSync(stateDir, { recursive: true })
+      fs.writeFileSync(path.join(stateDir, "acknowledged-auto-groups.json"), "[]", "utf-8")
+
+      enforceTrustGate(makeInput({
+        bundleRoot,
+        senseType: "open",
+        channel: "bluebubbles",
+        provider: "imessage-handle",
+        externalId: "group:any;+;array-1",
+        friend,
+        isGroupChat: true,
+        groupHasFamilyMember: true,
+      }))
+
+      const innerPendingDir = path.join(bundleRoot, "state", "pending", "self", "inner", "dialog")
+      expect(fs.readdirSync(innerPendingDir)).toHaveLength(1)
+    })
+
     it("does NOT surface an auto-created group whose trustLevel has been promoted (acknowledged via promotion)", () => {
       const friend = makeFriend({
         id: "friend-promoted-1",

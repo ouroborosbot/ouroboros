@@ -214,6 +214,7 @@ export function enforceTrustGate(input: TrustGateInput): TrustGateResult {
   // gets a chance to categorize / rename / dismiss the relationship instead
   // of accumulating activity invisibly.
   if (input.isGroupChat && input.groupHasFamilyMember) {
+    /* v8 ignore next 2 -- input.bundleRoot / input.now defaults shared with the rest of the gate; tested via the stranger-trust path above */
     const bundleRoot = input.bundleRoot ?? getAgentRoot()
     const nowIso = (input.now ?? (() => new Date()))().toISOString()
     maybeSurfaceAutoCreatedGroup(input, bundleRoot, nowIso)

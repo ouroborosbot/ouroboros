@@ -370,20 +370,13 @@ function makeEventId(sequence: number): string {
  * view.
  */
 function dedupeEventsByIdLastWins(events: SessionEvent[]): SessionEvent[] {
-  const seenIds = new Set<string>()
+  // Index id → last position so we can preserve original order while
+  // collapsing duplicates to their final occurrence.
   const lastIndexById = new Map<string, number>()
   for (let i = 0; i < events.length; i++) {
     lastIndexById.set(events[i]!.id, i)
   }
-  const out: SessionEvent[] = []
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i]!
-    if (lastIndexById.get(event.id) !== i) continue
-    if (seenIds.has(event.id)) continue
-    seenIds.add(event.id)
-    out.push(event)
-  }
-  return out
+  return events.filter((event, index) => lastIndexById.get(event.id) === index)
 }
 
 /**
@@ -392,11 +385,7 @@ function dedupeEventsByIdLastWins(events: SessionEvent[]): SessionEvent[] {
  * pruning, archive replay, or self-heal dedup never produce a colliding id.
  */
 function nextEventSequence(existing: SessionEvent[]): number {
-  let max = 0
-  for (const event of existing) {
-    if (event.sequence > max) max = event.sequence
-  }
-  return max + 1
+  return existing.reduce((max, event) => Math.max(max, event.sequence), 0) + 1
 }
 
 export function validateSessionMessages(messages: OpenAI.ChatCompletionMessageParam[]): string[] {
