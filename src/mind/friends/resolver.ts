@@ -111,6 +111,22 @@ export class FriendResolver {
 
     const isFirstImprint = !hasAnyFriends
 
+    // BlueBubbles group chats route through here as `imessage-handle` with an
+    // externalId of the form `group:any;+;<chatHash>`. When the harness auto-
+    // creates the group friend at stranger trust, we mark the record so that
+    // the trust gate can surface the relationship for explicit acknowledgment
+    // later instead of letting messages accumulate silently.
+    const isImessageGroup =
+      this.params.provider === "imessage-handle" &&
+      typeof this.params.externalId === "string" &&
+      this.params.externalId.startsWith("group:")
+    const baseNotes = this.params.displayName !== "Unknown"
+      ? { name: { value: this.params.displayName, savedAt: now } }
+      : {}
+    const notes = isImessageGroup && !isFirstImprint
+      ? { ...baseNotes, autoCreatedGroup: { value: true, savedAt: now } }
+      : baseNotes
+
     const friend: FriendRecord = {
       id: randomUUID(),
       name: this.params.displayName,
@@ -120,7 +136,7 @@ export class FriendResolver {
       externalIds: [externalId],
       tenantMemberships,
       toolPreferences: {},
-      notes: this.params.displayName !== "Unknown" ? { name: { value: this.params.displayName, savedAt: now } } : {},
+      notes,
       totalTokens: 0,
       createdAt: now,
       updatedAt: now,
