@@ -236,7 +236,7 @@ describe("hosted mail tools", () => {
     expect(searchTool).toBeTruthy()
 
     const result = await searchTool!.handler({
-      query: "2433516539",
+      query: "missing-anchor, 2433516539, nothing-here",
       scope: "delegated",
       reason: "travel refresh",
     }, trustedContext())
@@ -325,7 +325,7 @@ describe("hosted mail tools", () => {
     expect(searchTool).toBeTruthy()
 
     const result = await searchTool!.handler({
-      query: "2433516539",
+      query: "missing-anchor, 2433516539, nothing-here",
       scope: "delegated",
     }, trustedContext())
 
@@ -334,7 +334,7 @@ describe("hosted mail tools", () => {
     expect(recordAccess).toHaveBeenCalledWith(expect.objectContaining({
       agentId: "slugger",
       tool: "mail_search",
-      reason: "search: 2433516539",
+      reason: "search: missing-anchor, 2433516539, nothing-here",
     }))
   })
 

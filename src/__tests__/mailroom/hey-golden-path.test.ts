@@ -190,10 +190,19 @@ describe("HEY MBOX golden path", () => {
     }, familyContext())
     expect(disjunction).toContain("Flight to London confirmed")
 
+    const commaSeparatedAnchors = await tool("mail_search").handler({
+      query: "missing-token, LDN42A, nothing-here",
+      scope: "delegated",
+      source: "hey",
+      reason: "recover travel search with anchor list",
+    }, familyContext())
+    expect(commaSeparatedAnchors).toContain("Flight to London confirmed")
+
     const accessLog = await store.listAccessLog("slugger")
     expect(accessLog).toEqual(expect.arrayContaining([
       expect.objectContaining({ tool: "mail_search", reason: "update Ari travel plan" }),
       expect.objectContaining({ tool: "mail_search", reason: "recover travel search with OR terms" }),
+      expect.objectContaining({ tool: "mail_search", reason: "recover travel search with anchor list" }),
       expect.objectContaining({ tool: "mail_thread", reason: "extract travel confirmation for upcoming plan update" }),
     ]))
   })

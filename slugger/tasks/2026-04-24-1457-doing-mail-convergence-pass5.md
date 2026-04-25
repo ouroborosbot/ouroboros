@@ -10,12 +10,12 @@ Execute the fifth convergence pass on agent mail by aligning delegated historica
 
 ## Completion Criteria
 
-- [ ] Delegated `mail_search` finds older imported travel mail beyond the recent-window slice.
-- [ ] `mail_search` supports simple `OR` disjunction queries that match when any term appears.
-- [ ] Docs/tests clearly teach `mail_recent` versus `mail_search`.
-- [ ] Coverage gate passes at 100% on changed code paths.
-- [ ] Local runtime is rebuilt/reloaded and live-verified against Slugger’s setup.
-- [ ] Slugger retries the summer-travel update in the audited iMessage lane and either updates the plan artifacts or produces the next real blocker.
+- [x] Delegated `mail_search` finds older imported travel mail beyond the recent-window slice.
+- [x] `mail_search` supports simple `OR` disjunction queries that match when any term appears.
+- [x] Docs/tests clearly teach `mail_recent` versus `mail_search`.
+- [x] Coverage gate passes at 100% on changed code paths.
+- [x] Local runtime is rebuilt/reloaded and live-verified against Slugger’s setup.
+- [x] Slugger retries the summer-travel update in the audited iMessage lane and either updates the plan artifacts or produces the next real blocker.
 
 ## Code Coverage Requirements
 
@@ -105,3 +105,18 @@ Acceptance:
   - commit this convergence unit;
   - reload the daemon from this worktree so Slugger is no longer on the stale 14:57 runtime;
   - then watch the audited iMessage lane for either autonomous resumption or the next concrete blocker.
+- 2026-04-24 18:27 Slugger's next blocker was finally truthful and specific: the booking emails were already present in `state/mail-search/` with exact hits for `9FLJTF` and `24LEBB`, but his natural comma-separated anchor lists were being treated as one literal query string.
+- 2026-04-24 18:27 Repair shape:
+  - teach `mail_search` to treat simple comma-separated anchor lists like the existing `OR` disjunction path;
+  - add one hosted regression and one HEY golden-path regression so cached delegated travel mail stays discoverable when Slugger pastes natural booking-code/vendor lists;
+  - update recovery docs so the operator truth matches the real supported query shapes.
+- 2026-04-24 18:34 Verification after the query-parser repair:
+  - `npm test -- --run src/__tests__/mailroom/tools-mail-hosted.test.ts src/__tests__/mailroom/hey-golden-path.test.ts` passed;
+  - `npm run test:coverage` passed again at 100% with `nerves audit: pass`;
+  - next live step is runtime reload plus the same audited Slugger retry, with no new hints about the hidden itinerary change.
+- 2026-04-24 18:45 The first "reload" was fake-green. `rsync` updated the installed CLI `dist`, but `ouro up` left the already-running daemon/worker in place, so Slugger's retry was still hitting stale in-memory code. The honest repair was `ouro down` followed by `ouro up`, then verifying the worker pid changed before asking him to retry.
+- 2026-04-24 18:49 After the real restart, the audited iMessage lane converged cleanly:
+  - Slugger immediately moved from failing delegated retrieval to `mail_thread`, then into `bookings.md` and `itinerary.md`;
+  - the travel docs on disk updated from April 8 mtimes to fresh April 24 mtimes;
+  - `git -C /Users/arimendelow/AgentBundles/slugger.ouro diff -- travel/2026-summer-trip/bookings.md travel/2026-summer-trip/itinerary.md` confirmed the hidden itinerary change was recovered from email evidence;
+  - Slugger's audited closeout named the concrete updates: Lufthansa/Edelweiss fare, baggage, total price, and ticket numbers for `9FLJTF`; Aer Lingus arrival corrected from `23:55` to `23:50`; bag details and total-price context added for `24LEBB`; itinerary note changed to "Arrive Dublin just before midnight"; blocker `none`.

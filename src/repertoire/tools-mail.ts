@@ -93,6 +93,7 @@ function parseMailList(value: string | undefined): string[] {
 function mailSearchTerms(query: string): string[] {
   return query
     .split(/\s+OR\s+/i)
+    .flatMap((entry) => entry.split(/[\n,;]+/))
     .map((entry) => entry.trim())
     .filter(Boolean)
 }
