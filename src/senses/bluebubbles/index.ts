@@ -1180,12 +1180,18 @@ async function syncBlueBubblesRuntime(deps: Partial<RuntimeDeps> = {}): Promise<
     const catchUp = await catchUpMissedBlueBubblesMessages(resolvedDeps, previousState)
     const failed = captured.failed + recovery.failed + catchUp.failed
     const recovered = captured.recovered + recovery.recovered + catchUp.recovered
+    // upstreamStatus reflects whether BlueBubbles itself is healthy and we
+    // have unprocessed work (pendingRecoveryCount). Per-cycle recovery
+    // failures are noted in `detail` for transparency but do NOT flip the
+    // status to error: a single permanently-unrecoverable message would
+    // otherwise stick the sense in "error" forever, contradicting `ouro
+    // doctor` which only checks upstream reachability.
     writeBlueBubblesRuntimeState(agentName, {
-      upstreamStatus: recovery.pending > 0 || failed > 0 ? "error" : "ok",
-      detail: failed > 0
-        ? `recovery failures: ${failed}`
-        : recovery.pending > 0
-          ? `pending recovery: ${recovery.pending}`
+      upstreamStatus: recovery.pending > 0 ? "error" : "ok",
+      detail: recovery.pending > 0
+        ? `pending recovery: ${recovery.pending}`
+        : failed > 0
+          ? `${failed} message(s) unrecoverable this cycle; upstream ok`
           : catchUp.recovered > 0
             ? formatRecoveredCount(catchUp.recovered)
           : "upstream reachable",

@@ -4449,10 +4449,14 @@ describe("BlueBubbles sense runtime", () => {
 
     const runtimePath = path.join(tempAgentRoot, "state", "senses", "bluebubbles", "runtime.json")
     await waitFor(() => fs.existsSync(runtimePath))
+    // Per-cycle recovery failures stay informational — upstream is reachable
+    // and there's nothing pending, so status should be "ok" with the failure
+    // count called out in detail. This prevents one permanently-unrecoverable
+    // message from sticking the sense in "error" forever.
     expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
       expect.objectContaining({
-        upstreamStatus: "error",
-        detail: "recovery failures: 1",
+        upstreamStatus: "ok",
+        detail: "1 message(s) unrecoverable this cycle; upstream ok",
         pendingRecoveryCount: 0,
       }),
     )
