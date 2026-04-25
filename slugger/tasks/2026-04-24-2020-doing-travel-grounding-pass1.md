@@ -51,6 +51,22 @@ Branch: `slugger/mail-convergence-pass1`
   - tighter query semantics,
   - or a durable parsed index for imported archives.
 
+## Later Harness Bug: Oversized Provider Replay
+
+- During the next audited Messages pass, Slugger drifted into stale earlier thread material and then hit a hard provider failure:
+  - `400 Invalid 'input[52].output': string too long ... got length 18638187`
+- The important lesson is not just "tool output can be long." It is:
+  - Responses providers were willing to replay giant `function_call_output` items from session history or fresh tool appends with no hard per-item cap.
+  - That creates a bad failure mode where one pathological past tool result can brick an otherwise normal future turn.
+- Patch-forward applied in this pass:
+  - add a shared truncation guard for Responses `function_call_output` items;
+  - apply it both when rebuilding provider input from saved session messages and when appending fresh tool results during the same turn;
+  - keep both the leading and trailing edge so the agent still sees setup plus terminal failure details.
+- Focused regression coverage now lives in:
+  - `src/__tests__/heart/streaming.test.ts`
+  - `src/__tests__/heart/providers/openai-codex.test.ts`
+  - `src/__tests__/heart/providers/github-copilot.test.ts`
+
 ## Actions Taken
 
 - Sent an audited Messages prompt to Slugger asking for a no-hints re-audit of delegated mail and travel artifacts, with a clean closeout format.
