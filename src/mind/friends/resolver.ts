@@ -120,12 +120,13 @@ export class FriendResolver {
       this.params.provider === "imessage-handle" &&
       typeof this.params.externalId === "string" &&
       this.params.externalId.startsWith("group:")
-    const baseNotes = this.params.displayName !== "Unknown"
-      ? { name: { value: this.params.displayName, savedAt: now } }
-      : {}
-    const notes = isImessageGroup && !isFirstImprint
-      ? { ...baseNotes, autoCreatedGroup: { value: true, savedAt: now } }
-      : baseNotes
+    const notes: Record<string, { value: string; savedAt: string }> = {}
+    if (this.params.displayName !== "Unknown") {
+      notes.name = { value: this.params.displayName, savedAt: now }
+    }
+    if (isImessageGroup && !isFirstImprint) {
+      notes.autoCreatedGroup = { value: "true", savedAt: now }
+    }
 
     const friend: FriendRecord = {
       id: randomUUID(),

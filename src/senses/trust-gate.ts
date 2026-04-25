@@ -144,8 +144,7 @@ function persistAcknowledgedGroupsState(bundleRoot: string, state: AcknowledgedG
 function maybeSurfaceAutoCreatedGroup(input: TrustGateInput, bundleRoot: string, nowIso: string): boolean {
   if (!input.isGroupChat) return false
   if (input.friend.trustLevel !== "stranger") return false
-  const noteEntry = input.friend.notes?.["autoCreatedGroup"]
-  if (!noteEntry || (typeof noteEntry === "object" && (noteEntry as { value?: unknown }).value !== true)) return false
+  if (!input.friend.notes?.["autoCreatedGroup"]) return false
   let state: AcknowledgedGroupsState
   try {
     state = loadAcknowledgedGroupsState(bundleRoot)

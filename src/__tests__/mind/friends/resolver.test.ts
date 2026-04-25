@@ -454,7 +454,7 @@ describe("FriendResolver", () => {
 
       const persisted = (store.put as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as FriendRecord
       expect(persisted.trustLevel).toBe("stranger")
-      expect(persisted.notes?.autoCreatedGroup).toEqual(expect.objectContaining({ value: true }))
+      expect(persisted.notes?.autoCreatedGroup).toEqual(expect.objectContaining({ value: "true" }))
       expect(persisted.notes?.autoCreatedGroup).toEqual(expect.objectContaining({ savedAt: expect.any(String) }))
       expect(persisted.notes?.name).toEqual(expect.objectContaining({ value: "Consciousness TBD" }))
     })

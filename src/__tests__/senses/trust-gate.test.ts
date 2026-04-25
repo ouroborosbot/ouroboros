@@ -465,7 +465,7 @@ describe("trust gate", () => {
         trustLevel: "stranger",
         notes: {
           name: { value: "Consciousness TBD", savedAt: "2026-03-14T23:12:21.302Z" },
-          autoCreatedGroup: { value: true, savedAt: "2026-03-14T23:12:21.302Z" },
+          autoCreatedGroup: { value: "true", savedAt: "2026-03-14T23:12:21.302Z" },
         },
       })
 
@@ -502,7 +502,7 @@ describe("trust gate", () => {
         id: friendId,
         name: "Consciousness TBD",
         trustLevel: "stranger",
-        notes: { autoCreatedGroup: { value: true, savedAt: "2026-03-14T23:12:21.302Z" } },
+        notes: { autoCreatedGroup: { value: "true", savedAt: "2026-03-14T23:12:21.302Z" } },
       })
       const inputs = {
         bundleRoot,
@@ -553,7 +553,7 @@ describe("trust gate", () => {
         id: "friend-promoted-1",
         name: "Promoted Group",
         trustLevel: "friend",
-        notes: { autoCreatedGroup: { value: true, savedAt: "2026-03-14T23:12:21.302Z" } },
+        notes: { autoCreatedGroup: { value: "true", savedAt: "2026-03-14T23:12:21.302Z" } },
       })
 
       const result = enforceTrustGate(makeInput({
