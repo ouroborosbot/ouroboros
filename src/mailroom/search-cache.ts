@@ -47,10 +47,6 @@ function cacheDir(agentId: string): string {
   return path.join(getAgentRoot(agentId), "state", "mail-search")
 }
 
-function cacheStateKey(agentId: string): string {
-  return `${agentId}:${cacheDir(agentId)}`
-}
-
 function cachePath(agentId: string, messageId: string): string {
   return path.join(cacheDir(agentId), `${messageId}.json`)
 }
@@ -73,7 +69,7 @@ function readJsonDocument(filePath: string): MailSearchCacheDocument | null {
 }
 
 function cacheState(agentId: string): MailSearchCacheState {
-  const key = cacheStateKey(agentId)
+  const key = `${agentId}:${cacheDir(agentId)}`
   let state = cacheStates.get(key)
   if (state) return state
   state = { loaded: false, docs: new Map() }
