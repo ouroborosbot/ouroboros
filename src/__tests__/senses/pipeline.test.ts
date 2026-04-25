@@ -1671,9 +1671,10 @@ describe("handleInboundTurn", () => {
       const mockRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
       const failoverState = {
         pending: {
-          errorSummary: "openai-codex hit its usage limit",
+          errorSummary: "openai-codex / gpt-5.4 hit its usage limit",
           classification: "usage-limit" as const,
           currentProvider: "openai-codex" as const,
+          currentModel: "gpt-5.4",
           currentLane: "outward" as const,
           agentName: "slugger",
           workingProviders: ["anthropic" as const],
@@ -1743,9 +1744,10 @@ describe("handleInboundTurn", () => {
       const mockRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
       const failoverState = {
         pending: {
-          errorSummary: "openai-codex hit its usage limit",
+          errorSummary: "openai-codex / gpt-5.4 hit its usage limit",
           classification: "usage-limit" as const,
           currentProvider: "openai-codex" as const,
+          currentModel: "gpt-5.4",
           currentLane: "outward" as const,
           agentName: "slugger",
           workingProviders: ["anthropic" as const, "minimax" as const],
@@ -1785,7 +1787,7 @@ describe("handleInboundTurn", () => {
         expect(lastUserMsg?.content).toContain("refused")
         expect(lastUserMsg?.content).toContain("anthropic")
         expect(lastUserMsg?.content).toContain("401 token expired")
-        expect(lastUserMsg?.content).toContain("current lane unchanged: openai-codex")
+        expect(lastUserMsg?.content).toContain("current lane unchanged: openai-codex / gpt-5.4")
         // The minimax alternative is listed; the just-refused anthropic is excluded.
         expect(lastUserMsg?.content).toContain("minimax (MiniMax-M2.7)")
         expect(lastUserMsg?.content).toMatch(/available verified alternatives/)
@@ -1817,9 +1819,10 @@ describe("handleInboundTurn", () => {
       // Only anthropic was ready; once it's refused there are no alternatives.
       const failoverState = {
         pending: {
-          errorSummary: "openai-codex hit its usage limit",
+          errorSummary: "openai-codex / gpt-5.4 hit its usage limit",
           classification: "usage-limit" as const,
           currentProvider: "openai-codex" as const,
+          currentModel: "gpt-5.4",
           currentLane: "outward" as const,
           agentName: "slugger",
           workingProviders: ["anthropic" as const],
@@ -1873,9 +1876,10 @@ describe("handleInboundTurn", () => {
       const mockRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
       const failoverState = {
         pending: {
-          errorSummary: "openai-codex hit its usage limit",
+          errorSummary: "openai-codex / gpt-5.4 hit its usage limit",
           classification: "usage-limit" as const,
           currentProvider: "openai-codex" as const,
+          currentModel: "gpt-5.4",
           currentLane: "outward" as const,
           agentName: "slugger",
           workingProviders: ["anthropic" as const],

@@ -48,6 +48,7 @@ export interface FailoverContext {
   errorSummary: string
   classification: ProviderErrorClassification
   currentProvider: AgentProvider
+  currentModel: string
   currentLane: ProviderLane
   agentName: string
   workingProviders: AgentProvider[]
@@ -265,6 +266,7 @@ export function buildFailoverContext(
     errorSummary,
     classification,
     currentProvider,
+    currentModel,
     currentLane,
     agentName,
     workingProviders,

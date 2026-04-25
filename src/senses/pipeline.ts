@@ -178,7 +178,7 @@ function buildFailoverSwitchRefusedMessage(
   return [
     `[provider switch refused: tried to switch ${refusedAction.lane} lane to ${refusedLabel}.`,
     `reason: preflight ping failed (${refusal.classification}: ${refusal.message}).`,
-    `current lane unchanged: ${pendingContext.currentProvider} on the ${pendingContext.currentLane} lane.`,
+    `current lane unchanged: ${pendingContext.currentProvider} / ${pendingContext.currentModel} on the ${pendingContext.currentLane} lane.`,
     alternativesLine,
     nextMove + "]",
   ].join(" ")
