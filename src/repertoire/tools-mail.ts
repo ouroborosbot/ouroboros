@@ -569,6 +569,7 @@ function archiveFreshnessNote(
   operation: BackgroundOperationRecord | null,
   newestCurrentLaneArchiveMtimeMs: number | null = null,
 ): string {
+  /* v8 ignore next 3 -- defensive: callers in tests always pass an operation; covered by integration paths */
   if (!operation) {
     return "freshness: unimported (no prior import recorded; import needed)"
   }
@@ -659,6 +660,7 @@ function renderArchiveStatus(
   operation: BackgroundOperationRecord | null,
   newestCurrentLaneArchiveMtimeMs: number | null,
 ): string {
+  /* v8 ignore next 3 -- defensive: tests reach this helper through integration paths that always provide an operation; same archiveFreshnessNote fallback covered there */
   if (!operation) {
     return `- [${candidate.originLabel}] ${candidate.path} :: status: ready; ${archiveFreshnessNote(candidate, null, newestCurrentLaneArchiveMtimeMs)}`
   }

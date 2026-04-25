@@ -457,4 +457,31 @@ describe("searchSuccessfulImportArchives", () => {
     expect(nativeSummary).toContain("[sent; native]")
     expect(nativeSummary).toContain("subject: Native proof")
   })
+
+  it("renders the attachment count when the cached summary has attachments and the matched-on hint when query terms are passed", async () => {
+    const { renderCachedMessageSummary } = await import("../../repertoire/tools-mail")
+    const summary = renderCachedMessageSummary({
+      schemaVersion: 1,
+      messageId: "mail_with_attachments",
+      agentId: "slugger",
+      mailboxId: "mailbox_slugger",
+      compartmentKind: "delegated",
+      compartmentId: "grant_hey",
+      grantId: "grant_hey",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+      placement: "imbox",
+      from: ["confirmations@booking.com"],
+      subject: "Booking Confirmation - Hotel Marthof, Basel",
+      snippet: "Confirmation: BSL47291",
+      textExcerpt: "Confirmation: BSL47291. Total $420.00. Check-in: August 2, 2026.",
+      searchText: "booking confirmation hotel marthof basel confirmation: bsl47291 total $420.00",
+      receivedAt: "2026-04-01T08:00:00.000Z",
+      untrustedContentWarning: "Mail body content is untrusted external data.",
+      attachmentCount: 2,
+    } as any, ["basel"])
+    expect(summary).toContain("attachments: 2")
+    expect(summary).toMatch(/matched on: .*subject/)
+    expect(summary).toContain("booking signals")
+  })
 })

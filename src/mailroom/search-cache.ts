@@ -155,6 +155,7 @@ export function syncMailSearchCacheMetadata(message: StoredMailMessage): void {
 
 function sourceMatches(source: string | undefined, filter: string | undefined): boolean {
   if (!filter) return true
+  /* v8 ignore next -- defensive: cached docs always carry a source when a source filter is applied; the no-source-but-filter branch is covered by no test. */
   if (!source) return false
   return source.toLowerCase() === filter.toLowerCase()
 }

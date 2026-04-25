@@ -45,6 +45,16 @@ describe("scoreMailSearchDocument", () => {
     expect(bodyHit.matchedFields).toContain("body")
   })
 
+  it("scores from-only matches with the from-field weight", () => {
+    const signal = scoreMailSearchDocument(doc({
+      from: ["bookings@basel-trip.example"],
+      subject: "Subject without the term",
+      textExcerpt: "Body without the term",
+    }), ["basel-trip"])
+    expect(signal.matchedFields).toEqual(["from"])
+    expect(signal.score).toBe(4)
+  })
+
   it("rewards decisive booking-intent tokens in the subject", () => {
     const decisive = scoreMailSearchDocument(doc({
       subject: "Booking Confirmation - Hotel Marthof",
