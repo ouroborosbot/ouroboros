@@ -248,11 +248,6 @@ function normalizeSearchTerms(queryTerms: string[]): string[] {
     .filter((term) => term.length > 0)
 }
 
-function rawMessageMatchesQueryTerms(rawMessage: Buffer, queryTerms: string[]): boolean {
-  const searchText = rawMessage.toString("utf-8").toLowerCase()
-  return queryTerms.some((term) => searchText.includes(term))
-}
-
 function historicalImportClassification(resolvedPlacement: StoredMailMessage["placement"], sourceGrant: SourceGrantRecord): MailClassification {
   return {
     placement: resolvedPlacement,
@@ -400,7 +395,6 @@ export async function cacheMatchingMailSearchDocumentsFromMboxFile(input: Search
   if (queryTerms.length === 0 || input.limit <= 0) return []
   const matches: MailSearchCacheDocument[] = []
   for await (const rawMessage of streamMboxMessagesFromFile(input.filePath)) {
-    if (!rawMessageMatchesQueryTerms(rawMessage, queryTerms)) continue
     const parsedMessage = parseMboxMessage(rawMessage, target.sourceGrant)
     const { message, privateEnvelope } = await buildStoredMailMessage({
       resolved: target.resolved,

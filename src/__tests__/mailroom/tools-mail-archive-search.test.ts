@@ -43,6 +43,22 @@ function writeArchive(filePath: string, subject: string, body: string): void {
   ].join("\n"), "utf-8")
 }
 
+function writeQuotedPrintableArchive(filePath: string, subject: string, encodedBody: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, [
+    "From MAILER-DAEMON Thu Jan  1 00:00:00 1970",
+    "From: Travel Desk <travel@example.com>",
+    "To: Slugger <me.mendelow.ari.slugger@ouro.bot>",
+    "Date: Wed, 24 Apr 2026 10:00:00 -0700",
+    `Subject: ${subject}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    encodedBody,
+    "",
+  ].join("\n"), "utf-8")
+}
+
 afterEach(() => {
   if (originalHome === undefined) delete process.env.HOME
   else process.env.HOME = originalHome
@@ -330,6 +346,72 @@ describe("searchSuccessfulImportArchives", () => {
       limit: 10,
     })
     expect(cached.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("searches parsed imported messages instead of relying on raw archive bytes", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+
+    const agentRoot = path.join(homeRoot, "AgentBundles", "slugger.ouro")
+    const archivePath = path.join(homeRoot, "Downloads", "HEY-emails-ari-mendelow-me-quoted-printable.mbox")
+    const { registry } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+
+    writeQuotedPrintableArchive(
+      archivePath,
+      "Swiss hotel confirmation",
+      "Reservation code: =4C=55=47=41=4E=4F=52=45=53=31=32=33\nHotel: Villa Lugano",
+    )
+
+    writeOperation(agentRoot, "quoted-printable-archive", {
+      schemaVersion: 1,
+      id: "quoted-printable-archive",
+      agentName: "slugger",
+      kind: "mail.import-mbox",
+      title: "mail import",
+      status: "succeeded",
+      summary: "quoted-printable archive",
+      createdAt: "2026-04-24T20:10:00.000Z",
+      updatedAt: "2026-04-24T20:10:00.000Z",
+      spec: {
+        filePath: archivePath,
+        ownerEmail: "ari@mendelow.me",
+        source: "hey",
+      },
+    })
+
+    vi.doMock("../../mailroom/reader", () => ({
+      readMailroomRegistry: async () => registry,
+      resolveMailroomReader: () => {
+        throw new Error("unused")
+      },
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { searchSuccessfulImportArchives } = await import("../../repertoire/tools-mail")
+    const matches = await searchSuccessfulImportArchives({
+      agentId: "slugger",
+      config: makeConfig(),
+      queryTerms: ["luganores123"],
+      limit: 5,
+      source: "hey",
+    })
+
+    expect(matches).toHaveLength(1)
+    expect(matches[0]?.subject).toBe("Swiss hotel confirmation")
+
+    const cached = searchMailSearchCache({
+      agentId: "slugger",
+      queryTerms: ["luganores123"],
+      source: "hey",
+      limit: 5,
+    })
+    expect(cached).toHaveLength(1)
+    expect(cached[0]?.subject).toBe("Swiss hotel confirmation")
   })
 
   it("renders cached summaries defensively for delegated and native lanes", async () => {
