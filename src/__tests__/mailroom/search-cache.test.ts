@@ -182,4 +182,82 @@ describe("mail search cache", () => {
     process.env.HOME = tempDir()
     expect(searchMailSearchCache({ agentId: "slugger" })).toHaveLength(0)
   })
+
+  describe("booking-aware ranking benchmark", () => {
+    // Synthetic corpus that mirrors the failure shape Slugger named: an older
+    // decisive booking confirmation buried under newer travel-ish noise
+    // mentioning the same place. Pure-recency ranking returns the noise first;
+    // the new relevance ranking should hand back the confirmation first.
+    it("ranks the decisive booking message above newer noise on the same query", () => {
+      process.env.HOME = tempDir()
+
+      // Decisive: oldest of the four, but every booking signal lights up.
+      upsertMailSearchCacheDocument(
+        message({
+          id: "mail_decisive",
+          receivedAt: "2026-04-01T08:00:00.000Z",
+        }),
+        privateEnvelope({
+          from: ["confirmations@booking.com"],
+          subject: "Booking Confirmation - Hotel Marthof, Basel",
+          text: "Your reservation is confirmed. Confirmation: BSL47291. Total: $420.00. Check-in: August 2, 2026. Check-out: August 5, 2026.",
+          snippet: "Your reservation is confirmed. Confirmation: BSL47291. Total: $420.00.",
+        }),
+      )
+      // Noise 1: newest, but it's a marketing newsletter from a travel-ish sender.
+      upsertMailSearchCacheDocument(
+        message({
+          id: "mail_newsletter",
+          receivedAt: "2026-04-24T18:00:00.000Z",
+        }),
+        privateEnvelope({
+          from: ["newsletter@hotels.example"],
+          subject: "Top Basel Stays For Summer 2026",
+          text: "Curated picks for travelers heading to Basel this season.",
+          snippet: "Curated picks for travelers heading to Basel this season.",
+        }),
+      )
+      // Noise 2: brainstorm chatter from a friend.
+      upsertMailSearchCacheDocument(
+        message({
+          id: "mail_friend",
+          receivedAt: "2026-04-23T12:00:00.000Z",
+        }),
+        privateEnvelope({
+          from: ["alex@friend.example"],
+          subject: "thinking about a basel trip too?",
+          text: "what do you think about a Basel weekend in august? could be fun",
+          snippet: "what do you think about a Basel weekend in august? could be fun",
+        }),
+      )
+      // Noise 3: another friend reply, even more noise on the topic but not decisive.
+      upsertMailSearchCacheDocument(
+        message({
+          id: "mail_itinerary_chatter",
+          receivedAt: "2026-04-22T09:00:00.000Z",
+        }),
+        privateEnvelope({
+          from: ["alex@friend.example"],
+          subject: "Re: basel itinerary ideas",
+          text: "we could do day trips out of basel, lots of options for hotels in basel too",
+          snippet: "we could do day trips out of basel, lots of options for hotels in basel too",
+        }),
+      )
+
+      const results = searchMailSearchCache({
+        agentId: "slugger",
+        queryTerms: ["basel"],
+        limit: 10,
+      })
+
+      // All four messages contain "basel" and should be returned (we're not
+      // filtering noise out — we're ranking it down).
+      expect(results).toHaveLength(4)
+      // The decisive booking message — older but loaded with booking signals —
+      // must rank first.
+      expect(results[0]?.messageId).toBe("mail_decisive")
+      // The newest noise (the newsletter) must NOT lead.
+      expect(results.map((r) => r.messageId)[0]).not.toBe("mail_newsletter")
+    })
+  })
 })

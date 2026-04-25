@@ -12,6 +12,7 @@ import {
 } from "./core"
 import { type MailroomStore } from "./file-store"
 import { buildMailSearchCacheDocument, upsertMailSearchCacheDocument, type MailSearchCacheDocument } from "./search-cache"
+import { compareByRelevanceThenRecency, scoreMailSearchDocument } from "./search-relevance"
 
 export interface MboxImportInput {
   registry: MailroomRegistry
@@ -414,5 +415,8 @@ export async function cacheMatchingMailSearchDocumentsFromMboxFile(input: Search
     matches.push(document)
     if (matches.length >= input.limit) break
   }
-  return matches.sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
+  return matches
+    .map((document) => ({ document, relevance: scoreMailSearchDocument(document, queryTerms) }))
+    .sort(compareByRelevanceThenRecency)
+    .map((entry) => entry.document)
 }

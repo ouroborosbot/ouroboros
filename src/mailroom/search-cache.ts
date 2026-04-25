@@ -3,6 +3,7 @@ import * as path from "node:path"
 import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 import type { MailCompartmentKind, MailPlacement, PrivateMailEnvelope, StoredMailMessage } from "./core"
+import { compareByRelevanceThenRecency, scoreMailSearchDocument } from "./search-relevance"
 
 const SEARCH_TEXT_EXCERPT_LIMIT = 16_384
 
@@ -155,15 +156,25 @@ function sourceMatches(source: string | undefined, filter: string | undefined): 
 }
 
 export function searchMailSearchCache(filters: MailSearchCacheFilters): MailSearchCacheDocument[] {
+  const queryTerms = filters.queryTerms ?? []
   const docs = [...loadCache(filters.agentId).values()]
     .filter((document) => filters.placement ? document.placement === filters.placement : true)
     .filter((document) => filters.compartmentKind ? document.compartmentKind === filters.compartmentKind : true)
     .filter((document) => sourceMatches(document.source, filters.source))
-    .filter((document) => filters.queryTerms?.length
-      ? filters.queryTerms.some((term) => document.searchText.includes(term))
+    .filter((document) => queryTerms.length
+      ? queryTerms.some((term) => document.searchText.includes(term))
       : true)
-    .sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
-  return typeof filters.limit === "number" ? docs.slice(0, filters.limit) : docs
+
+  let ordered: MailSearchCacheDocument[]
+  if (queryTerms.length > 0) {
+    ordered = docs
+      .map((document) => ({ document, relevance: scoreMailSearchDocument(document, queryTerms) }))
+      .sort(compareByRelevanceThenRecency)
+      .map((entry) => entry.document)
+  } else {
+    ordered = docs.sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
+  }
+  return typeof filters.limit === "number" ? ordered.slice(0, filters.limit) : ordered
 }
 
 export function resetMailSearchCacheForTests(): void {

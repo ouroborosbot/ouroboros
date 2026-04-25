@@ -7,6 +7,7 @@ import { confirmMailDraftSend, createMailDraft, resolveOutboundProviderClient, r
 import { applyMailDecision, buildSenderPolicy, type MailDecisionAction, type MailDecisionActor, type MailScreenerCandidateStatus } from "../mailroom/policy"
 import { searchMailSearchCache, upsertMailSearchCacheDocument, type MailSearchCacheDocument } from "../mailroom/search-cache"
 import { cacheMatchingMailSearchDocumentsFromMboxFile } from "../mailroom/mbox-import"
+import { compareByRelevanceThenRecency, formatRelevanceHint, scoreMailSearchDocument } from "../mailroom/search-relevance"
 import {
   describeMailProvenance,
   normalizeMailAddress,
@@ -192,29 +193,42 @@ function renderMessageSummary(message: DecryptedMailMessage): string {
   ].join("\n")
 }
 
-export function renderCachedMessageSummary(message: MailSearchCacheDocument): string {
+export function renderCachedMessageSummary(message: MailSearchCacheDocument, queryTerms: string[] = []): string {
   const scope = message.compartmentKind === "delegated"
     ? `delegated:${message.ownerEmail ?? "unknown"}:${message.source ?? "source"}`
     : "native"
   const from = message.from.join(", ") || "(unknown sender)"
   const subject = message.subject || "(no subject)"
-  return [
+  const lines = [
     `- ${message.messageId} [${message.placement}; ${scope}]`,
     `  from: ${from}`,
     `  subject: ${subject}`,
-    `  snippet: ${message.snippet}`,
-    `  warning: ${message.untrustedContentWarning}`,
-  ].join("\n")
+  ]
+  if (queryTerms.length > 0) {
+    const hint = formatRelevanceHint(scoreMailSearchDocument(message, queryTerms))
+    if (hint) lines.push(`  matched on: ${hint}`)
+  }
+  lines.push(`  snippet: ${message.snippet}`)
+  lines.push(`  warning: ${message.untrustedContentWarning}`)
+  return lines.join("\n")
 }
 
 export function mergeCachedMailSearchDocuments(
   cached: MailSearchCacheDocument[],
   imported: MailSearchCacheDocument[],
   limit: number,
+  queryTerms: string[] = [],
 ): MailSearchCacheDocument[] {
   const merged: MailSearchCacheDocument[] = []
   const seen = new Set<string>()
-  for (const message of [...cached, ...imported].sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))) {
+  const all = [...cached, ...imported]
+  const ordered = queryTerms.length > 0
+    ? all
+        .map((document) => ({ document, relevance: scoreMailSearchDocument(document, queryTerms) }))
+        .sort(compareByRelevanceThenRecency)
+        .map((entry) => entry.document)
+    : all.sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
+  for (const message of ordered) {
     if (seen.has(message.messageId)) continue
     seen.add(message.messageId)
     merged.push(message)
@@ -1048,7 +1062,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
           tool: "mail_search",
           reason: args.reason || `search: ${query}`,
         })
-        return cachedMatches.map(renderCachedMessageSummary).join("\n\n")
+        return cachedMatches.map((message) => renderCachedMessageSummary(message, terms)).join("\n\n")
       }
       if (
         scope !== "native"
@@ -1063,13 +1077,13 @@ export const mailToolDefinitions: ToolDefinition[] = [
           ...(args.source ? { source: args.source } : {}),
         })
         if (importedMatches.length > 0) {
-          const mergedMatches = mergeCachedMailSearchDocuments(cachedMatches, importedMatches, limit)
+          const mergedMatches = mergeCachedMailSearchDocuments(cachedMatches, importedMatches, limit, terms)
           await resolved.store.recordAccess({
             agentId: resolved.agentName,
             tool: "mail_search",
             reason: args.reason || `search: ${query}`,
           })
-          return mergedMatches.map(renderCachedMessageSummary).join("\n\n")
+          return mergedMatches.map((message) => renderCachedMessageSummary(message, terms)).join("\n\n")
         }
       }
       const all = await resolved.store.listMessages({
