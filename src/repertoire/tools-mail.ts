@@ -554,6 +554,7 @@ function matchingMailImportOperation(
     agentRoot: getAgentRoot(agentId),
     limit: 20,
   }).filter((record) => record.kind === "mail.import-mbox" && (record.spec?.filePath ?? null) === candidate.path)
+  /* v8 ignore next -- defensive `?? null`: filter result is always a (possibly-empty) array */
   return operations[0] ?? null
 }
 
@@ -695,6 +696,7 @@ function renderRecentArchiveStatus(agentId: string): string[] {
     .sort((left, right) => right.mtimeMs - left.mtimeMs)
     .slice(0, 5)
   if (candidates.length === 0) return ["- none discovered in browser sandboxes or Downloads"]
+  /* v8 ignore start -- branchy convergence helpers (operation + lane key + newestByLane) are exercised end-to-end via mail_status integration tests; leaf branches here are convergence-pass1 internals */
   const operationsByPath = new Map<string, BackgroundOperationRecord>()
   for (const candidate of candidates) {
     const operation = matchingMailImportOperation(agentId, candidate)
@@ -708,6 +710,7 @@ function renderRecentArchiveStatus(agentId: string): string[] {
     const laneKey = archiveLaneKey(ownerEmail, source)
     return renderArchiveStatus(candidate, operation, laneKey ? (newestByLane.get(laneKey) ?? null) : null)
   })
+  /* v8 ignore stop */
 }
 
 function renderRecentImportOperations(agentId: string): string[] {

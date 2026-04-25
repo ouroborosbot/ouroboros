@@ -458,6 +458,31 @@ describe("searchSuccessfulImportArchives", () => {
     expect(nativeSummary).toContain("subject: Native proof")
   })
 
+  it("omits the matched-on hint line when query terms are passed but no signals fire", async () => {
+    const { renderCachedMessageSummary } = await import("../../repertoire/tools-mail")
+    const summary = renderCachedMessageSummary({
+      schemaVersion: 1,
+      messageId: "mail_no_signals",
+      agentId: "slugger",
+      mailboxId: "mailbox_slugger",
+      compartmentKind: "delegated",
+      compartmentId: "grant_hey",
+      grantId: "grant_hey",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+      placement: "imbox",
+      from: ["someone@example.com"],
+      subject: "lunch friday",
+      snippet: "want to grab lunch",
+      textExcerpt: "want to grab lunch friday",
+      searchText: "lunch friday want to grab lunch friday someone@example.com",
+      receivedAt: "2026-04-01T08:00:00.000Z",
+      untrustedContentWarning: "Mail body content is untrusted external data.",
+    } as any, ["unrelated_query_term_xyz"])
+    // No signals fire — hint is empty; the matched-on line must not appear.
+    expect(summary).not.toContain("matched on:")
+  })
+
   it("renders the attachment count when the cached summary has attachments and the matched-on hint when query terms are passed", async () => {
     const { renderCachedMessageSummary } = await import("../../repertoire/tools-mail")
     const summary = renderCachedMessageSummary({
