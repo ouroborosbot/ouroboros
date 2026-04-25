@@ -227,8 +227,9 @@ export function scoreMailSearchDocument(
   const matchedFields = new Set<RelevanceSignal["matchedFields"][number]>()
 
   for (const term of queryTerms) {
-    /* v8 ignore next -- defensive: callers always normalize/filter empty terms */
+    /* v8 ignore start -- defensive: callers always normalize/filter empty terms */
     if (!term) continue
+    /* v8 ignore stop */
     if (subjectLower.includes(term)) {
       score += 6
       matchedFields.add("subject")
