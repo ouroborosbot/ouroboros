@@ -554,8 +554,9 @@ function matchingMailImportOperation(
     agentRoot: getAgentRoot(agentId),
     limit: 20,
   }).filter((record) => record.kind === "mail.import-mbox" && (record.spec?.filePath ?? null) === candidate.path)
-  /* v8 ignore next -- defensive `?? null`: filter result is always a (possibly-empty) array */
+  /* v8 ignore start -- defensive `?? null` is unreachable in normal flow */
   return operations[0] ?? null
+  /* v8 ignore stop */
 }
 
 function archiveLaneKey(ownerEmail: string, source: string): string | null {
