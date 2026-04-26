@@ -3547,7 +3547,7 @@ async function executeConnectBlueBubbles(agent: string, deps: OuroCliDeps): Prom
   // filter group-chat echoes whose `isFromMe` flag was lost or never set.
   // Without this, the agent would ingest its own outbound message as inbound
   // and reply to itself ("Slugger talking to himself" in groups).
-  const ownHandlesRaw = (await promptInput("Your iMessage handle(s) — comma-separated phone or email used by this BB account, blank to skip: ")).trim()
+  const ownHandlesRaw = (await promptInput("Your iMessage handle(s) — phone(s) and/or email(s) BlueBubbles attributes to your sent messages (comma-separated; needed for the group self-talk filter; blank to skip): ")).trim()
   const ownHandles = ownHandlesRaw
     ? ownHandlesRaw.split(",").map((h) => h.trim()).filter((h) => h.length > 0)
     : []
