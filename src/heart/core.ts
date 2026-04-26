@@ -749,6 +749,13 @@ export async function runAgent(
   let sawQuerySession = false;
   let sawBridgeManage = false;
   let sawExternalStateQuery = false;
+  // Once-per-turn flag for the fresh-work rest gate. Without this, an agent
+  // that called rest, was told "fresh work arrived", processed the items,
+  // and called rest again would get the same message forever — the gate
+  // condition is read from the turn-start snapshot of pendingMessages,
+  // which doesn't update mid-turn. The agent only needs to be told once;
+  // after that, repeated rest attempts mean they've acknowledged.
+  let freshWorkGateFired = false;
   const toolLoopState = createToolLoopState();
   const toolFrictionLedger = createToolFrictionLedger();
   const finishTerminalProviderError = (error: Error, classification: ProviderErrorClassification): void => {
@@ -1115,12 +1122,20 @@ export async function runAgent(
             continue;
           }
 
-          if (hasFreshPendingWork(options)) {
+          if (hasFreshPendingWork(options) && !freshWorkGateFired) {
+            freshWorkGateFired = true;
             callbacks.onToolEnd("rest", summarizeArgs("rest", restArgs), false);
             messages.push(msg);
             const gateMessage = "fresh work arrived for me this turn — inspect the pending messages above and take the next concrete action before you rest.";
             messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: gateMessage });
             providerRuntime.appendToolOutput(result.toolCalls[0].id, gateMessage);
+            emitNervesEvent({
+              level: "info",
+              component: "engine",
+              event: "engine.fresh_work_gate_fired",
+              message: "rest deferred once because pending work arrived this turn; agent has been notified",
+              meta: { pendingCount: options!.pendingMessages!.length },
+            });
             continue;
           }
 

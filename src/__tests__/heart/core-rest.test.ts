@@ -339,20 +339,17 @@ describe("rest tool in runAgent", () => {
     expect(callbacks.onToolEnd).toHaveBeenCalledWith("rest", expect.any(String), false)
   })
 
-  it("rest is rejected when fresh pending work arrived this turn", async () => {
-    vi.useFakeTimers()
-    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks()))
-    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks()))
-    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks()))
-    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks()))
-    mockCreate.mockImplementation(() => {
-      const err: any = new Error("test fixture: stop loop")
-      err.status = 400
-      throw err
-    })
+  it("rest is rejected once when fresh pending work arrived, then accepted on the second attempt", async () => {
+    // Regression for the self-sustaining 'fresh work arrived' loop Slugger
+    // hit. The gate previously fired on every rest call within the turn
+    // because hasFreshPendingWork(options) reads from the turn-start
+    // snapshot and never updates. The fix gates it once-per-turn: after the
+    // agent has been told fresh work arrived, repeated rest attempts pass.
+    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks())) // first rest → blocked
+    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks())) // second rest → accepted
 
     const callbacks = makeCallbacks()
-    const promise = runAgent(
+    await runAgent(
       [{ role: "user", content: "heartbeat" }],
       callbacks,
       "inner",
@@ -367,13 +364,16 @@ describe("rest tool in runAgent", () => {
         },
       },
     )
-    await vi.advanceTimersByTimeAsync(2100)
-    await vi.advanceTimersByTimeAsync(4100)
-    await vi.advanceTimersByTimeAsync(100)
-    await promise
-    vi.useRealTimers()
 
-    expect(callbacks.onToolEnd).toHaveBeenCalledWith("rest", expect.any(String), false)
+    // First rest blocked by gate, second rest accepted — exactly 2 chat calls.
+    expect(mockCreate).toHaveBeenCalledTimes(2)
+    const restEnds = (callbacks.onToolEnd as any).mock.calls.filter((c: any[]) => c[0] === "rest")
+    expect(restEnds).toHaveLength(2)
+    expect(restEnds[0][2]).toBe(false) // first rest blocked
+    expect(restEnds[1][2]).toBe(true)  // second rest accepted
+    // Gate observability event fires exactly once per turn.
+    const gateEvents = vi.mocked(emitNervesEvent).mock.calls.filter(([e]) => (e as any).event === "engine.fresh_work_gate_fired")
+    expect(gateEvents).toHaveLength(1)
   })
 
   // ── Sole-call rejection ──────────────────────────────────
