@@ -186,6 +186,7 @@ describe("rest tool in runAgent", () => {
     mockCreate.mockReset()
     mockQueuePendingMessage.mockReset()
     mockRequestInnerWake.mockReset().mockResolvedValue(undefined)
+    vi.mocked(emitNervesEvent).mockClear()
     await setupMinimax()
     const core = await import("../../heart/core")
     runAgent = core.runAgent
@@ -510,5 +511,129 @@ describe("rest tool in runAgent", () => {
     )
 
     expect(result.outcome).toBe("rested")
+  })
+
+  // Regression for the MiniMax-M2.7 empty-reply bug Slugger surfaced via MCP.
+  // The model emitted only a <think>...</think> block with no tool call,
+  // despite tool_choice: "required". The harness used to silently accept
+  // the empty turn — now it retries with a corrective nudge up to twice,
+  // then falls through.
+  it("retries with a corrective nudge when the model returns no tool call despite tool_choice=required", async () => {
+    // Stream 1: only think content, no tool call (the violation)
+    mockCreate.mockReturnValueOnce(makeStream([
+      makeChunk("<think>thinking but never calling a tool</think>", undefined),
+    ]))
+    // Stream 2: same violation again
+    mockCreate.mockReturnValueOnce(makeStream([
+      makeChunk("<think>still thinking, still no tool</think>", undefined),
+    ]))
+    // Stream 3: agent finally settles
+    mockCreate.mockReturnValueOnce(makeStream(settleChunks("ok here is my answer")))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "say hi" }],
+      callbacks,
+      "mcp",
+      undefined,
+      {
+        toolContext: {
+          currentSession: { friendId: "self", channel: "mcp", key: "test" },
+        },
+      },
+    )
+
+    // Three model calls total: 2 violations + 1 successful settle.
+    expect(mockCreate).toHaveBeenCalledTimes(3)
+    // engine.no_tool_call_retry warn event fired twice.
+    const retryEvents = vi.mocked(emitNervesEvent).mock.calls.filter(([e]) => (e as any).event === "engine.no_tool_call_retry")
+    expect(retryEvents).toHaveLength(2)
+    expect(retryEvents[0]?.[0]).toMatchObject({ level: "warn", meta: expect.objectContaining({ attempt: 1, cap: 2 }) })
+    expect(retryEvents[1]?.[0]).toMatchObject({ level: "warn", meta: expect.objectContaining({ attempt: 2, cap: 2 }) })
+    // Final settle delivered "ok here is my answer" to onTextChunk.
+    const textCalls = (callbacks.onTextChunk as any).mock.calls.flat()
+    expect(textCalls.join("")).toContain("ok here is my answer")
+  })
+
+  it("does NOT retry when the model returns no tool call but tool_choice was not required", async () => {
+    mockCreate.mockReturnValueOnce(makeStream([
+      makeChunk("just plain content with no tool call", undefined),
+    ]))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "mcp",
+      undefined,
+      {
+        toolChoiceRequired: false,
+        toolContext: {
+          currentSession: { friendId: "self", channel: "mcp", key: "test" },
+        },
+      },
+    )
+
+    // Single model call, no retry.
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    const retryEvents = vi.mocked(emitNervesEvent).mock.calls.filter(([e]) => (e as any).event === "engine.no_tool_call_retry")
+    expect(retryEvents).toHaveLength(0)
+  })
+
+  it("retries with the inner-dialog corrective when channel is inner", async () => {
+    mockCreate.mockReturnValueOnce(makeStream([
+      makeChunk("<think>thinking, no tool call</think>", undefined),
+    ]))
+    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks()))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "heartbeat" }],
+      callbacks,
+      "inner",
+      undefined,
+      {
+        toolContext: {
+          currentSession: { friendId: "self", channel: "inner", key: "dialog" },
+        },
+      },
+    )
+
+    // Two model calls: one violation + one rest accepted.
+    expect(mockCreate).toHaveBeenCalledTimes(2)
+    const retryEvents = vi.mocked(emitNervesEvent).mock.calls.filter(([e]) => (e as any).event === "engine.no_tool_call_retry")
+    expect(retryEvents).toHaveLength(1)
+    // The pushed corrective message should reference rest (inner-dialog wording),
+    // not settle. Inspect the messages array indirectly via the last mockCreate call's params.
+    const lastCallParams = mockCreate.mock.calls[1]?.[0] as any
+    const userMessages = (lastCallParams.messages as any[]).filter((m) => m.role === "user")
+    const lastUserMsg = userMessages[userMessages.length - 1]
+    expect(lastUserMsg.content).toContain("rest")
+    expect(lastUserMsg.content).not.toContain("settle")
+  })
+
+  it("caps no-tool-call retries at 2 then accepts the empty turn", async () => {
+    // Three consecutive no-tool-call violations.
+    mockCreate.mockReturnValueOnce(makeStream([makeChunk("<think>v1</think>", undefined)]))
+    mockCreate.mockReturnValueOnce(makeStream([makeChunk("<think>v2</think>", undefined)]))
+    mockCreate.mockReturnValueOnce(makeStream([makeChunk("<think>v3</think>", undefined)]))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "mcp",
+      undefined,
+      {
+        toolContext: {
+          currentSession: { friendId: "self", channel: "mcp", key: "test" },
+        },
+      },
+    )
+
+    // 3 model calls (turn + 2 retries), cap reached, accept as-is.
+    expect(mockCreate).toHaveBeenCalledTimes(3)
+    const retryEvents = vi.mocked(emitNervesEvent).mock.calls.filter(([e]) => (e as any).event === "engine.no_tool_call_retry")
+    expect(retryEvents).toHaveLength(2)
   })
 })
