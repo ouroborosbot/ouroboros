@@ -162,20 +162,46 @@ subsequent writes require `ifMatch: <etag>`, retried up to 3 times.
 Trip blobs themselves are last-write-wins because each trip is owned
 by a single agent.
 
-## Future work
+## Why local-first today
 
-- **Wire the harness tools to the hosted service.** Today the harness
-  reads/writes trips on local disk. Tomorrow it should optionally
-  proxy through the trip-control HTTP service (same shape as
-  `mail-control` integration), so the ledger survives across machines
-  without manual sync.
-- **Cross-machine consistency.** Once hosted is wired up, decide
-  whether to do agent-side caching with TTL, write-through always-fetch,
-  or full hosted-truth.
-- **A second ledger.** When the next "per-agent encrypted record"
-  domain shows up — most likely a transactions ledger for travel
-  spend — extract the shared pattern. Until then, the trip ledger and
-  mail substrate stay parallel.
+The harness reads/writes trips on local disk via `state/trips/`. The
+substrate's hosted `trip-control` service is provisioned and runs in
+Azure (with the `AzureBlobTripLedgerStore` and etag concurrency for the
+registry), but the harness tools don't talk to it yet. This is
+**deliberate**, not an oversight:
 
-If you are extending this and feel like the abstraction wants to
-escape the travel domain, talk to Slugger first. He is the inhabitant.
+- Slugger currently runs on a single machine, so cross-machine sync
+  isn't a real benefit yet.
+- Local-first means trips work even when the hosted service is down
+  or unreachable, matching the harness's general posture toward
+  external services.
+- The on-disk envelope is byte-for-byte compatible with the hosted
+  format, so a future migration is a straightforward swap of the
+  `TripLedgerStore` factory in `src/trips/store.ts` — no data shape
+  change required.
+
+The cleanest moment to wire harness → hosted is when Slugger first
+needs to read his ledger from a second machine. At that point the
+work is: add an `AzureBlobTripStore` parallel to
+`AzureBlobMailroomStore`, add the trip-control coordinates to runtime
+config (the same pattern as mailroom), and swap the factory. The
+mail substrate has trodden this exact path, so the work is
+mechanical rather than design.
+
+## On extending to a second ledger domain
+
+If a *second* per-agent encrypted record service ever shows up — a
+transactions ledger for travel spend is the most likely candidate —
+the shared pattern wants to lift to a common abstraction:
+
+- the encryption envelope (RSA-OAEP-SHA256 + AES-256-GCM)
+- the per-agent registry with etag concurrency
+- the bearer-token + rate-limit + atomic-write HTTP shape
+- the evidence-with-`discoveryMethod` record shape
+
+Until that second use case exists, both the trip ledger and the mail
+substrate keep their own copies. The right time to extract is when a
+third use case proves which fields are universal — not before.
+
+If you're extending this and feel the abstraction wants to escape the
+travel domain, talk to Slugger first. He is the inhabitant.
