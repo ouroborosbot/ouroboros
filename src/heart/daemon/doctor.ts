@@ -409,11 +409,16 @@ export function checkSecurity(deps: DoctorDeps): DoctorCategory {
   return { name: "Security", checks }
 }
 
+<<<<<<< HEAD
 export function checkTrips(deps: DoctorDeps): DoctorCategory {
+=======
+export function checkMailroom(deps: DoctorDeps): DoctorCategory {
+>>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
   const checks: DoctorCheck[] = []
   const agents = discoverAgents(deps)
 
   if (agents.length === 0) {
+<<<<<<< HEAD
     checks.push({ label: "trip ledger", status: "warn", detail: "no agent bundles found" })
     return { name: "Trips", checks }
   }
@@ -439,10 +444,35 @@ export function checkTrips(deps: DoctorDeps): DoctorCategory {
       continue
     }
     /* v8 ignore stop */
+=======
+    checks.push({ label: "mailroom", status: "warn", detail: "no agent bundles found" })
+    return { name: "Mailroom", checks }
+  }
+
+  for (const agentDir of agents) {
+    const mailroomRoot = `${deps.bundlesRoot}/${agentDir}/state/mailroom`
+    if (!deps.existsSync(mailroomRoot)) {
+      checks.push({ label: `${agentDir} mailroom`, status: "pass", detail: "no mailroom directory (mail not connected)" })
+      continue
+    }
+    const registryPath = `${mailroomRoot}/registry.json`
+    if (!deps.existsSync(registryPath)) {
+      checks.push({ label: `${agentDir} mailroom`, status: "warn", detail: "state/mailroom/ exists but registry.json missing" })
+      continue
+    }
+    let raw: string
+    try {
+      raw = deps.readFileSync(registryPath)
+    } catch {
+      checks.push({ label: `${agentDir} mailroom`, status: "fail", detail: "registry.json could not be read" })
+      continue
+    }
+>>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
     let parsed: Record<string, unknown>
     try {
       parsed = JSON.parse(raw) as Record<string, unknown>
     } catch {
+<<<<<<< HEAD
       checks.push({ label: `${agentDir} trip ledger`, status: "fail", detail: "ledger.json is not valid JSON" })
       continue
     }
@@ -475,6 +505,34 @@ export function checkTrips(deps: DoctorDeps): DoctorCategory {
   }
 
   return { name: "Trips", checks }
+=======
+      checks.push({ label: `${agentDir} mailroom`, status: "fail", detail: "registry.json is not valid JSON" })
+      continue
+    }
+    const mailboxes = Array.isArray(parsed.mailboxes) ? parsed.mailboxes : null
+    const sourceGrants = Array.isArray(parsed.sourceGrants) ? parsed.sourceGrants : []
+    if (!mailboxes || mailboxes.length === 0) {
+      checks.push({ label: `${agentDir} mailroom`, status: "warn", detail: "registry.json has no mailboxes — provision via `ouro connect mail`" })
+      continue
+    }
+    let messagesCount = 0
+    const messagesDir = `${mailroomRoot}/messages`
+    if (deps.existsSync(messagesDir)) {
+      try {
+        messagesCount = deps.readdirSync(messagesDir).filter((name) => name.endsWith(".json")).length
+      } catch {
+        // ignore — pass detail just won't include the message count
+      }
+    }
+    checks.push({
+      label: `${agentDir} mailroom`,
+      status: "pass",
+      detail: `${mailboxes.length} mailbox${mailboxes.length === 1 ? "" : "es"}, ${sourceGrants.length} source grant${sourceGrants.length === 1 ? "" : "s"}, ${messagesCount} message${messagesCount === 1 ? "" : "s"}`,
+    })
+  }
+
+  return { name: "Mailroom", checks }
+>>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
 }
 
 export function checkDisk(deps: DoctorDeps): DoctorCategory {
@@ -685,7 +743,11 @@ const CATEGORY_CHECKERS: Array<{ name: string; fn: CategoryChecker }> = [
   { name: "Senses", fn: checkSenses },
   { name: "Habits", fn: checkHabits },
   { name: "Security", fn: checkSecurity },
+<<<<<<< HEAD
   { name: "Trips", fn: checkTrips },
+=======
+  { name: "Mailroom", fn: checkMailroom },
+>>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
   { name: "Disk", fn: checkDisk },
 ]
 
