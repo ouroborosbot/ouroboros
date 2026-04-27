@@ -164,6 +164,27 @@ describe("runDoctorChecks", () => {
     const failedChecks = result.categories.flatMap((c) => c.checks).filter((c) => c.status === "fail")
     expect(failedChecks.some((c) => c.detail?.includes("string error"))).toBe(true)
   })
+
+  it("filters to a single category when options.category is set", async () => {
+    const deps = createMockDeps()
+    const result = await runDoctorChecks(deps, { category: "CLI" })
+    expect(result.categories).toHaveLength(1)
+    expect(result.categories[0].name).toBe("CLI")
+  })
+
+  it("category match is case-insensitive", async () => {
+    const deps = createMockDeps()
+    const result = await runDoctorChecks(deps, { category: "daemon" })
+    expect(result.categories).toHaveLength(1)
+    expect(result.categories[0].name).toBe("Daemon")
+  })
+
+  it("returns zero categories for an unknown category name", async () => {
+    const deps = createMockDeps()
+    const result = await runDoctorChecks(deps, { category: "Bogus" })
+    expect(result.categories).toHaveLength(0)
+    expect(result.summary).toEqual({ passed: 0, warnings: 0, failed: 0 })
+  })
 })
 
 // ── CLI PATH checks ──

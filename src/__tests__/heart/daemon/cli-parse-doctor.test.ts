@@ -11,6 +11,14 @@ describe("ouro doctor CLI parsing", () => {
     expect(parseOuroCommand(["doctor"])).toEqual({ kind: "doctor" })
   })
 
+  it("parses 'doctor --category Daemon' with the category set", () => {
+    expect(parseOuroCommand(["doctor", "--category", "Daemon"])).toEqual({ kind: "doctor", category: "Daemon" })
+  })
+
+  it("ignores --category without a value", () => {
+    expect(parseOuroCommand(["doctor", "--category"])).toEqual({ kind: "doctor" })
+  })
+
   it("usage() output includes 'doctor'", () => {
     const text = usage()
     expect(text).toContain("doctor")

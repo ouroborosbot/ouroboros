@@ -2,6 +2,14 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.514",
+      "changes": [
+        "Add `--category <name>` flag to `ouro doctor` for running a single category. With doctor's coverage growing (Lifecycle in #616, Trips in #631, Mailroom in #632, Friends in #636), the full pass takes longer than necessary when an operator wants to debug one specific area. `ouro doctor --category Daemon` now runs only the Daemon checker.",
+        "Implementation: `runDoctorChecks(deps, options)` accepts `{ category?: string }` and filters `CATEGORY_CHECKERS` case-insensitively. Unknown categories return zero categories — the CLI surfaces this as a clear error message listing the known names. Same `--json` and text output paths work unchanged. Passing no category preserves the existing run-all behavior.",
+        "New `KNOWN_DOCTOR_CATEGORIES` export gives external tooling a way to enumerate available filters. 5 new tests cover the parse path (with-value, no-value-as-flag-only) and the filter path (matches one, case-insensitive, unknown returns empty); existing 65 tests pass."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.494",
       "changes": [
         "Bump default Azure Blob operation timeout from 20s to 60s. Slugger's HEY-corpus validation against the booking-aware ranking from #608 surfaced a real issue: ranking and metadata are clean, but body fetches for targeted retrieval (`mail_thread`-style 'open this specific message') were timing out on real-world mail bodies. HEY mail with HTML-heavy booking confirmations regularly exceed the 20s ceiling on cold reads from Azure Blob. 60s with 2 attempts gives 120s max wait, which matches Azure's actual cold-read SLA for few-MB blobs while still bounding total wait. Index reads still fit comfortably in this budget. Existing test fixture for the timeout error message updated."

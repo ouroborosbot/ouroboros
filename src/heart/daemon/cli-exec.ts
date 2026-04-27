@@ -8099,7 +8099,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       homedir: os.homedir(),
       envPath: process.env.PATH ?? "",
     }
-    const doctorResult = await runDoctorChecks(doctorDeps)
+    const doctorResult = await runDoctorChecks(doctorDeps, command.category ? { category: command.category } : {})
+    if (command.category && doctorResult.categories.length === 0) {
+      const message = `unknown doctor category '${command.category}'. known categories: CLI, Daemon, Agents, Senses, Habits, Security, Disk.\n`
+      deps.writeStdout(message)
+      return message
+    }
     const output = formatDoctorOutput(doctorResult)
     deps.writeStdout(output)
     emitNervesEvent({
