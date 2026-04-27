@@ -97,6 +97,20 @@ describe("runSessionPlayback", () => {
 })
 
 describe("runSessionPlaybackCli", () => {
+  it("prints help and exits 0 when --help is passed alongside a path", () => {
+    const sessionPath = tempFile({ version: 1, messages: [] })
+    const logs: string[] = []
+    const original = console.log
+    console.log = (...args: unknown[]) => { logs.push(args.map(String).join(" ")) }
+    try {
+      const code = runSessionPlaybackCli([sessionPath, "--help"])
+      expect(code).toBe(0)
+      expect(logs.join("\n")).toContain("usage: ouro session-playback")
+    } finally {
+      console.log = original
+    }
+  })
+
   it("prints help when called with no args and exits with code 2", () => {
     const logs: string[] = []
     const original = console.log
