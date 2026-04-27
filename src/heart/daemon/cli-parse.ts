@@ -1517,8 +1517,24 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "clone") return parseCloneCommand(args.slice(1))
   if (head === "doctor") {
     const tail = args.slice(1)
+<<<<<<< HEAD
     const json = tail.includes("--json")
     return { kind: "doctor", json }
+=======
+    let category: string | undefined
+    let strict = false
+    for (let i = 0; i < tail.length; i++) {
+      if (tail[i] === "--category" && typeof tail[i + 1] === "string") {
+        category = tail[i + 1]
+      } else if (tail[i] === "--strict") {
+        strict = true
+      }
+    }
+    const command: Extract<OuroCliCommand, { kind: "doctor" }> = { kind: "doctor" }
+    if (category !== undefined) command.category = category
+    if (strict) command.strict = true
+    return command
+>>>>>>> 3976b684 (feat(doctor): --strict + --category flags for CI-friendly invocation (alpha.515))
   }
   if (head === "bluebubbles") return parseBlueBubblesCommand(args.slice(1))
 
