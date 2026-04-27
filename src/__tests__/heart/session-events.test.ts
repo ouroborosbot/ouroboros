@@ -502,7 +502,7 @@ describe("session events", () => {
       },
       {
         role: "tool",
-        content: "error: tool call was interrupted (previous turn timed out or was aborted)",
+        content: "error: this tool call's result was lost — the previous turn ended before the tool finished (provider rejection, daemon interrupt, or the tool itself errored). if the work needs to be done, retry the tool call now.",
         tool_call_id: "tc-custom",
       },
       {
@@ -565,7 +565,7 @@ describe("session events", () => {
       {
         role: "tool",
         tool_call_id: "call-1",
-        content: "error: tool call was interrupted (previous turn timed out or was aborted)",
+        content: "error: this tool call's result was lost — the previous turn ended before the tool finished (provider rejection, daemon interrupt, or the tool itself errored). if the work needs to be done, retry the tool call now.",
       },
       { role: "user", content: "next" },
     ])
@@ -607,7 +607,7 @@ describe("session events", () => {
       {
         role: "tool",
         tool_call_id: "call-1",
-        content: "error: tool call was interrupted (previous turn timed out or was aborted)",
+        content: "error: this tool call's result was lost — the previous turn ended before the tool finished (provider rejection, daemon interrupt, or the tool itself errored). if the work needs to be done, retry the tool call now.",
       },
       { role: "assistant", content: "moving on" },
       { role: "tool", tool_call_id: "call-1", content: "late result" },
@@ -661,7 +661,7 @@ describe("session events", () => {
       {
         role: "tool",
         tool_call_id: "call-2",
-        content: "error: tool call was interrupted (previous turn timed out or was aborted)",
+        content: "error: this tool call's result was lost — the previous turn ended before the tool finished (provider rejection, daemon interrupt, or the tool itself errored). if the work needs to be done, retry the tool call now.",
       },
       { role: "assistant", content: "starting a fresh thought" },
     ])
@@ -714,7 +714,7 @@ describe("session events", () => {
       {
         role: "tool",
         tool_call_id: "call-2",
-        content: "error: tool call was interrupted (previous turn timed out or was aborted)",
+        content: "error: this tool call's result was lost — the previous turn ended before the tool finished (provider rejection, daemon interrupt, or the tool itself errored). if the work needs to be done, retry the tool call now.",
       },
       { role: "user", content: "new question" },
     ])
@@ -2314,6 +2314,101 @@ describe("session events", () => {
       expect(newEvent).toBeDefined()
       expect(newEvent!.sequence).toBe(131)
       expect(newEvent!.id).toBe("evt-000131")
+    })
+  })
+
+  describe("inline-reasoning replay repair (MiniMax 2013 fix)", () => {
+    // The bug Slugger surfaced: MiniMax-M2.7 emits assistant messages with
+    // inline <think>...</think> content AND tool_calls. Replaying that
+    // combination triggers MiniMax error 2013 ("tool result's tool id not
+    // found") and stalls the session — every subsequent turn fails.
+    //
+    // The fix has two halves:
+    // (a) Strip the <think> blocks from the assistant content so replays
+    //     are valid.
+    // (b) The synthetic tool-result message is an EXPLANATORY one (not the
+    //     generic "interrupted") so the agent has full awareness of what
+    //     happened and what to do — strip-and-stay-silent would be bad AX.
+    it("strips inline <think> blocks from assistant messages with tool_calls and surfaces an explanatory tool-result", async () => {
+      const { sanitizeProviderMessages } = await import("../../heart/session-events")
+      const sanitized = sanitizeProviderMessages([
+        { role: "user", content: "what's up?" },
+        {
+          role: "assistant",
+          content: "<think>doing some reasoning that the provider can't replay</think>",
+          tool_calls: [{ id: "call_xyz", type: "function" as const, function: { name: "settle", arguments: "{\"answer\":\"ok\"}" } }],
+        },
+        // Note: NO matching tool result for call_xyz — repairToolCallSequences will synthesize one.
+        { role: "user", content: "next message" },
+      ])
+
+      const assistant = sanitized.find((m) => m.role === "assistant") as any
+      expect(assistant).toBeDefined()
+      // <think> stripped from persisted content (or content set to null if the
+      // strip leaves nothing).
+      const content = assistant.content
+      const contentText = typeof content === "string" ? content : ""
+      expect(contentText).not.toContain("<think>")
+      expect(contentText).not.toContain("</think>")
+      // The tool_call survives (so the API replay reconstructs correctly).
+      expect(assistant.tool_calls).toHaveLength(1)
+      expect(assistant.tool_calls[0].id).toBe("call_xyz")
+
+      // The synthesized tool-result is the EXPLANATORY one (not the generic
+      // "result was lost" — that one is for tool calls whose parent didn't
+      // have stripped reasoning).
+      const synthetic = sanitized.find((m) => m.role === "tool" && (m as any).tool_call_id === "call_xyz") as any
+      expect(synthetic).toBeDefined()
+      expect(synthetic.content).toContain("inline `<think>")
+      expect(synthetic.content).toContain("MiniMax")
+      expect(synthetic.content).toContain("retry the tool call")
+    })
+
+    it("keeps the generic 'result was lost' message for orphaned tool_calls whose parent did NOT have stripped reasoning", async () => {
+      const { sanitizeProviderMessages } = await import("../../heart/session-events")
+      const sanitized = sanitizeProviderMessages([
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "no inline reasoning here, just plain content",
+          tool_calls: [{ id: "call_plain", type: "function" as const, function: { name: "read_file", arguments: "{}" } }],
+        },
+        // Orphan: no matching tool result.
+        { role: "user", content: "next" },
+      ])
+      const synthetic = sanitized.find((m) => m.role === "tool" && (m as any).tool_call_id === "call_plain") as any
+      expect(synthetic).toBeDefined()
+      expect(synthetic.content).toContain("result was lost")
+      expect(synthetic.content).not.toContain("inline `<think>")
+    })
+
+    it("handles an unclosed <think> tag (open without close) by dropping everything from <think> onward", async () => {
+      const { sanitizeProviderMessages } = await import("../../heart/session-events")
+      const sanitized = sanitizeProviderMessages([
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "early text<think>started thinking but stream was cut",
+          tool_calls: [{ id: "call_truncated", type: "function" as const, function: { name: "settle", arguments: "{}" } }],
+        },
+        { role: "user", content: "next" },
+      ])
+      const assistant = sanitized.find((m) => m.role === "assistant") as any
+      const content = typeof assistant.content === "string" ? assistant.content : ""
+      // Everything from <think> to end of string is dropped; the early text survives.
+      expect(content).toBe("early text")
+      expect(content).not.toContain("<think>")
+    })
+
+    it("leaves an assistant message with <think> but no tool_calls untouched (think tags are fine on their own)", async () => {
+      const { sanitizeProviderMessages } = await import("../../heart/session-events")
+      const sanitized = sanitizeProviderMessages([
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "<think>just thinking</think>final answer here" },
+      ])
+      const assistant = sanitized.find((m) => m.role === "assistant") as any
+      // No tool_calls means no replay-rejection risk; we don't strip.
+      expect(assistant.content).toContain("<think>")
     })
   })
 })
