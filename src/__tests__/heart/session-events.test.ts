@@ -2400,6 +2400,59 @@ describe("session events", () => {
       expect(content).not.toContain("<think>")
     })
 
+    it("end-to-end: a Slugger-shaped poisoned session produces a valid replay shape after sanitize", async () => {
+      // Reproduces the exact pattern observed in
+      // ~/AgentBundles/slugger.ouro/state/sessions/.../mcp/c11a7ba8-...json:
+      // assistant with <think>...</think> + settle tool_call, no matching
+      // tool_result, then a stack of new user messages. After sanitize, the
+      // shape MiniMax sees should be: clean assistant (no think tags), the
+      // tool_call survives, an explanatory tool-result is inserted, and the
+      // user messages follow normally — no replay violation.
+      const { sanitizeProviderMessages } = await import("../../heart/session-events")
+      const sanitized = sanitizeProviderMessages([
+        { role: "user", content: "earlier user message" },
+        {
+          role: "assistant",
+          content: "<think>thinking through the answer</think>",
+          tool_calls: [{ id: "call_function_utqogadgqp5h_1", type: "function" as const, function: { name: "settle", arguments: "{\"answer\":\"the actual answer slugger wanted to deliver\",\"intent\":\"direct_reply\"}" } }],
+        },
+        // No tool_result for call_function_utqogadgqp5h_1 — the original
+        // session was saved before the result was written
+        { role: "user", content: "follow-up message 1" },
+        { role: "user", content: "follow-up message 2" },
+        { role: "user", content: "follow-up message 3 (now what?)" },
+      ])
+
+      // Find the assistant — it should NOT have <think> tags anymore
+      const assistant = sanitized.find((m) => m.role === "assistant") as any
+      expect(typeof assistant.content === "string" ? assistant.content : "").not.toContain("<think>")
+
+      // The tool_call survives so the API can match the tool_result
+      expect(assistant.tool_calls).toHaveLength(1)
+      expect(assistant.tool_calls[0].id).toBe("call_function_utqogadgqp5h_1")
+
+      // A synthetic tool-result was inserted with the explanatory message
+      const toolResult = sanitized.find((m) => m.role === "tool" && (m as any).tool_call_id === "call_function_utqogadgqp5h_1") as any
+      expect(toolResult).toBeDefined()
+      expect(toolResult.content).toContain("MiniMax")
+      expect(toolResult.content).toContain("retry the tool call")
+
+      // The user messages follow normally
+      const userMsgs = sanitized.filter((m) => m.role === "user").map((m) => m.content)
+      expect(userMsgs).toContain("earlier user message")
+      expect(userMsgs).toContain("follow-up message 1")
+      expect(userMsgs).toContain("follow-up message 2")
+      expect(userMsgs).toContain("follow-up message 3 (now what?)")
+
+      // The order is correct: assistant before its synthetic tool-result,
+      // and follow-up users come after the tool-result.
+      const assistantIdx = sanitized.findIndex((m) => m.role === "assistant")
+      const toolResultIdx = sanitized.findIndex((m) => m.role === "tool")
+      const firstFollowUpIdx = sanitized.findIndex((m) => m.role === "user" && m.content === "follow-up message 1")
+      expect(assistantIdx).toBeLessThan(toolResultIdx)
+      expect(toolResultIdx).toBeLessThan(firstFollowUpIdx)
+    })
+
     it("leaves an assistant message with <think> but no tool_calls untouched (think tags are fine on their own)", async () => {
       const { sanitizeProviderMessages } = await import("../../heart/session-events")
       const sanitized = sanitizeProviderMessages([
