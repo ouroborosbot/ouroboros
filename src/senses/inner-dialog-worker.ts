@@ -204,6 +204,7 @@ export function createInnerDialogWorker(
     if (!message || typeof message !== "object") return
     const maybeMessage = message as Partial<InnerDialogWorkerMessage>
     if (maybeMessage.type === "habit") {
+      /* v8 ignore next -- defensive fallback: live habit dispatch always sets habitName @preserve */
       const habitName = maybeMessage.habitName ?? "(unnamed)"
       recordHabitFireForRecursion(habitName)
       await run("habit", undefined, maybeMessage.habitName)
