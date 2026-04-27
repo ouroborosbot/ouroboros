@@ -6,7 +6,11 @@ import { resolveMailroomReader, readMailroomRegistry, writeMailroomRegistry, typ
 import { confirmMailDraftSend, createMailDraft, resolveOutboundProviderClient, resolveOutboundTransport, type MailOutboundTransport } from "../mailroom/outbound"
 import { applyMailDecision, buildSenderPolicy, type MailDecisionAction, type MailDecisionActor, type MailScreenerCandidateStatus } from "../mailroom/policy"
 import { searchMailSearchCache, upsertMailSearchCacheDocument, type MailSearchCacheDocument } from "../mailroom/search-cache"
+<<<<<<< HEAD
 import { reconstructThread } from "../mailroom/thread"
+=======
+import { cacheMailBody, getCachedMailBody } from "../mailroom/body-cache"
+>>>>>>> a88c5964 (feat(mail): in-process LRU cache for decrypted mail bodies (alpha.503))
 import { cacheMatchingMailSearchDocumentsFromMboxFile } from "../mailroom/mbox-import"
 import { compareByRelevanceThenRecency, formatRelevanceHint, scoreMailSearchDocument } from "../mailroom/search-relevance"
 import {
@@ -297,6 +301,7 @@ function renderAccessLogProvenance(entry: MailAccessLogEntry): string {
 function cacheDecryptedMessages(messages: DecryptedMailMessage[]): void {
   for (const message of messages) {
     upsertMailSearchCacheDocument(message, message.private)
+    cacheMailBody(message)
   }
 }
 
@@ -1159,6 +1164,38 @@ export const mailToolDefinitions: ToolDefinition[] = [
       if (!messageId) return "message_id is required."
       const resolved = resolveMailroomReader()
       if (!resolved.ok) return resolved.error
+
+      const cached = getCachedMailBody(messageId)
+      if (cached && cached.agentId === resolved.agentName) {
+        if (cached.compartmentKind === "delegated") {
+          const blocked = delegatedHumanMailBlocked(ctx)
+          if (blocked) return blocked
+        }
+        await resolved.store.recordAccess({
+          agentId: resolved.agentName,
+          messageId,
+          tool: "mail_thread",
+          reason: args.reason,
+          ...accessProvenance(cached),
+        })
+        emitNervesEvent({
+          component: "repertoire",
+          event: "repertoire.mail_body_cache_hit",
+          message: "served mail_thread body from in-memory cache",
+          meta: { messageId },
+        })
+        const maxCharsCached = numberArg(args.max_chars, 2000, 200, 6000)
+        const bodyCached = cached.private.text.length > maxCharsCached
+          ? `${cached.private.text.slice(0, maxCharsCached - 3)}...`
+          : cached.private.text
+        return [
+          renderMessageSummary(cached),
+          "",
+          "body (untrusted external content):",
+          bodyCached || "(no text body)",
+        ].join("\n")
+      }
+
       const message = await resolved.store.getMessage(messageId)
       if (!message || message.agentId !== resolved.agentName) return `No visible mail message found for ${messageId}.`
       if (message.compartmentKind === "delegated") {
@@ -1181,6 +1218,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
         return renderUndecryptableThread(message, keyId)
       }
       upsertMailSearchCacheDocument(message, decrypted.private)
+      cacheMailBody(decrypted)
       const maxChars = numberArg(args.max_chars, 2000, 200, 6000)
       const body = decrypted.private.text.length > maxChars
         ? `${decrypted.private.text.slice(0, maxChars - 3)}...`
