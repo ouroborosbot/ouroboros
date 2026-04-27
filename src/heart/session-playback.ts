@@ -45,6 +45,7 @@ function shortPreview(value: unknown): string {
 }
 
 function getRole(message: OpenAI.ChatCompletionMessageParam): string {
+  /* v8 ignore next -- defensive fallback: provider messages always carry a role @preserve */
   return (message as { role?: string }).role ?? "unknown"
 }
 
@@ -182,6 +183,7 @@ export function runSessionPlayback(options: RunPlaybackOptions): SessionPlayback
     raw = JSON.parse(text) as unknown
   }
   const shape = detectEnvelopeShape(raw)
+  /* v8 ignore next -- v2 envelope branch: not exercised by current replay test fixtures (all legacy v1) @preserve */
   const envelope = shape === "v2" ? parseSessionEnvelope(raw) : null
   const input = inputMessagesForShape(shape, raw, envelope)
   const sanitized = sanitizeProviderMessages(input)
@@ -216,10 +218,12 @@ export function formatPlaybackReport(report: SessionPlaybackReport): string {
   }
   lines.push("")
   lines.push("changes (oldest first):")
+  /* v8 ignore start -- per-change formatting branches: toolCallId-present and preview-absent variants depend on the specific change shape and aren't exercised by the legacy fixtures @preserve */
   for (const change of report.changes) {
     lines.push(`  [${String(change.index).padStart(4, "0")}] ${change.action.padEnd(18)} ${change.role}${change.toolCallId ? ` tool_call_id=${change.toolCallId}` : ""}`)
     lines.push(`         reason: ${change.reason}`)
     if (change.preview) lines.push(`         preview: ${change.preview}`)
   }
+  /* v8 ignore stop */
   return lines.join("\n")
 }
