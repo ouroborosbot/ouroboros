@@ -30,8 +30,12 @@ import {
   checkSenses,
   checkHabits,
   checkSecurity,
+<<<<<<< HEAD
   checkTrips,
   checkMailroom,
+=======
+  checkFriends,
+>>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
   checkDisk,
   checkLifecycle,
 } from "../../../heart/daemon/doctor"
@@ -1223,6 +1227,7 @@ describe("checkSecurity", () => {
   })
 })
 
+<<<<<<< HEAD
 // ── Trip ledger checks ──
 
 describe("checkTrips", () => {
@@ -1337,6 +1342,16 @@ describe("checkMailroom", () => {
     domain: "ouro.bot",
     mailboxes: [{ agentId: "test", mailboxId: "mb_x", canonicalAddress: "test@ouro.bot", keyId: "k", publicKeyPem: "pem", defaultPlacement: "imbox" }],
     sourceGrants: [],
+=======
+// ── Friends checks ──
+
+describe("checkFriends", () => {
+  const friendJson = (overrides: Record<string, unknown> = {}): string => JSON.stringify({
+    id: "test-friend",
+    name: "Test Friend",
+    trustLevel: "friend",
+    externalIds: [],
+>>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
     ...overrides,
   })
 
@@ -1345,17 +1360,27 @@ describe("checkMailroom", () => {
       existsSync: existsFor(["/tmp/bundles"]),
       readdirSync: readdirFor({ "/tmp/bundles": [] }),
     })
+<<<<<<< HEAD
     const cat = checkMailroom(deps)
     expect(cat.name).toBe("Mailroom")
+=======
+    const cat = checkFriends(deps)
+    expect(cat.name).toBe("Friends")
+>>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
     expect(cat.checks[0].status).toBe("warn")
     expect(cat.checks[0].detail).toContain("no agent bundles")
   })
 
+<<<<<<< HEAD
   it("passes when no mailroom dir (mail not connected)", () => {
+=======
+  it("passes when no friends directory (no friends recorded)", () => {
+>>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
     const deps = createMockDeps({
       existsSync: existsFor(["/tmp/bundles"]),
       readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
     })
+<<<<<<< HEAD
     const cat = checkMailroom(deps)
     expect(cat.checks[0].status).toBe("pass")
     expect(cat.checks[0].detail).toContain("not connected")
@@ -1426,6 +1451,79 @@ describe("checkMailroom", () => {
     expect(cat.checks[0].detail).toContain("1 mailbox")
     expect(cat.checks[0].detail).toContain("1 source grant")
     expect(cat.checks[0].detail).toContain("3 messages")
+=======
+    const cat = checkFriends(deps)
+    expect(cat.checks[0].status).toBe("pass")
+    expect(cat.checks[0].detail).toContain("no friends directory")
+  })
+
+  it("passes with zero count when friends dir is empty", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles", "/tmp/bundles/test.ouro/friends"]),
+      readdirSync: readdirFor({
+        "/tmp/bundles": ["test.ouro"],
+        "/tmp/bundles/test.ouro/friends": [],
+      }),
+    })
+    const cat = checkFriends(deps)
+    expect(cat.checks[0].status).toBe("pass")
+    expect(cat.checks[0].detail).toBe("0 friends recorded")
+  })
+
+  it("passes with trust-level breakdown when friends are healthy", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles", "/tmp/bundles/test.ouro/friends"]),
+      readdirSync: readdirFor({
+        "/tmp/bundles": ["test.ouro"],
+        "/tmp/bundles/test.ouro/friends": ["a.json", "b.json", "c.json", "d.json", "ignore.txt"],
+      }),
+      readFileSync: readFileFor({
+        "/tmp/bundles/test.ouro/friends/a.json": friendJson({ id: "a", trustLevel: "family" }),
+        "/tmp/bundles/test.ouro/friends/b.json": friendJson({ id: "b", trustLevel: "family" }),
+        "/tmp/bundles/test.ouro/friends/c.json": friendJson({ id: "c", trustLevel: "friend" }),
+        "/tmp/bundles/test.ouro/friends/d.json": friendJson({ id: "d", trustLevel: "stranger" }),
+      }),
+    })
+    const cat = checkFriends(deps)
+    expect(cat.checks[0].status).toBe("pass")
+    expect(cat.checks[0].detail).toContain("4 friends")
+    expect(cat.checks[0].detail).toContain("2 family")
+    expect(cat.checks[0].detail).toContain("1 friend")
+    expect(cat.checks[0].detail).toContain("1 stranger")
+  })
+
+  it("warns when some friend files are unparseable", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles", "/tmp/bundles/test.ouro/friends"]),
+      readdirSync: readdirFor({
+        "/tmp/bundles": ["test.ouro"],
+        "/tmp/bundles/test.ouro/friends": ["good.json", "bad.json"],
+      }),
+      readFileSync: readFileFor({
+        "/tmp/bundles/test.ouro/friends/good.json": friendJson(),
+        "/tmp/bundles/test.ouro/friends/bad.json": "{not json",
+      }),
+    })
+    const cat = checkFriends(deps)
+    expect(cat.checks[0].status).toBe("warn")
+    expect(cat.checks[0].detail).toContain("1 unparseable")
+  })
+
+  it("counts a record with an unrecognized trust level under 'other'", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles", "/tmp/bundles/test.ouro/friends"]),
+      readdirSync: readdirFor({
+        "/tmp/bundles": ["test.ouro"],
+        "/tmp/bundles/test.ouro/friends": ["weird.json"],
+      }),
+      readFileSync: readFileFor({
+        "/tmp/bundles/test.ouro/friends/weird.json": friendJson({ trustLevel: "blocked" }),
+      }),
+    })
+    const cat = checkFriends(deps)
+    expect(cat.checks[0].status).toBe("pass")
+    expect(cat.checks[0].detail).toContain("1 other")
+>>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
   })
 })
 
