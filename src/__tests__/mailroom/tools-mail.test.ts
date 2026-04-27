@@ -1649,6 +1649,7 @@ describe("mail tools", () => {
     expect(missingSource).toContain("delegated:ari@mendelow.me:source")
   })
 
+<<<<<<< HEAD
   it("mail_thread reconstructs a multi-message conversation, mail_body opens one message, both audit-logged", async () => {
     setAgentName("slugger")
     const storePath = tempDir()
@@ -1750,6 +1751,71 @@ describe("mail tools", () => {
       context: { friend: { id: "x", name: "X", trustLevel: "stranger", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, totalTokens: 0, createdAt: "0", updatedAt: "0", schemaVersion: 1 }, channel: { channel: "cli", senseType: "local", availableIntegrations: [], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
     } as unknown as ToolContext
     const result = await tool("mail_thread").handler({ message_id: "x", reason: "snoop" }, ctx) as string
+=======
+  it("mail_outbox lists drafts and sends with newest-first ordering and status filter", async () => {
+    setAgentName("slugger")
+    const storePath = tempDir()
+    const sinkPath = path.join(storePath, "outbound-sink.jsonl")
+    const { keys } = provisionMailboxRegistry({ agentId: "slugger" })
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: {
+        mailboxAddress: "slugger@ouro.bot",
+        storePath,
+        privateKeys: keys,
+        outbound: { transport: "local-sink", sinkPath },
+      },
+    })
+
+    const empty = await tool("mail_outbox").handler({ reason: "first look" }, trustedContext()) as string
+    expect(empty).toBe("No outbound mail recorded yet.")
+
+    const draft1 = await tool("mail_compose").handler({
+      to: "ari@example.com",
+      subject: "First draft",
+      text: "hello",
+      reason: "compose 1",
+    }, trustedContext())
+    const draft1Id = /draft_[a-f0-9]+/.exec(String(draft1))?.[0]!
+
+    // Insert another draft a moment later — newest-first ordering should put it ahead.
+    await new Promise((r) => setTimeout(r, 10))
+    const draft2 = await tool("mail_compose").handler({
+      to: "ari@example.com",
+      subject: "Second draft",
+      text: "hello again",
+      reason: "compose 2",
+    }, trustedContext())
+    const draft2Id = /draft_[a-f0-9]+/.exec(String(draft2))?.[0]!
+
+    const allDrafts = await tool("mail_outbox").handler({ reason: "review" }, trustedContext()) as string
+    expect(allDrafts.indexOf(draft2Id)).toBeLessThan(allDrafts.indexOf(draft1Id))
+    expect(allDrafts).toContain("[draft]")
+    expect(allDrafts).toContain("First draft")
+    expect(allDrafts).toContain("Second draft")
+
+    const onlySent = await tool("mail_outbox").handler({ status: "sent", reason: "review sent" }, trustedContext()) as string
+    expect(onlySent).toBe("No outbound mail with status 'sent'.")
+
+    const limited = await tool("mail_outbox").handler({ limit: "1", reason: "limit" }, trustedContext()) as string
+    expect(limited).toContain(draft2Id)
+    expect(limited).not.toContain(draft1Id)
+
+    const audit = await tool("mail_access_log").handler({}, trustedContext()) as string
+    expect(audit).toContain("mail_outbox")
+  })
+
+  it("mail_outbox blocks untrusted callers", async () => {
+    setAgentName("slugger")
+    const storePath = tempDir()
+    const { keys } = provisionMailboxRegistry({ agentId: "slugger" })
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: { mailboxAddress: "slugger@ouro.bot", storePath, privateKeys: keys },
+    })
+    const result = await tool("mail_outbox").handler({ reason: "snoop" }, {
+      signin: async () => undefined,
+      context: { friend: { id: "x", name: "X", trustLevel: "stranger", externalIds: [] } },
+    } as unknown as ToolContext)
+>>>>>>> 93f80a6f (feat(mail): mail_outbox tool — agent-introspectable outbound mail (alpha.504))
     expect(result).toContain("mail is private")
   })
 })

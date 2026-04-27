@@ -132,6 +132,7 @@ describe("tool registry contract", () => {
     expect(names).toContain("mail_status");
     expect(names).toContain("mail_compose");
     expect(names).toContain("mail_send");
+    expect(names).toContain("mail_outbox");
     expect(names).toContain("mail_access_log");
     expect(names).toContain("claude");
     expect(names).toContain("coding_spawn");
@@ -199,7 +200,11 @@ describe("tool registry contract", () => {
     expect(names).toContain("trip_update_leg");
     expect(names).toContain("trip_new_id");
 
+<<<<<<< HEAD
     // Exact count: 75 tools total including Mailroom status, outbound mail (mail_compose/send), mail_body+mail_thread, attachment, image recovery, and trip ledger tools
+=======
+    // Exact count: 75 tools total including Mailroom status, outbound mail (compose+send+outbox), attachment, image recovery, and trip ledger tools
+>>>>>>> 93f80a6f (feat(mail): mail_outbox tool — agent-introspectable outbound mail (alpha.504))
     expect(names).toHaveLength(75);
   });
 });
