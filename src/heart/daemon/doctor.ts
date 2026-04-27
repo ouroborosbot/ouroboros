@@ -409,6 +409,70 @@ export function checkSecurity(deps: DoctorDeps): DoctorCategory {
   return { name: "Security", checks }
 }
 
+export function checkTrips(deps: DoctorDeps): DoctorCategory {
+  const checks: DoctorCheck[] = []
+  const agents = discoverAgents(deps)
+
+  if (agents.length === 0) {
+    checks.push({ label: "trip ledger", status: "warn", detail: "no agent bundles found" })
+    return { name: "Trips", checks }
+  }
+
+  for (const agentDir of agents) {
+    const tripsRootPath = `${deps.bundlesRoot}/${agentDir}/state/trips`
+    if (!deps.existsSync(tripsRootPath)) {
+      // Trip ledger is optional; absence is fine. Pass with a hint.
+      checks.push({ label: `${agentDir} trip ledger`, status: "pass", detail: "no ledger directory (no trips ensured yet)" })
+      continue
+    }
+    const ledgerPath = `${tripsRootPath}/ledger.json`
+    if (!deps.existsSync(ledgerPath)) {
+      checks.push({ label: `${agentDir} trip ledger`, status: "warn", detail: "state/trips/ exists but ledger.json missing — run trip_ensure_ledger" })
+      continue
+    }
+    let raw: string
+    try {
+      raw = deps.readFileSync(ledgerPath)
+    } catch {
+      checks.push({ label: `${agentDir} trip ledger`, status: "fail", detail: "ledger.json could not be read" })
+      continue
+    }
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>
+    } catch {
+      checks.push({ label: `${agentDir} trip ledger`, status: "fail", detail: "ledger.json is not valid JSON" })
+      continue
+    }
+    const ledgerId = typeof parsed.ledgerId === "string" ? parsed.ledgerId : null
+    const hasPrivateKey = typeof parsed.privateKeyPem === "string" && parsed.privateKeyPem.includes("BEGIN")
+    if (!ledgerId) {
+      checks.push({ label: `${agentDir} trip ledger`, status: "warn", detail: "ledger.json missing ledgerId field" })
+      continue
+    }
+    if (!hasPrivateKey) {
+      checks.push({ label: `${agentDir} trip ledger`, status: "fail", detail: `${ledgerId}: privateKeyPem missing — encrypted trip records cannot be read` })
+      continue
+    }
+    let recordCount = 0
+    const recordsDir = `${tripsRootPath}/records`
+    if (deps.existsSync(recordsDir)) {
+      try {
+        recordCount = deps.readdirSync(recordsDir).filter((name) => name.endsWith(".json")).length
+      } catch {
+        // ignore — the warn detail will still report 0 records
+      }
+    }
+    checks.push({
+      label: `${agentDir} trip ledger`,
+      status: "pass",
+      detail: `${ledgerId} (${recordCount} record${recordCount === 1 ? "" : "s"})`,
+    })
+  }
+
+  return { name: "Trips", checks }
+}
+
 export function checkDisk(deps: DoctorDeps): DoctorCategory {
   const checks: DoctorCheck[] = []
 
@@ -617,6 +681,7 @@ const CATEGORY_CHECKERS: Array<{ name: string; fn: CategoryChecker }> = [
   { name: "Senses", fn: checkSenses },
   { name: "Habits", fn: checkHabits },
   { name: "Security", fn: checkSecurity },
+  { name: "Trips", fn: checkTrips },
   { name: "Disk", fn: checkDisk },
 ]
 
