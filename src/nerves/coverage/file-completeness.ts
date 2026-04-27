@@ -112,6 +112,9 @@ const DISPATCH_EXEMPT_PATTERNS = [
   "heart/outlook/outlook-http-hooks",
   "heart/outlook/outlook-http-routes",
   "heart/outlook/outlook-http-response",
+  // Session playback CLI entry: 4-line bin shim that delegates to runSessionPlaybackCli.
+  // The CLI module owns observability; the entry has no logic to instrument.
+  "heart/session-playback-cli-main",
 ]
 
 function isDispatchExempt(filePath: string): boolean {

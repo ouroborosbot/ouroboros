@@ -128,4 +128,27 @@ describe("runSessionPlaybackCli", () => {
       console.log = original
     }
   })
+
+  it("prints the human-readable report by default and reports zero changes", () => {
+    const sessionPath = tempFile({
+      version: 1,
+      messages: [
+        { role: "system", content: "system" },
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "hello" },
+      ],
+    })
+    const logs: string[] = []
+    const original = console.log
+    console.log = (...args: unknown[]) => { logs.push(args.map(String).join(" ")) }
+    try {
+      const code = runSessionPlaybackCli([sessionPath])
+      expect(code).toBe(0)
+      const output = logs.join("\n")
+      expect(output).toContain("Session playback:")
+      expect(output).toContain("no repairs would apply.")
+    } finally {
+      console.log = original
+    }
+  })
 })

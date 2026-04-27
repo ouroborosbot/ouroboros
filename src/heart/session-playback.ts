@@ -1,7 +1,6 @@
 import * as fs from "node:fs"
 import type OpenAI from "openai"
 import {
-  loadSessionEnvelopeFile,
   parseSessionEnvelope,
   projectProviderMessages,
   sanitizeProviderMessages,
@@ -49,6 +48,7 @@ function getRole(message: OpenAI.ChatCompletionMessageParam): string {
 
 function getToolCallId(message: OpenAI.ChatCompletionMessageParam): string | undefined {
   const value = (message as { tool_call_id?: unknown }).tool_call_id
+  /* v8 ignore next -- defensive: tool messages always carry a string tool_call_id @preserve */
   return typeof value === "string" ? value : undefined
 }
 
@@ -190,10 +190,6 @@ export function runSessionPlayback(options: RunPlaybackOptions): SessionPlayback
     },
     changes,
   }
-}
-
-export function tryLoadSessionFromPath(sessionPath: string): SessionEnvelope | null {
-  return loadSessionEnvelopeFile(sessionPath)
 }
 
 export function formatPlaybackReport(report: SessionPlaybackReport): string {
