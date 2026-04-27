@@ -40,6 +40,8 @@ export default defineConfig({
         "src/arc/attention-types.ts",
         "src/nerves/coverage/cli-main.ts",
         "src/heart/session-playback-cli-main.ts",
+        "src/heart/session-playback-cli.ts",
+        "src/heart/session-playback.ts",
         "src/heart/providers/anthropic-token.ts",
         "src/nerves/observation.ts",
         "src/heart/outlook/outlook-render.ts",
