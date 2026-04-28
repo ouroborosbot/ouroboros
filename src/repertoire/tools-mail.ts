@@ -1171,14 +1171,14 @@ export const mailToolDefinitions: ToolDefinition[] = [
         await resolved.store.recordAccess({
           agentId: resolved.agentName,
           messageId,
-          tool: "mail_thread",
+          tool: "mail_body",
           reason: args.reason,
           ...accessProvenance(cached),
         })
         emitNervesEvent({
           component: "repertoire",
           event: "repertoire.mail_body_cache_hit",
-          message: "served mail_thread body from in-memory cache",
+          message: "served mail_body from in-memory cache",
           meta: { messageId },
         })
         const maxCharsCached = numberArg(args.max_chars, 2000, 200, 6000)
