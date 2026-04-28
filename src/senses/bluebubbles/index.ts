@@ -644,6 +644,25 @@ export function createBlueBubblesCallbacks(
       textBuffer = ""
     },
 
+    async flushNow(): Promise<void> {
+      const trimmed = textBuffer.trim()
+      if (!trimmed) return
+      textBuffer = ""
+      await client.sendText({
+        chat,
+        text: trimmed,
+        replyToMessageGuid: replyTarget.getReplyToMessageGuid(),
+      })
+      // Note: do NOT call client.setTyping(chat, false) here — the agent is
+      // still mid-turn, so the typing indicator stays ACTIVE.
+      emitNervesEvent({
+        component: "senses",
+        event: "bluebubbles.speak_flush",
+        message: "bluebubbles flushed mid-turn speak",
+        meta: { messageLength: trimmed.length },
+      })
+    },
+
     async flush(): Promise<void> {
       statusBatcher.flush()
       await queue
