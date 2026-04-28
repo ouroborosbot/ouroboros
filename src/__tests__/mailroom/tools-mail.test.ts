@@ -6,6 +6,7 @@ import { provisionMailboxRegistry } from "../../mailroom/core"
 import { buildNativeMailAutonomyPolicy } from "../../mailroom/autonomy"
 import { FileMailroomStore, ingestRawMailToStore } from "../../mailroom/file-store"
 import { resetMailSearchCacheForTests } from "../../mailroom/search-cache"
+import { clearMailBodyCache } from "../../mailroom/body-cache"
 import type { BackgroundOperationRecord } from "../../heart/background-operations"
 import type { DiscoveredMboxCandidate } from "../../heart/mail-import-discovery"
 import { cacheRuntimeCredentialConfig, resetRuntimeCredentialConfigCache } from "../../heart/runtime-credentials"
@@ -293,6 +294,7 @@ afterEach(() => {
   else process.env.HOME = originalHome
   resetIdentity()
   resetMailSearchCacheForTests()
+  clearMailBodyCache()
   resetRuntimeCredentialConfigCache()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
