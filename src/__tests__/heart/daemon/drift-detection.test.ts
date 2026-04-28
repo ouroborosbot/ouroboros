@@ -292,6 +292,31 @@ describe("detectProviderBindingDrift — pure intent-vs-observed comparator", ()
     })
   })
 
+  describe("missing-lane-intent path", () => {
+    it("emits no finding for a lane whose agent.json has neither legacy nor new key set", () => {
+      // The agent.json has no usable binding for the inner lane (humanFacing
+      // is the only lane configured; agentFacing has been deleted/blanked
+      // and no `inner` key exists either). The comparator stays silent on
+      // that lane — drift detection has no intent to compare against.
+      const partial = {
+        version: 2,
+        enabled: true,
+        humanFacing: facing("anthropic", "claude-opus-4-6"),
+        // agentFacing intentionally absent: cast through unknown so the test
+        // can model an agent.json that doesn't carry an inner lane at all
+        // (a real-world parse outcome when the rename is mid-flight and the
+        // new key hasn't been added yet).
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["t"] },
+      } as unknown as AgentConfig
+      const result = detectProviderBindingDrift({
+        agentName: "alpha",
+        agentJson: partial,
+        providerState: providerState(),
+      })
+      expect(result).toEqual([])
+    })
+  })
+
   describe("repair command shape", () => {
     it("uses the agent name from input, not a hard-coded value", () => {
       const result = detectProviderBindingDrift({
