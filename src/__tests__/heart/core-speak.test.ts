@@ -338,6 +338,50 @@ describe("speak interception in runAgent", () => {
     expect(spoken).toBeDefined()
   })
 
+  it("delivery failure: flushNow throws → onToolEnd(success=false), error tool result, engine.speak_delivery_failed event, turn continues", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(speakChunk("got it")))
+    mockCreate.mockReturnValueOnce(makeStream(settleChunks("done")))
+
+    const flushNowError = new Error("teams delivery failed: stream dead and sendMessage failed")
+    const callbacks = makeCallbacks({
+      flushNow: vi.fn(async () => { throw flushNowError }),
+    })
+    const messages: any[] = [{ role: "user", content: "x" }]
+    const result = await runAgent(messages, callbacks, "cli", undefined, {
+      toolContext: { signin: async () => undefined },
+    })
+
+    // Turn does NOT crash; settle still completes after speak failure
+    expect(result.outcome).toBe("settled")
+
+    // onToolEnd called with success=false for speak
+    const onToolEndCalls = (callbacks.onToolEnd as any).mock.calls
+    const speakEnd = onToolEndCalls.find((c: any[]) => c[0] === "speak")
+    expect(speakEnd).toBeDefined()
+    expect(speakEnd[2]).toBe(false)
+
+    // Error tool result pushed (NOT "(spoken)")
+    const errMsg = messages.find((m: any) =>
+      m.role === "tool" &&
+      typeof m.content === "string" &&
+      m.content.includes("speak delivery failed") &&
+      m.content.includes("did not reach your friend")
+    )
+    expect(errMsg).toBeDefined()
+    // (spoken) was NOT pushed for the failed speak call
+    const spokenForFailed = messages.find((m: any) =>
+      m.role === "tool" && m.content === "(spoken)" && m.tool_call_id === "call_speak_1"
+    )
+    expect(spokenForFailed).toBeUndefined()
+
+    // Nerves event fired
+    expect(mockEmitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "engine.speak_delivery_failed",
+      component: "engine",
+      level: "error",
+    }))
+  })
+
   it("emits engine.speak nerves event on success with messageLength meta", async () => {
     mockCreate.mockReturnValueOnce(makeStream(speakChunk("hello")))
     mockCreate.mockReturnValueOnce(makeStream(settleChunks("done")))

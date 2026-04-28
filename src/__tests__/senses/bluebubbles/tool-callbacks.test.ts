@@ -226,4 +226,22 @@ describe("BlueBubbles createBlueBubblesCallbacks - flushNow (speak tool)", () =>
     await expect((callbacks as any).flushNow()).resolves.not.toThrow()
     expect(sendText).not.toHaveBeenCalled()
   })
+
+  it("flushNow PROPAGATES rejection when client.sendText rejects (hard delivery failure)", async () => {
+    const indexModule = await import("../../../senses/bluebubbles")
+    const { createBlueBubblesCallbacks } = indexModule
+    const sendText = vi.fn(async () => { throw new Error("bb network down") })
+    const setTyping = vi.fn(async () => {})
+    const markChatRead = vi.fn(async () => {})
+    const editMessage = vi.fn(async () => {})
+    const checkHealth = vi.fn(async () => {})
+    const repairEvent = vi.fn(async (e: any) => e)
+    const getMessageText = vi.fn(async () => null)
+    const client = { sendText, editMessage, setTyping, markChatRead, checkHealth, repairEvent, getMessageText }
+    const chat = { chatGuid: "chat-1", participants: [] } as any
+    const replyTarget = { getReplyToMessageGuid: vi.fn(() => "reply-guid"), setSelection: vi.fn(() => "ok") }
+    const callbacks = createBlueBubblesCallbacks(client as any, chat, replyTarget as any, false)
+    callbacks.onTextChunk("hello will fail")
+    await expect((callbacks as any).flushNow()).rejects.toThrow(/bb network down/)
+  })
 })

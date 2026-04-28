@@ -182,4 +182,21 @@ describe("Teams createTeamsCallbacks - flushNow (speak tool)", () => {
     await expect((callbacks as any).flushNow()).resolves.not.toThrow()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
+
+  it("flushNow THROWS when stream.emit fails AND sendMessage also fails (hard delivery failure)", async () => {
+    const teams = await import("../../senses/teams")
+    mockStream.emit = vi.fn(() => { throw new Error("stream dead") })
+    const sendMessage = vi.fn(async () => { throw new Error("sendMessage dead") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    callbacks.onTextChunk("hello will fail")
+    await expect((callbacks as any).flushNow()).rejects.toThrow(/teams.*delivery failed|sendMessage|stream/i)
+  })
+
+  it("flushNow THROWS when stream.emit fails AND no sendMessage fallback is wired", async () => {
+    const teams = await import("../../senses/teams")
+    mockStream.emit = vi.fn(() => { throw new Error("stream dead") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("hello no fallback")
+    await expect((callbacks as any).flushNow()).rejects.toThrow(/teams.*delivery failed|stream/i)
+  })
 })
