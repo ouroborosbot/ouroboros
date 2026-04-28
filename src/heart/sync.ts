@@ -3,6 +3,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { emitNervesEvent } from "../nerves/runtime"
 import type { SyncConfig } from "./config"
+import type { SyncClassification } from "./sync-classification"
 
 export interface SyncResult {
   ok: boolean
@@ -16,11 +17,18 @@ export interface SyncResult {
  *
  * Backward compat: readers should tolerate entries without `classification`
  * or `conflictFiles` (pre-alpha.289 schema) — they fall back to "unknown".
+ *
+ * Layer 2 extension: `classification` now widens to the full
+ * `SyncClassification` union from `sync-classification.ts`. The legacy
+ * three-variant set (`push_rejected | pull_rebase_conflict | unknown`)
+ * is still emitted by `postTurnPush`'s existing call sites — adding
+ * the new variants is additive, so existing readers keep working as
+ * long as a producer doesn't hand them a Layer-2-only variant.
  */
 export interface PendingSyncRecord {
   error: string
   failedAt: string
-  classification: "push_rejected" | "pull_rebase_conflict" | "unknown"
+  classification: SyncClassification
   conflictFiles: string[]
 }
 
