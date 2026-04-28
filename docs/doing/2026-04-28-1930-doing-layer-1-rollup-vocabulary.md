@@ -167,7 +167,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 - `runtime-readers.ts`: parse a health file with each of the five literals → carries the typed `DaemonStatus` through. Parse a health file with junk status (`"banana"`) → defensive fallback to `"unknown"` (existing behavior preserved; the new layer is type-narrowing of the valid path).
 **Acceptance**: Tests exist and FAIL (red). All five rollup states are exercised in `daemonUnavailableStatusOutput`. Both `degraded` sub-cases are present.
 
-### ⬜ Unit 4b: Update consumers — Implementation
+### ✅ Unit 4b: Update consumers — Implementation
 **What**:
 - In `cli-render.ts`: replace the `\`Last known status: ${health.status} ...\`` line with a status-specific render switch. Map each `DaemonStatus` literal to a label + a colored dot (reusing the existing `statusDot` helper or via a dedicated rollup-color map). For `degraded`, branch on `health.agents` map size to pick the copy variant — empty map → fresh-install copy, non-empty → all-failed copy. Default branch must be `never`-typed.
 - In `runtime-readers.ts`: tighten the `health.status` read to use `isDaemonStatus` (newly exported from `daemon-health.ts` in Unit 1b). The existing `"unknown"` fallback for genuinely missing/corrupt status is preserved; the typed path now produces a typed `DaemonStatus`. The DTO field's TypeScript type widens to `DaemonStatus | "unknown"` so downstream Outlook code carries the new vocabulary forward.

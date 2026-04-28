@@ -538,6 +538,7 @@ export function buildStoppedStatusPayload(
 export function renderRollupStatusLine(health: DaemonHealthState): string {
   const status: DaemonStatus = health.status
   const tail = `(pid ${health.pid}, uptime ${health.uptimeSeconds}s)`
+  /* v8 ignore next -- v8 instruments the switch statement itself as a branch; the never-typed default below is unreachable by construction so v8 cannot observe its branch firing @preserve */
   switch (status) {
     case "healthy":
       return `Last known status: healthy ${tail}`
@@ -556,6 +557,7 @@ export function renderRollupStatusLine(health: DaemonHealthState): string {
       return `Last known status: safe-mode — crash loop tripped ${tail}`
     case "down":
       return `Last known status: down ${tail}`
+    /* v8 ignore start -- compiler-forced exhaustiveness: the never-typed default branch is unreachable by construction; if DaemonStatus widens, tsc errors at the assignment before the throw can run @preserve */
     default: {
       // Compiler-forced exhaustiveness. If DaemonStatus grows a new
       // literal, this `never` cast errors at tsc, forcing every
@@ -565,6 +567,7 @@ export function renderRollupStatusLine(health: DaemonHealthState): string {
       const _exhaustive: never = status
       throw new Error(`unhandled daemon status: ${_exhaustive as string}`)
     }
+    /* v8 ignore stop */
   }
 }
 
