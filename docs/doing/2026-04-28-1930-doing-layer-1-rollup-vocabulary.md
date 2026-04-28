@@ -112,7 +112,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **What**: Verify coverage is 100% for the new type/guard. Refactor if needed.
 **Acceptance**: Coverage report shows 100% for new lines. Tests still green.
 
-### ⬜ Unit 2a: Rollup function — Tests
+### ✅ Unit 2a: Rollup function — Tests
 **What**: Write failing tests for `computeDaemonRollup(input: { enabledAgents: AgentLiveCheckResult[]; bootstrapDegraded: DegradedComponent[]; safeMode: boolean }): RollupStatus`. Tests in `src/__tests__/heart/daemon/daemon-rollup.test.ts` (new file). Cover every row of the rollup state table above + every edge case from "Code Coverage Requirements".
 
 **Input contract — pin explicitly**: `enabledAgents` contains ONLY agents whose `enabled` flag is true. The rollup function does NOT filter — the caller is responsible for filtering via `listEnabledBundleAgents` (or equivalent) before invoking. This keeps the function purely declarative on the data it receives.
@@ -129,11 +129,11 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 
 **Acceptance**: Tests exist and FAIL (red). All eight scenarios above are present as named test cases.
 
-### ⬜ Unit 2b: Rollup function — Implementation
+### ✅ Unit 2b: Rollup function — Implementation
 **What**: Implement `computeDaemonRollup` in `src/heart/daemon/daemon-rollup.ts` (new file). Place it next to `daemon-health.ts`. Pure function — no I/O, no side effects, deterministic on inputs. Returns `RollupStatus` (4-state union — never `"down"`; that's caller-owned, set elsewhere in the daemon-entry flow before this function is reachable).
 **Acceptance**: Tests PASS (green). Function is < ~50 lines (rollup is genuinely a small decision tree).
 
-### ⬜ Unit 2c: Rollup function — Coverage & refactor
+### ✅ Unit 2c: Rollup function — Coverage & refactor
 **What**: Verify 100% branch coverage on the rollup function. Refactor for readability if needed.
 **Acceptance**: Coverage 100%. Tests green. No mutation observed (function is pure).
 
@@ -255,3 +255,4 @@ The render layer reads `health.agents` (already a field on `DaemonHealthState`) 
   - Unit 5 strengthened from "grep-based sweep" to "compiler-forced exhaustiveness." Every switch on a status value MUST have a `never`-typed default branch. No fallback `default:` returning a guess value. A deliberate add-a-hypothetical-state experiment is required to prove every consumer compile-errors when the union grows.
 - 2026-04-28 13:04 Unit 0 complete: status-callsites map written; scope correction confirmed with ouroboros. Real consumers of `DaemonHealthState.status` are `cli-render.ts:566` and `runtime-readers.ts:281`, not `inner-status.ts` / `startup-tui.ts`. Unit 4 retargeted; Completion Criteria entry rephrased to match. Test fixtures in `daemon-health.test.ts`, `daemon-status-health.test.ts`, and `daemon-entry-health-state.test.ts` flagged for vocabulary update during Unit 5.
 - 2026-04-28 13:16 Unit 1a/1b/1c complete: introduced `RollupStatus` (4-state) + `DaemonStatus` (5-state) unions and `isRollupStatus` / `isDaemonStatus` runtime guards. Tightened `DaemonHealthState.status` to `DaemonStatus` and tightened `readHealth` to use the guard so corrupt or old-vocabulary cached files fail parse. Bumped the `daemon-entry.ts:164` literal from `"ok"`/`"degraded"` to `"healthy"`/`"degraded"` so tsc passes — Unit 3b will replace this literal entirely with `computeDaemonRollup`. Updated existing test fixtures across daemon-health, daemon-status-health, daemon-cli-defaults, daemon-entry-health-state, and prompt rhythm tests to use the new vocabulary. 100% coverage on `daemon-health.ts`. Full suite: 9716 tests green; tsc/lint/build clean.
+- 2026-04-28 13:24 Unit 2a/2b/2c complete: `computeDaemonRollup` pure decision function in `daemon-rollup.ts`. Truth table fully covered (8 rows + permutation/order-independence + non-mutation + determinism + return-type-narrowing). `AgentRollupInput` is the minimal projection — `name + status` — kept decoupled from `DaemonAgentSnapshot` so the function stays trivially testable. Caller will project at the daemon-entry call site in Unit 3b. 100% coverage on `daemon-rollup.ts`; 21 new truth-table tests; tsc/lint/build clean.
