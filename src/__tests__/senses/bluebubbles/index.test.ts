@@ -1880,6 +1880,30 @@ describe("BlueBubbles sense runtime", () => {
     expect(mocks.runAgent).not.toHaveBeenCalled()
     expect(mocks.sendText).not.toHaveBeenCalled()
     expect(mocks.markChatRead).not.toHaveBeenCalled()
+    expect(bluebubbles.getDiscoveredOwnHandles()).toEqual([])
+  })
+
+  it("discovers own handles from group-chat from-me echoes only", async () => {
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent({
+      ...groupThreadPayload,
+      data: {
+        ...groupThreadPayload.data,
+        guid: "GROUP-FROM-ME-DISCOVERY",
+        isFromMe: true,
+        handle: { address: "+1 (415) 555-0000" },
+      },
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        handled: true,
+        notifiedAgent: false,
+        reason: "from_me",
+      }),
+    )
+    expect(bluebubbles.getDiscoveredOwnHandles()).toEqual(["+14155550000"])
+    expect(mocks.runAgent).not.toHaveBeenCalled()
   })
 
   it("filters group echoes whose sender matches an agent-owned handle (isFromMe missing/false)", async () => {

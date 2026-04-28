@@ -726,12 +726,11 @@ export function isAgentSelfHandle(senderExternalId: string | undefined, ownHandl
 }
 
 /**
- * In-memory store of agent iMessage handles auto-discovered from
- * `event.fromMe === true` events. Bluebubbles attributes the agent's
- * canonical handle as `event.sender.externalId` on outbound messages —
- * capturing it here makes the next `isFromMe`-missing group echo
- * (the bug that motivated `bluebubbles.ownHandles` originally) recoverable
- * even before the operator has populated the config.
+ * In-memory store of agent iMessage handles auto-discovered from group-chat
+ * `event.fromMe === true` events. Bluebubbles can attribute the peer's handle
+ * as `event.sender.externalId` on 1:1 outbound messages, so discovery is
+ * intentionally limited to the group echo bug that motivated
+ * `bluebubbles.ownHandles` originally.
  *
  * Per-process. A daemon restart re-learns from the next outbound. The
  * accompanying nerves event (`senses.bluebubbles_own_handle_discovered`)
@@ -785,7 +784,7 @@ async function handleBlueBubblesNormalizedEvent(
         kind: event.kind,
       },
     })
-    recordDiscoveredOwnHandle(event.sender.externalId)
+    if (event.chat.isGroup) recordDiscoveredOwnHandle(event.sender.externalId)
     return { handled: true, notifiedAgent: false, kind: event.kind, reason: "from_me" }
   }
   // Fallback self-detection: BlueBubbles sometimes broadcasts a group-chat
