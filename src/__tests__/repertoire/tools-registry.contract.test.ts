@@ -201,13 +201,8 @@ describe("tool registry contract", () => {
     expect(names).toContain("trip_remove_leg");
     expect(names).toContain("trip_new_id");
 
-<<<<<<< HEAD
     expect(names).toContain("mail_outbox");
-    // Exact count: 76 tools total including Mailroom status, outbound mail (mail_compose+send+outbox), mail_body+mail_thread, attachment, image recovery, and trip ledger tools
-    expect(names).toHaveLength(76);
-=======
-    // Exact count: 75 tools total — trip ledger now at 8 tools with trip_remove_leg added
-    expect(names).toHaveLength(75);
->>>>>>> 9f40e484 (feat(trips): trip_remove_leg tool for cancelled bookings (alpha.508))
+    // Exact count: 77 tools total — trip ledger at 8 with trip_remove_leg, plus mail_outbox addition
+    expect(names).toHaveLength(77);
   });
 });
