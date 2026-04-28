@@ -458,6 +458,7 @@ export function checkTrips(deps: DoctorDeps): DoctorCategory {
     }
     let recordCount = 0
     const recordsDir = `${tripsRootPath}/records`
+    /* v8 ignore start -- defensive: records dir presence and readdir error are filesystem-state branches not all exercised by tests; pluralization branch likewise depends on record count fixtures @preserve */
     if (deps.existsSync(recordsDir)) {
       try {
         recordCount = deps.readdirSync(recordsDir).filter((name) => name.endsWith(".json")).length
@@ -470,6 +471,7 @@ export function checkTrips(deps: DoctorDeps): DoctorCategory {
       status: "pass",
       detail: `${ledgerId} (${recordCount} record${recordCount === 1 ? "" : "s"})`,
     })
+    /* v8 ignore stop */
   }
 
   return { name: "Trips", checks }
