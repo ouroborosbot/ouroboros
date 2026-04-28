@@ -105,8 +105,8 @@ function readMessage(error: unknown): string {
   if (error === null || error === undefined) return String(error)
   try {
     return JSON.stringify(error)
-  /* v8 ignore next 3 -- defensive: JSON.stringify only fails on circular/BigInt; real-world git errors don't trigger it @preserve */
   } catch {
+    /* v8 ignore next -- defensive: JSON.stringify only fails on circular/BigInt; real-world git errors don't trigger it @preserve */
     return String(error)
   }
 }
