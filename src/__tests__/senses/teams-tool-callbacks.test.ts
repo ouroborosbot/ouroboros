@@ -7,6 +7,16 @@ vi.mock("../../nerves/runtime", () => ({
 vi.mock("../../heart/identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/tmp/AgentBundles/testagent.ouro"),
+  resetAgentConfigCache: vi.fn(),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    provider: "minimax",
+    phrases: {
+      thinking: ["thinking..."],
+      tool: ["working..."],
+      followup: ["one moment..."],
+    },
+  })),
 }))
 
 describe("Teams tool callbacks via createToolActivityCallbacks", () => {
@@ -181,6 +191,42 @@ describe("Teams createTeamsCallbacks - flushNow (speak tool)", () => {
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     await expect((callbacks as any).flushNow()).resolves.not.toThrow()
     expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onToolStart('speak', ...) is INVISIBLE — does NOT stop phrase rotation, does NOT emit ⏳ placeholder, does NOT emit tool-activity status", async () => {
+    vi.useFakeTimers()
+    try {
+      const teams = await import("../../senses/teams")
+      const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+      // Trigger phrase rotation by calling onModelStart (it sets up phraseTimer + initial update).
+      callbacks.onModelStart()
+      // baseline updates from onModelStart (phrase placeholder)
+      const baselineUpdateCount = mockStream.update.mock.calls.length
+      const baselineEmitCount = mockStream.emit.mock.calls.length
+
+      callbacks.onToolStart("speak", { message: "hi" })
+
+      // No NEW update or emit triggered by onToolStart for speak — phrase rotation
+      // continues, no ⏳ placeholder, no tool-activity status text written.
+      expect(mockStream.update.mock.calls.length).toBe(baselineUpdateCount)
+      expect(mockStream.emit.mock.calls.length).toBe(baselineEmitCount)
+
+      // Advance timers a tick to confirm phrase rotation is still active (it would
+      // have been killed if onToolStart had called stopPhraseRotation).
+      vi.advanceTimersByTime(1500)
+      expect(mockStream.update.mock.calls.length).toBeGreaterThan(baselineUpdateCount)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("onToolEnd('speak', ...) is INVISIBLE — does NOT post tool-activity status", async () => {
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    const baselineUpdateCount = mockStream.update.mock.calls.length
+    callbacks.onToolEnd("speak", "message=hi", true)
+    // No new update for the speak tool end.
+    expect(mockStream.update.mock.calls.length).toBe(baselineUpdateCount)
   })
 
   it("flushNow THROWS when stream.emit fails AND sendMessage also fails (hard delivery failure)", async () => {

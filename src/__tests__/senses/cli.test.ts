@@ -622,6 +622,75 @@ describe("CLI adapter - onToolStart", () => {
   })
 })
 
+describe("CLI adapter - speak is invisible (flow-control)", () => {
+  it("onToolStart('speak', ...) does NOT start a spinner — no phrase rotation, no tool spinner text", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../../senses/cli")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onToolStart("speak", { message: "hello friend" })
+    const output = stderrChunks.join("")
+
+    // No tool-spinner phrase should be written (those would be the "running..." style phrases)
+    for (const phrase of getPhrases().tool) {
+      expect(output).not.toContain(phrase)
+    }
+
+    callbacks.onToolEnd("speak", "message=hello friend", true)
+    vi.restoreAllMocks()
+  })
+
+  it("onToolEnd('speak', ...) writes nothing to stderr (flow-control tools are invisible)", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../../senses/cli")
+    const callbacks = agent.createCliCallbacks()
+
+    // Reset chunks so we only capture writes from onToolEnd
+    stderrChunks.length = 0
+    callbacks.onToolEnd("speak", "message=hi", true)
+    const output = stderrChunks.join("")
+
+    // No green check, no red cross, no "speak" word for the result line
+    expect(output).not.toContain("✓")
+    expect(output).not.toContain("✗")
+    expect(output).not.toContain("speak")
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("CLI tool-display flow control", () => {
+  it("FLOW_CONTROL_TOOLS includes 'speak' so writeToolStart/writeToolEnd skip it", async () => {
+    const toolDisplay = await import("../../senses/cli/tool-display")
+    // Reach into the module — both writers should noop for speak
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+
+    toolDisplay.writeToolStart("speak", { message: "hello" })
+    toolDisplay.writeToolEnd("speak", "message=hello", true)
+    expect(stderrChunks.join("")).toBe("")
+
+    vi.restoreAllMocks()
+  })
+})
+
 describe("CLI adapter - onToolEnd", () => {
   it("writes green formatted tool result on success", async () => {
     const stderrChunks: string[] = []

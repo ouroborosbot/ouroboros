@@ -227,6 +227,50 @@ describe("BlueBubbles createBlueBubblesCallbacks - flushNow (speak tool)", () =>
     expect(sendText).not.toHaveBeenCalled()
   })
 
+  it("onToolStart('speak', ...) is INVISIBLE — no statusBatcher/sendStatus tool-activity message", async () => {
+    const indexModule = await import("../../../senses/bluebubbles")
+    const { createBlueBubblesCallbacks } = indexModule
+    const sendText = vi.fn(async () => ({ messageGuid: "g" }))
+    const setTyping = vi.fn(async () => {})
+    const markChatRead = vi.fn(async () => {})
+    const editMessage = vi.fn(async () => {})
+    const checkHealth = vi.fn(async () => {})
+    const repairEvent = vi.fn(async (e: any) => e)
+    const getMessageText = vi.fn(async () => null)
+    const client = { sendText, editMessage, setTyping, markChatRead, checkHealth, repairEvent, getMessageText }
+    const chat = { chatGuid: "chat-1", participants: [] } as any
+    const replyTarget = { getReplyToMessageGuid: vi.fn(() => "reply-guid"), setSelection: vi.fn(() => "ok") }
+    const callbacks = createBlueBubblesCallbacks(client as any, chat, replyTarget as any, false)
+
+    // Calling onToolStart for "speak" must NOT enqueue any sendText for status.
+    // (sendText for the actual speak message goes through flushNow, not onToolStart.)
+    callbacks.onToolStart("speak", { message: "hi friend" })
+    // Wait briefly to let any micro-task queue settle (sendStatus uses enqueue/queue).
+    await new Promise((r) => setTimeout(r, 50))
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
+  it("onToolEnd('speak', ...) is INVISIBLE — no failure status sent on success", async () => {
+    const indexModule = await import("../../../senses/bluebubbles")
+    const { createBlueBubblesCallbacks } = indexModule
+    const sendText = vi.fn(async () => ({ messageGuid: "g" }))
+    const setTyping = vi.fn(async () => {})
+    const markChatRead = vi.fn(async () => {})
+    const editMessage = vi.fn(async () => {})
+    const checkHealth = vi.fn(async () => {})
+    const repairEvent = vi.fn(async (e: any) => e)
+    const getMessageText = vi.fn(async () => null)
+    const client = { sendText, editMessage, setTyping, markChatRead, checkHealth, repairEvent, getMessageText }
+    const chat = { chatGuid: "chat-1", participants: [] } as any
+    const replyTarget = { getReplyToMessageGuid: vi.fn(() => "reply-guid"), setSelection: vi.fn(() => "ok") }
+    const callbacks = createBlueBubblesCallbacks(client as any, chat, replyTarget as any, false)
+
+    callbacks.onToolStart("speak", { message: "hi" })
+    callbacks.onToolEnd("speak", "message=hi", true)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
   it("flushNow PROPAGATES rejection when client.sendText rejects (hard delivery failure)", async () => {
     const indexModule = await import("../../../senses/bluebubbles")
     const { createBlueBubblesCallbacks } = indexModule
