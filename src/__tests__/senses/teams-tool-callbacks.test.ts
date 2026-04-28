@@ -252,4 +252,30 @@ describe("Teams createTeamsCallbacks - flushNow (speak tool)", () => {
     callbacks.onTextChunk("hello no fallback")
     await expect((callbacks as any).flushNow()).rejects.toThrow(/teams.*delivery failed|stream/i)
   })
+
+  it("flushNow throws 'no fallback available' when stopped flag is set out-of-band before flushNow runs", async () => {
+    // Goal: hit branch line 422 (!stopped===false branch) AND line 444 (lastError??"no fallback available" right side).
+    // Setup: queue text in buffer (while stopped=false), then trigger markStopped() via a
+    // SEPARATE path (safeUpdate's catch block fires markStopped when stream.update throws),
+    // then call flushNow with no sendMessage fallback wired.
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("payload to deliver")
+    // Reassign stream.update to throw — this triggers markStopped() inside safeUpdate's catch.
+    mockStream.update = vi.fn(() => { throw new Error("forced update fail") })
+    callbacks.onError(new Error("synthetic"), "transient") // -> safeUpdate -> throws -> markStopped()
+    // Now stopped=true, buffer still has "payload to deliver", no sendMessage wired.
+    await expect((callbacks as any).flushNow()).rejects.toThrow(/no fallback available/i)
+  })
+
+  it("flushNow wraps non-Error throws from sendMessage in Error (lastError coercion)", async () => {
+    // Stream emit fails, and sendMessage throws a NON-Error value (string).
+    // The catch on line 432 must coerce it via `err instanceof Error ? err : new Error(String(err))`.
+    const teams = await import("../../senses/teams")
+    mockStream.emit = vi.fn(() => { throw new Error("stream dead") })
+    const sendMessage = vi.fn(async () => { throw "string-not-error-thrown-from-sendMessage" })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    callbacks.onTextChunk("payload")
+    await expect((callbacks as any).flushNow()).rejects.toThrow(/string-not-error-thrown-from-sendMessage/)
+  })
 })

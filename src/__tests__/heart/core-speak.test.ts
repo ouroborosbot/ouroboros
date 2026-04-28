@@ -382,6 +382,31 @@ describe("speak interception in runAgent", () => {
     }))
   })
 
+  it("delivery failure: flushNow throws a NON-Error value (string) → engine wraps it in Error and reports failure", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(speakChunk("got it")))
+    mockCreate.mockReturnValueOnce(makeStream(settleChunks("done")))
+
+    const callbacks = makeCallbacks({
+      // Throwing a non-Error (e.g. a string) — the engine must coerce it to Error.
+      flushNow: vi.fn(async () => { throw "boom-not-an-error" }),
+    })
+    const messages: any[] = [{ role: "user", content: "x" }]
+    const result = await runAgent(messages, callbacks, "cli", undefined, {
+      toolContext: { signin: async () => undefined },
+    })
+
+    expect(result.outcome).toBe("settled")
+    const errMsg = messages.find((m: any) =>
+      m.role === "tool" &&
+      typeof m.content === "string" &&
+      m.content.includes("speak delivery failed: boom-not-an-error")
+    )
+    expect(errMsg).toBeDefined()
+    expect(mockEmitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "engine.speak_delivery_failed",
+    }))
+  })
+
   it("emits engine.speak nerves event on success with messageLength meta", async () => {
     mockCreate.mockReturnValueOnce(makeStream(speakChunk("hello")))
     mockCreate.mockReturnValueOnce(makeStream(settleChunks("done")))
