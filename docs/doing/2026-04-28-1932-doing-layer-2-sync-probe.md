@@ -122,18 +122,18 @@ Hard timeouts (locked O1):
 **What**: 100% coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 3a: `preTurnPull` accepts AbortSignal — Tests
+### ✅ Unit 3a: `preTurnPull` accepts AbortSignal — Tests
 **What**: `src/heart/sync.ts:89` — `preTurnPull(agentRoot: string, config: SyncConfig): SyncResult`. Extend the signature to `preTurnPull(agentRoot: string, config: SyncConfig, options?: { signal?: AbortSignal }): SyncResult`. Write failing tests in `src/__tests__/heart/sync-pre-turn-pull-signal.test.ts` asserting:
 - Without signal — existing behavior preserved (back-compat).
 - With aborted signal — pull aborts, returns a `SyncResult` with `classification = "timeout-hard"` (or rolls up to that).
 - With signal that aborts mid-fetch — git child process is killed (signal propagation works).
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 3b: `preTurnPull` accepts AbortSignal — Implementation
+### ✅ Unit 3b: `preTurnPull` accepts AbortSignal — Implementation
 **What**: Modify `preTurnPull` to accept the optional signal and propagate it to its child-process invocations. Use `child_process.spawn(..., { signal })` so the signal aborts the underlying git op.
 **Acceptance**: Tests from 3a PASS. Existing `preTurnPull` callers (per-turn agent path) still work — back-compat preserved by making `options` optional.
 
-### ⬜ Unit 3c: `preTurnPull` accepts AbortSignal — Coverage & refactor
+### ✅ Unit 3c: `preTurnPull` accepts AbortSignal — Coverage & refactor
 **What**: 100% coverage on changed lines.
 **Acceptance**: Coverage 100%. Tests green.
 
@@ -221,3 +221,4 @@ Hard timeouts (locked O1):
 - 2026-04-28 Unit 0 complete: layer 1 vocabulary on main at 3c8e2c38. `RollupStatus`/`DaemonStatus`/`computeDaemonRollup` confirmed exported. Branch `harness/layer-2-sync-probe` cut from main. Artifacts dir created.
 - 2026-04-28 Unit 1a-c complete: `classifySyncFailure` taxonomy implemented in `src/heart/sync-classification.ts`. 27 tests. 100% line/branch/function/statement coverage on the new file. `PendingSyncRecord.classification` widened additively to `SyncClassification` union; existing 26 sync.ts tests still green.
 - 2026-04-28 Unit 2a-c complete: `runWithTimeouts<T>` soft/hard timeout wrapper in `src/heart/timeouts.ts`. 13 tests. 100% line/branch/function/statement coverage. Honours `OURO_BOOT_TIMEOUT_GIT_SOFT/HARD` and `OURO_BOOT_TIMEOUT_LIVECHECK` env overrides via `envKey` opt-in. Cleans up timers on resolve/reject so no dangling refs block process exit.
+- 2026-04-28 Unit 3a-c complete: `preTurnPullAsync` async/signal-aware sibling added to `src/heart/sync.ts`. 11 tests. Uses `child_process.execFile` (not `execFileSync`) with `{ signal }` so an injected `AbortSignal` cancels the child mid-fetch. Sync `preTurnPull` preserved unchanged for the per-turn pipeline at `senses/pipeline.ts:522`. Coverage 100% across the whole file.
