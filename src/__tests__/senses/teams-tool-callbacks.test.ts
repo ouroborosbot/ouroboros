@@ -268,6 +268,36 @@ describe("Teams createTeamsCallbacks - flushNow (speak tool)", () => {
     await expect((callbacks as any).flushNow()).rejects.toThrow(/no fallback available/i)
   })
 
+  it("REGRESSION (Blocker C): stream emit failure + sendMessage success does NOT abort the controller", async () => {
+    // Bug: flushNow → tryEmit → markStopped() → controller.abort() before falling
+    // back to sendMessage. If sendMessage succeeded, flushNow returned normally and
+    // core marked speak as delivered, but the turn was already aborted, killing the
+    // next model/tool step. Successful fallback delivery must NOT poison the turn.
+    const teams = await import("../../senses/teams")
+    const { emitNervesEvent } = await import("../../nerves/runtime")
+    ;(emitNervesEvent as any).mockClear?.()
+    mockStream.emit = vi.fn(() => { throw new Error("stream dead") })
+    const sendMessage = vi.fn(async () => {})
+    const abortSpy = vi.spyOn(controller, "abort")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    callbacks.onTextChunk("hi friend")
+
+    await expect((callbacks as any).flushNow()).resolves.toBeUndefined()
+
+    // sendMessage was called with the buffered text — fallback delivery happened.
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(sendMessage).toHaveBeenCalledWith("hi friend")
+    // controller.abort MUST NOT have been called — the turn must continue.
+    expect(abortSpy).not.toHaveBeenCalled()
+    expect(controller.signal.aborted).toBe(false)
+    // Nerves event reflects delivered=true.
+    const speakFlushCalls = (emitNervesEvent as any).mock.calls.filter(
+      (c: any[]) => c[0]?.event === "teams.speak_flush",
+    )
+    expect(speakFlushCalls.length).toBe(1)
+    expect(speakFlushCalls[0][0].meta.delivered).toBe(true)
+  })
+
   it("flushNow wraps non-Error throws from sendMessage in Error (lastError coercion)", async () => {
     // Stream emit fails, and sendMessage throws a NON-Error value (string).
     // The catch on line 432 must coerce it via `err instanceof Error ? err : new Error(String(err))`.
