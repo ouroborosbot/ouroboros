@@ -67,7 +67,7 @@ This PR is **read-only**: it never writes to `state/providers.json` and never in
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 0: Verify layer 1 has landed
+### ✅ Unit 0: Verify layer 1 has landed
 **What**: Confirm `DaemonStatus` union type from layer 1 is in `daemon-health.ts` and `computeDaemonRollup` exists. If not, halt — do not start this PR.
 **Acceptance**: `git log` shows layer 1 PR merged on the base branch. `grep -rn "DaemonStatus" src/heart/daemon/daemon-health.ts` returns the type definition.
 
@@ -182,3 +182,4 @@ Place in `src/__tests__/heart/daemon/drift-rollup.test.ts` and extend `inner-sta
 
 ## Progress Log
 - 2026-04-28 19:31 UTC Created as PR 2 of 4 in the sequential rollout (1 → 4 → 2 → 3). Depends on layer 1 PR being merged.
+- Unit 0 complete: verified Layer 1 vocabulary at HEAD — `DaemonStatus`/`RollupStatus` in `src/heart/daemon/daemon-health.ts:56-57`, `computeDaemonRollup` in `src/heart/daemon/daemon-rollup.ts:67`. Branch `harness/layer-4-drift-detection` cut from `3c8e2c38`.
