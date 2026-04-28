@@ -272,6 +272,7 @@ export interface DaemonMessageReceipt {
 
 export interface DaemonProcessManagerLike {
   startAutoStartAgents(): Promise<void>
+  triggerAutoStartAgents?(): void
   stopAll(): Promise<void>
   startAgent(agent: string): Promise<void>
   stopAgent?(agent: string): Promise<void>
@@ -738,8 +739,9 @@ export class OuroDaemon {
     /* v8 ignore start -- orphan cleanup + pidfile: calls process management functions @preserve */
     killOrphanProcesses()
     /* v8 ignore stop */
-    await this.processManager.startAutoStartAgents()
-    await this.senseManager?.startAutoStartSenses()
+    await this.openCommandSocket()
+    this.triggerAutoStartAgents()
+    this.triggerAutoStartSenses()
 
     // Write all managed PIDs to disk so the next daemon can clean up
     /* v8 ignore start -- pidfile write: collects PIDs from process managers @preserve */
@@ -766,7 +768,42 @@ export class OuroDaemon {
         meta: { port: OUTLOOK_DEFAULT_PORT },
       })
     }
+  }
 
+  private triggerAutoStartAgents(): void {
+    if (this.processManager.triggerAutoStartAgents) {
+      this.processManager.triggerAutoStartAgents()
+      return
+    }
+    void this.processManager.startAutoStartAgents().catch((error) => {
+      emitNervesEvent({
+        level: "error",
+        component: "daemon",
+        event: "daemon.agent_autostart_error",
+        message: "agent autostart failed after daemon socket opened",
+        meta: { error: error instanceof Error ? error.message : String(error) },
+      })
+    })
+  }
+
+  private triggerAutoStartSenses(): void {
+    if (!this.senseManager) return
+    if (this.senseManager.triggerAutoStartSenses) {
+      this.senseManager.triggerAutoStartSenses()
+      return
+    }
+    void this.senseManager.startAutoStartSenses().catch((error) => {
+      emitNervesEvent({
+        level: "error",
+        component: "daemon",
+        event: "daemon.sense_autostart_error",
+        message: "sense autostart failed after daemon socket opened",
+        meta: { error: error instanceof Error ? error.message : String(error) },
+      })
+    })
+  }
+
+  private async openCommandSocket(): Promise<void> {
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)
     }

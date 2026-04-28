@@ -97,6 +97,22 @@ describe("daemon command plane branches", () => {
     expect(fs.existsSync(socketPath)).toBe(false)
   })
 
+  it("opens the command socket even when autostart workers are still blocked", async () => {
+    const socketPath = tmpSocketPath("daemon-start-before-autostart")
+    const { daemon, processManager, senseManager } = make(socketPath)
+    processManager.startAutoStartAgents.mockImplementation(() => new Promise<void>(() => {}))
+    senseManager.startAutoStartSenses.mockImplementation(() => new Promise<void>(() => {}))
+
+    await daemon.start()
+
+    expect(processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    expect(senseManager.startAutoStartSenses).toHaveBeenCalledTimes(1)
+    const raw = await sendRaw(socketPath, JSON.stringify({ kind: "daemon.status" }))
+    expect(JSON.parse(raw)).toEqual(expect.objectContaining({ ok: true }))
+
+    await daemon.stop()
+  })
+
   it("returns structured status data with separate senses and workers", async () => {
     const socketPath = tmpSocketPath("daemon-status")
     // Use an empty bundlesRoot so listBundleSyncRows returns [] (no leak to real ~/AgentBundles)

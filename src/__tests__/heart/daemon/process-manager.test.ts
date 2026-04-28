@@ -119,6 +119,30 @@ describe("daemon process manager", () => {
     expect(snap?.fixHint).toContain("ouro auth")
   })
 
+  it("turns thrown config checks into per-agent crashed snapshots", async () => {
+    const onSnapshotChange = vi.fn()
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck: async () => {
+        throw new Error("provider vault read hung up")
+      },
+      statusWriter: () => {},
+      onSnapshotChange,
+    })
+
+    await expect(manager.startAgent("slugger")).resolves.not.toThrow()
+
+    expect(spawn).not.toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
+    expect(manager.getAgentSnapshot("slugger")?.errorReason).toContain("provider vault read hung up")
+    expect(manager.getAgentSnapshot("ouroboros")?.status).toBe("stopped")
+    expect(onSnapshotChange).toHaveBeenCalled()
+  })
+
   it("leaves an agent stopped when configCheck asks to skip startup", async () => {
     const onSnapshotChange = vi.fn()
     const configCheck = vi.fn().mockReturnValue({

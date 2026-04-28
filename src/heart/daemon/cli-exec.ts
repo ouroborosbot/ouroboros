@@ -593,10 +593,8 @@ function providerRepairCountSummary(count: number): string {
   return `${count} ${count === 1 ? "needs" : "need"} attention`
 }
 
-function bootPhasePlan(daemonAlive: boolean): readonly string[] {
-  return daemonAlive
-    ? ["update check", "system setup", "starting daemon", "provider checks", "final daemon check"]
-    : ["update check", "system setup", "provider checks", "starting daemon", "final daemon check"]
+function bootPhasePlan(_daemonAlive: boolean): readonly string[] {
+  return ["update check", "system setup", "starting daemon", "provider checks", "final daemon check"]
 }
 
 function createHumanCommandProgress(deps: OuroCliDeps, commandName: string): CommandProgress {
@@ -705,33 +703,6 @@ async function verifyDaemonReadyForHandoff(deps: OuroCliDeps): Promise<FinalDaem
       ),
     }
   }
-}
-
-async function reportPostRepairProviderHealth(
-  deps: OuroCliDeps,
-  repairedAgents: string[],
-  onProgress?: (message: string) => void,
-): Promise<DegradedAgent[]> {
-  const remainingDegraded = await checkAgentProviders(deps, repairedAgents, onProgress)
-
-  emitNervesEvent({
-    level: remainingDegraded.length > 0 ? "warn" : "info",
-    component: "daemon",
-    event: "daemon.post_repair_provider_check",
-    message: remainingDegraded.length > 0
-      ? "post-repair provider health check still degraded"
-      : "post-repair provider health check recovered",
-    meta: { degradedCount: remainingDegraded.length, repairedAgents },
-  })
-
-  if (remainingDegraded.length === 0) {
-    deps.writeStdout("All set. Provider checks recovered after repair.")
-    return remainingDegraded
-  }
-
-  writeProviderRepairSummary(deps, "Still needs attention", remainingDegraded)
-  deps.writeStdout("Run `ouro up` again after these are fixed.")
-  return remainingDegraded
 }
 
 async function checkProviderHealthBeforeChat(
@@ -6468,7 +6439,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     // ── versioned CLI update check ──
     if (deps.checkForCliUpdate) {
       progress.startPhase("update check")
-      progress.updateDetail("checking npm registry\ncontinuing startup if it stays quiet")
+      progress.updateDetail(`current runtime: ${getPackageVersion()}\nchecking npm registry\ncontinuing startup if it stays quiet`)
       let pendingReExec = false
       let updateCheckStatus = "up to date"
       try {
@@ -6609,37 +6580,6 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     const daemonAliveBeforeStart = await deps.checkSocketAlive(deps.socketPath)
     ;(progress as { setPhasePlan?: (labels: readonly string[]) => void }).setPhasePlan?.(bootPhasePlan(daemonAliveBeforeStart))
-    let providerChecksAlreadyRun = false
-    if (!daemonAliveBeforeStart) {
-      progress.startPhase("provider checks")
-      const preflightProviderDegraded = await checkAgentProviders(deps, undefined, (msg) => progress.updateDetail(msg))
-      providerChecksAlreadyRun = true
-      progress.completePhase("provider checks", providerRepairCountSummary(preflightProviderDegraded.length))
-
-      if (preflightProviderDegraded.length > 0) {
-        progress.end()
-        if (command.noRepair) {
-          writeProviderRepairSummary(deps, "Provider checks need attention", preflightProviderDegraded)
-          const message = "daemon not started: provider checks need repair. Run `ouro repair` or rerun `ouro up` to choose a repair path."
-          return returnCliFailure(deps, message)
-        }
-
-        const repairResult = await runReadinessRepairForDegraded(preflightProviderDegraded, deps)
-        if (!repairResult.repairsAttempted) {
-          writeProviderRepairSummary(deps, "Provider checks still need attention", repairResult.remainingDegraded)
-          const message = "daemon not started: provider checks need repair. Run `ouro repair` or rerun `ouro up` to choose a repair path."
-          return returnCliFailure(deps, message)
-        }
-
-        const remainingDegraded = repairResult.remainingDegraded
-        if (remainingDegraded.length > 0) {
-          writeProviderRepairSummary(deps, "Still needs attention", remainingDegraded)
-          const message = "daemon not started: provider checks still need repair."
-          return returnCliFailure(deps, message)
-        }
-        deps.writeStdout("All set. Provider checks recovered after repair.")
-      }
-    }
 
     progress.startPhase("starting daemon")
     const daemonResult = await ensureDaemonRunning({
@@ -6657,12 +6597,10 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       return returnCliFailure(deps, daemonResult.message)
     }
     progress.completePhase("starting daemon", daemonProgressSummary(daemonResult))
-    if (!providerChecksAlreadyRun || daemonResult.alreadyRunning) {
-      progress.startPhase("provider checks")
-      const providerDegraded = await checkAlreadyRunningAgentProviders(deps, (msg) => progress.updateDetail(msg))
-      daemonResult.stability = mergeStartupStability(daemonResult.stability, providerDegraded)
-      progress.completePhase("provider checks", providerRepairCountSummary(providerDegraded.length))
-    }
+    progress.startPhase("provider checks")
+    const providerDegraded = await checkAlreadyRunningAgentProviders(deps, (msg) => progress.updateDetail(msg))
+    daemonResult.stability = mergeStartupStability(daemonResult.stability, providerDegraded)
+    progress.completePhase("provider checks", providerRepairCountSummary(providerDegraded.length))
     progress.startPhase("final daemon check")
     const finalDaemonCheck = await verifyDaemonReadyForHandoff(deps)
     if (!finalDaemonCheck.ok) {
@@ -6693,14 +6631,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         const typedDegraded = daemonResult.stability.degraded.filter((entry) => isKnownReadinessIssue(entry.issue))
         const untypedDegraded = daemonResult.stability.degraded.filter((entry) => !isKnownReadinessIssue(entry.issue))
         let repairsAttempted = false
-        const repairedAgents = new Set<string>()
+        let remainingDegraded: DegradedAgent[] = []
 
         if (typedDegraded.length > 0) {
           const guidedRepair = await runReadinessRepairForDegraded(typedDegraded, deps)
           if (guidedRepair.repairsAttempted) {
             repairsAttempted = true
-            typedDegraded.forEach((entry) => repairedAgents.add(entry.agent))
           }
+          remainingDegraded = mergeRemainingDegraded(remainingDegraded, guidedRepair.remainingDegraded)
         }
 
         if (untypedDegraded.length > 0) {
@@ -6749,16 +6687,30 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           })
           if (repairResult.repairsAttempted) {
             repairsAttempted = true
-            untypedDegraded
+            const repairedUntypedAgents = untypedDegraded
               .filter(hasRunnableInteractiveRepair)
-              .forEach((entry) => repairedAgents.add(entry.agent))
+              .map((entry) => entry.agent)
+            const recheckedUntyped = repairedUntypedAgents.length > 0
+              ? await checkAgentProviders(deps, repairedUntypedAgents, (msg) => progress.updateDetail(msg))
+              : []
+            const untouchedUntyped = untypedDegraded.filter((entry) => !repairedUntypedAgents.includes(entry.agent))
+            remainingDegraded = mergeRemainingDegraded([...remainingDegraded, ...untouchedUntyped], recheckedUntyped)
+          } else {
+            remainingDegraded = mergeRemainingDegraded(remainingDegraded, untypedDegraded)
           }
         }
 
         if (repairsAttempted) {
           progress.startPhase("post-repair check")
-          await reportPostRepairProviderHealth(deps, [...repairedAgents], (msg) => progress.updateDetail(msg))
-          progress.completePhase("post-repair check", providerRepairCountSummary(repairedAgents.size))
+          progress.completePhase("post-repair check", providerRepairCountSummary(remainingDegraded.length))
+          if (remainingDegraded.length === 0) {
+            deps.writeStdout("All set. Provider checks recovered after repair.")
+          } else {
+            writeProviderRepairSummary(deps, "Still needs attention", remainingDegraded)
+            deps.writeStdout("Run `ouro up` again after these are fixed.")
+          }
+        } else if (untypedDegraded.length > 0) {
+          writeProviderRepairSummary(deps, "Provider checks need attention", remainingDegraded)
         }
       }
     }

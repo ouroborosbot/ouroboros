@@ -27,6 +27,7 @@ export interface DaemonSenseRow {
 
 export interface DaemonSenseManagerLike {
   startAutoStartSenses(): Promise<void>
+  triggerAutoStartSenses?(): void
   stopAll(): Promise<void>
   listSenseRows(): DaemonSenseRow[]
   listHealthProbes?(): SenseProbe[]
@@ -38,6 +39,7 @@ export interface DaemonSenseManagerOptions {
   bundlesRoot?: string
   processManager?: {
     startAutoStartAgents(): Promise<void>
+    triggerAutoStartAgents?(): void
     stopAll(): Promise<void>
     listAgentSnapshots(): Array<{ name: string; status: string; pid?: number | null }>
   }
@@ -399,6 +401,22 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
 
   async startAutoStartSenses(): Promise<void> {
     await this.processManager.startAutoStartAgents()
+  }
+
+  triggerAutoStartSenses(): void {
+    if (this.processManager.triggerAutoStartAgents) {
+      this.processManager.triggerAutoStartAgents()
+      return
+    }
+    void this.processManager.startAutoStartAgents().catch((error) => {
+        emitNervesEvent({
+          level: "error",
+          component: "channels",
+          event: "channel.daemon_sense_autostart_error",
+          message: "sense autostart failed",
+          meta: { error: error instanceof Error ? error.message : String(error) },
+        })
+      })
   }
 
   async stopAll(): Promise<void> {

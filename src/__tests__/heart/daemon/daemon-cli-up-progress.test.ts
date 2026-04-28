@@ -154,7 +154,7 @@ describe("ouro up: UpProgress integration", () => {
     await runOuroCli(["up"], deps)
 
     expect(mocks.upProgressUpdateDetail).toHaveBeenCalledWith(
-      "checking npm registry\ncontinuing startup if it stays quiet",
+      expect.stringMatching(/^current runtime: .+\nchecking npm registry\ncontinuing startup if it stays quiet$/),
     )
   })
 
@@ -521,12 +521,14 @@ describe("ouro up: UpProgress integration", () => {
     const updateCheckComplete = phaseOrder.indexOf("complete:update check")
     const systemSetupStart = phaseOrder.indexOf("start:system setup")
     const daemonStart = phaseOrder.indexOf("start:starting daemon")
+    const providerStart = phaseOrder.indexOf("start:provider checks")
     const end = phaseOrder.indexOf("end")
 
     expect(updateCheckStart).toBeGreaterThanOrEqual(0)
     expect(updateCheckComplete).toBeGreaterThan(updateCheckStart)
     expect(systemSetupStart).toBeGreaterThan(updateCheckComplete)
     expect(daemonStart).toBeGreaterThan(systemSetupStart)
+    expect(providerStart).toBeGreaterThan(daemonStart)
     expect(end).toBeGreaterThan(daemonStart)
   })
 

@@ -2,6 +2,14 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.515",
+      "changes": [
+        "`ouro up` now prints the current runtime version in the update-check phase before asking npm for newer bits, so a stalled registry or update path no longer hides what is actually running.",
+        "Production `ouro up` starts or refreshes the daemon before provider health checks and repair prompts. Broken credentials for one agent are reported as degraded provider state after the daemon is answering instead of preventing every agent from coming online.",
+        "Daemon startup now opens the command socket before autostarting provider-dependent workers and kicks agent/sense autostart concurrently. A thrown or stalled config check is contained to that agent's crashed snapshot, leaving the daemon and sibling agents reachable."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.514",
       "changes": [
         "Add `--strict` flag to `ouro doctor` and bundle the `--category` flag (also in #637) for a coherent CI-friendly diagnostic interface. `--strict` makes the CLI exit non-zero (via thrown error caught by ouro-entry) when any check is `warn` or `fail`. Default behavior is unchanged.",

@@ -133,6 +133,29 @@ export class DaemonProcessManager {
     }
   }
 
+  private markConfigCheckFailed(
+    state: AgentRuntimeState,
+    errorReason: string,
+    fixHint: string | null,
+  ): void {
+    const agent = state.config.name
+    state.snapshot.status = "crashed"
+    state.snapshot.errorReason = errorReason
+    state.snapshot.fixHint = fixHint
+    emitNervesEvent({
+      level: "error",
+      component: "daemon",
+      event: "daemon.agent_config_invalid",
+      message: errorReason,
+      meta: { agent, fix: fixHint },
+    })
+    this.writeStatus(agent,
+      `[daemon] ${agent}: ${errorReason}\n` +
+      (fixHint ? `  Fix: ${fixHint}\n` : ""),
+    )
+    this.notifySnapshotChange(state.snapshot)
+  }
+
   constructor(options: DaemonProcessManagerOptions) {
     this.maxRestartsPerHour = options.maxRestartsPerHour ?? 10
     this.stabilityThresholdMs = options.stabilityThresholdMs ?? 60_000
@@ -187,6 +210,20 @@ export class DaemonProcessManager {
     }
   }
 
+  triggerAutoStartAgents(): void {
+    for (const state of this.agents.values()) {
+      if (!state.config.autoStart) continue
+      void this.startAgent(state.config.name).catch((error) => {
+        const errorReason = error instanceof Error ? error.message : String(error)
+        this.markConfigCheckFailed(
+          state,
+          `agent startup threw before the worker could run: ${errorReason}`,
+          "Run 'ouro doctor' for diagnostics, then retry 'ouro up'.",
+        )
+      })
+    }
+  }
+
   async startAgent(agent: string): Promise<void> {
     const state = this.requireAgent(agent)
     if (state.process) return
@@ -196,7 +233,18 @@ export class DaemonProcessManager {
     state.snapshot.status = "starting"
 
     if (this.configCheckFn) {
-      const result = await this.configCheckFn(agent)
+      let result: { ok: boolean; error?: string; fix?: string; skip?: boolean }
+      try {
+        result = await this.configCheckFn(agent)
+      } catch (error) {
+        const errorReason = error instanceof Error ? error.message : String(error)
+        this.markConfigCheckFailed(
+          state,
+          `agent config validation threw: ${errorReason}`,
+          "Run 'ouro doctor' for diagnostics, then retry 'ouro up'.",
+        )
+        return
+      }
       if (result.skip) {
         state.snapshot.status = "stopped"
         state.snapshot.errorReason = null
@@ -211,26 +259,11 @@ export class DaemonProcessManager {
         return
       }
       if (!result.ok) {
-        state.snapshot.status = "crashed"
-        // Surface the error and fix to the snapshot so sibling agents can
-        // read it via the pulse. Without this, the diagnosis stayed
-        // trapped in the nerves event and stderr — visible to humans
-        // running `ouro status` or grepping logs, but invisible to
-        // peer agents trying to coordinate around the broken state.
-        state.snapshot.errorReason = result.error ?? "agent config validation failed"
-        state.snapshot.fixHint = result.fix ?? null
-        emitNervesEvent({
-          level: "error",
-          component: "daemon",
-          event: "daemon.agent_config_invalid",
-          message: result.error ?? "agent config validation failed",
-          meta: { agent, fix: result.fix ?? null },
-        })
-        this.writeStatus(agent,
-          `[daemon] ${agent}: ${result.error}\n` +
-          (result.fix ? `  Fix: ${result.fix}\n` : ""),
+        this.markConfigCheckFailed(
+          state,
+          result.error ?? "agent config validation failed",
+          result.fix ?? null,
         )
-        this.notifySnapshotChange(state.snapshot)
         return
       }
       // Config check passed — clear any prior error so the pulse stops
