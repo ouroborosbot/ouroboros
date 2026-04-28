@@ -6,11 +6,8 @@ import { resolveMailroomReader, readMailroomRegistry, writeMailroomRegistry, typ
 import { confirmMailDraftSend, createMailDraft, resolveOutboundProviderClient, resolveOutboundTransport, type MailOutboundTransport } from "../mailroom/outbound"
 import { applyMailDecision, buildSenderPolicy, type MailDecisionAction, type MailDecisionActor, type MailScreenerCandidateStatus } from "../mailroom/policy"
 import { searchMailSearchCache, upsertMailSearchCacheDocument, type MailSearchCacheDocument } from "../mailroom/search-cache"
-<<<<<<< HEAD
 import { reconstructThread } from "../mailroom/thread"
-=======
 import { cacheMailBody, getCachedMailBody } from "../mailroom/body-cache"
->>>>>>> a88c5964 (feat(mail): in-process LRU cache for decrypted mail bodies (alpha.503))
 import { cacheMatchingMailSearchDocumentsFromMboxFile } from "../mailroom/mbox-import"
 import { compareByRelevanceThenRecency, formatRelevanceHint, scoreMailSearchDocument } from "../mailroom/search-relevance"
 import {
