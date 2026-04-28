@@ -1649,7 +1649,6 @@ describe("mail tools", () => {
     expect(missingSource).toContain("delegated:ari@mendelow.me:source")
   })
 
-<<<<<<< HEAD
   it("mail_thread reconstructs a multi-message conversation, mail_body opens one message, both audit-logged", async () => {
     setAgentName("slugger")
     const storePath = tempDir()
@@ -1751,7 +1750,9 @@ describe("mail tools", () => {
       context: { friend: { id: "x", name: "X", trustLevel: "stranger", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, totalTokens: 0, createdAt: "0", updatedAt: "0", schemaVersion: 1 }, channel: { channel: "cli", senseType: "local", availableIntegrations: [], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
     } as unknown as ToolContext
     const result = await tool("mail_thread").handler({ message_id: "x", reason: "snoop" }, ctx) as string
-=======
+    expect(result).toContain("mail is private")
+  })
+
   it("mail_outbox lists drafts and sends with newest-first ordering and status filter", async () => {
     setAgentName("slugger")
     const storePath = tempDir()
@@ -1815,7 +1816,6 @@ describe("mail tools", () => {
       signin: async () => undefined,
       context: { friend: { id: "x", name: "X", trustLevel: "stranger", externalIds: [] } },
     } as unknown as ToolContext)
->>>>>>> 93f80a6f (feat(mail): mail_outbox tool — agent-introspectable outbound mail (alpha.504))
     expect(result).toContain("mail is private")
   })
 })
