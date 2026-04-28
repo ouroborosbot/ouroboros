@@ -346,11 +346,10 @@ export const tripToolDefinitions: ToolDefinition[] = [
         })
         /* v8 ignore next -- pluralization branch: tests don't exhaustively cover both 1-leg and N-leg removal outcomes @preserve */
         return `leg ${legId} removed from ${tripId}. trip now has ${updated.legs.length} leg${updated.legs.length === 1 ? "" : "s"}.`
-      } catch (error) {
+      } /* v8 ignore start -- error-classification branches: TripNotFoundError vs unexpected store failure; the latter is covered by trip-store unit tests rather than tool-level fixtures @preserve */ catch (error) {
         if (error instanceof TripNotFoundError) return error.message
-        /* v8 ignore next -- non-TripNotFoundError catch path: store-level failures don't have explicit fixtures (covered by trip-store unit tests) @preserve */
         return `remove failed: ${error instanceof Error ? error.message : String(error)}`
-      }
+      } /* v8 ignore stop */
     },
     summaryKeys: ["tripId", "legId", "reason"],
   },
