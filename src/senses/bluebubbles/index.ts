@@ -151,7 +151,7 @@ interface RuntimeDeps {
   getOwnHandles: () => readonly string[]
 }
 
-interface BlueBubblesReplyTargetController {
+export interface BlueBubblesReplyTargetController {
   getReplyToMessageGuid(): string | undefined
   setSelection(selection: BlueBubblesReplyTargetSelection): string
 }
@@ -505,7 +505,7 @@ function emitBlueBubblesMarkReadWarning(chat: BlueBubblesChatRef, error: unknown
   })
 }
 
-function createBlueBubblesCallbacks(
+export function createBlueBubblesCallbacks(
   client: BlueBubblesClient,
   chat: BlueBubblesChatRef,
   replyTarget: BlueBubblesReplyTargetController,
