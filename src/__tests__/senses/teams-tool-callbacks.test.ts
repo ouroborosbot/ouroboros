@@ -19,6 +19,13 @@ vi.mock("../../heart/identity", () => ({
   })),
 }))
 
+vi.mock("../../heart/daemon/socket-client", () => ({
+  DEFAULT_DAEMON_SOCKET_PATH: "/tmp/ouroboros-test-mock.sock",
+  sendDaemonCommand: vi.fn().mockResolvedValue({ ok: true }),
+  checkDaemonSocketAlive: vi.fn().mockResolvedValue(false),
+  requestInnerWake: vi.fn().mockResolvedValue(null),
+}))
+
 describe("Teams tool callbacks via createToolActivityCallbacks", () => {
   beforeEach(() => {
     vi.resetModules()

@@ -410,6 +410,8 @@ export function createTeamsCallbacks(
       if (!trimmed) return
       // Cancel pending periodic flush — we're delivering now.
       stopFlushTimer()
+      // The actual speak message replaces any "thinking..." phrase cycling.
+      stopPhraseRotation()
       // Bypass MIN_INITIAL_CHARS threshold — speak delivers immediately.
       firstContentEmitted = true
       textBuffer = ""
@@ -454,6 +456,12 @@ export function createTeamsCallbacks(
       })
       return {
         onToolStart: (name: string, args: Record<string, string>) => {
+          // speak is flow-control: its visible output is the message itself
+          // (delivered via onTextChunk + flushNow). Do NOT stop phrase rotation
+          // here, do NOT emit the \u23f3 placeholder, do NOT post a tool-activity
+          // status update \u2014 all of those would create UI churn right before the
+          // actual speak content arrives.
+          if (name === "speak") return
           stopPhraseRotation()
           // Force-flush any accumulated text, bypassing MIN_INITIAL_CHARS threshold
           firstContentEmitted = true
@@ -468,6 +476,11 @@ export function createTeamsCallbacks(
           hadToolRun = true
         },
         onToolEnd: (name: string, summary: string, success: boolean) => {
+          // speak is flow-control: skip phrase-rotation stop and tool-activity end
+          // callback (no safeUpdate for \u2713/\u2717). The flushNow call inside the engine
+          // already emitted the actual message and stopped any rotation as part of
+          // tryEmit's first-content-emitted flag.
+          if (name === "speak") return
           stopPhraseRotation()
           toolCbs.onToolEnd(name, summary, success)
         },

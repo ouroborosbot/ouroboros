@@ -596,7 +596,12 @@ export function createBlueBubblesCallbacks(
     onReasoningChunk(_text: string): void {},
 
     onToolStart(name: string, _args: Record<string, string>): void {
-      if (name === "observe") {
+      // observe + speak are flow-control: their visible output (or lack of it) is
+      // handled outside the tool-activity callbacks. speak in particular delivers
+      // its message via onTextChunk/flushNow — we MUST NOT enqueue a "speaking..."
+      // status sendText here, which would arrive as a separate iMessage right
+      // before the actual speak content.
+      if (name === "observe" || name === "speak") {
         emitNervesEvent({
           component: "senses",
           event: "senses.bluebubbles_tool_start",
@@ -618,7 +623,8 @@ export function createBlueBubblesCallbacks(
     },
 
     onToolEnd(name: string, summary: string, success: boolean): void {
-      if (name !== "observe") {
+      // observe + speak skip the tool-activity end callback (no ✓/✗ status sent).
+      if (name !== "observe" && name !== "speak") {
         toolCallbacks.onToolEnd(name, summary, success)
       }
       emitNervesEvent({
