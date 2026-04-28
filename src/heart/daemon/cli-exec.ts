@@ -6620,6 +6620,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       if (command.noRepair) {
         // --no-repair: write degraded summary and skip interactive repair
         writeProviderRepairSummary(deps, "Provider checks need attention", daemonResult.stability.degraded)
+        deps.setExitCode?.(1)
         emitNervesEvent({
           level: "warn",
           component: "daemon",

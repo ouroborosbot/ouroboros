@@ -331,9 +331,11 @@ describe("ouro up: interactive repair wiring", () => {
     const startDaemonProcess = vi.fn(async () => ({ pid: 123 }))
     const promptInput = vi.fn(async () => "1")
     const writeStdout = vi.fn()
+    const setExitCode = vi.fn()
     const deps = makeDeps({
       startDaemonProcess,
       writeStdout,
+      setExitCode,
       promptInput,
       listDiscoveredAgents: vi.fn(() => ["test-agent"]),
       bundlesRoot: "/tmp/bundles",
@@ -350,6 +352,7 @@ describe("ouro up: interactive repair wiring", () => {
     expect(output).toContain("test-agent: vault locked")
     expect(output).toContain("next: ouro vault unlock --agent test-agent")
     expect(result).toContain("daemon started")
+    expect(setExitCode).toHaveBeenCalledWith(1)
   })
 
   it("keeps post-start --no-repair output tidy without a fix", async () => {
@@ -361,9 +364,11 @@ describe("ouro up: interactive repair wiring", () => {
 
     const startDaemonProcess = vi.fn(async () => ({ pid: 123 }))
     const writeStdout = vi.fn()
+    const setExitCode = vi.fn()
     const deps = makeDeps({
       startDaemonProcess,
       writeStdout,
+      setExitCode,
       listDiscoveredAgents: vi.fn(() => ["test-agent"]),
       bundlesRoot: "/tmp/bundles",
     })
@@ -375,6 +380,7 @@ describe("ouro up: interactive repair wiring", () => {
     const output = writeStdout.mock.calls.map((call: any[]) => call[0]).join("\n")
     expect(output).toContain("test-agent: provider failed without a repair hint")
     expect(output).not.toContain("fix:")
+    expect(setExitCode).toHaveBeenCalledWith(1)
   })
 
   it("checks selected providers after starting a stopped daemon and continues into the next runnable repair", async () => {
