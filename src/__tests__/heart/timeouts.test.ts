@@ -177,14 +177,17 @@ describe("runWithTimeouts", () => {
 
   it("preserves a non-abort error thrown by the op (rethrows wrapped, classification undefined)", async () => {
     const { runWithTimeouts } = await import("../../heart/timeouts")
+    // Attach the rejection handler before any async tick so vitest doesn't
+    // see an unhandled rejection.
     const promise = runWithTimeouts(
       async () => {
         throw new Error("404 not found")
       },
       { softMs: 8000, hardMs: 15000, label: "git-pull" },
     )
-    await vi.runAllTimersAsync()
     await expect(promise).rejects.toThrow(/404/)
+    // Drain timers afterwards so the test ends cleanly.
+    await vi.advanceTimersByTimeAsync(20000)
   })
 
   it("does NOT trip soft warning when op completes very fast", async () => {
