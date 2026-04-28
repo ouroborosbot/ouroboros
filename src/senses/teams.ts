@@ -405,6 +405,36 @@ export function createTeamsCallbacks(
     onClearText: () => {
       textBuffer = ""
     },
+    flushNow: async () => {
+      const trimmed = textBuffer.trim()
+      if (!trimmed) return
+      // Cancel pending periodic flush — we're delivering now.
+      stopFlushTimer()
+      // Bypass MIN_INITIAL_CHARS threshold — speak delivers immediately.
+      firstContentEmitted = true
+      textBuffer = ""
+      // Try the stream first; on failure, fall back to sendMessage (mirrors flush()).
+      let delivered = false
+      if (!stopped) {
+        const ok = await tryEmit(trimmed)
+        if (ok) delivered = true
+        else markStopped()
+      }
+      if (!delivered && sendMessage) {
+        try {
+          await sendMessage(trimmed)
+          delivered = true
+        } catch {
+          /* both paths failed; we already marked stopped — surface no further */
+        }
+      }
+      emitNervesEvent({
+        component: "senses",
+        event: "teams.speak_flush",
+        message: "teams flushed mid-turn speak",
+        meta: { messageLength: trimmed.length, delivered },
+      })
+    },
     ...(() => {
       const toolCbs = createToolActivityCallbacks({
         onDescription: (text) => safeUpdate(text),
