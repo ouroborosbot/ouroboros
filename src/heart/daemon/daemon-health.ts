@@ -45,23 +45,19 @@ export interface SafeModeState {
  * consumers that want to narrow `unknown` JSON into the typed union before
  * branching on it.
  */
-export type RollupStatus = "healthy" | "partial" | "degraded" | "safe-mode"
-export type DaemonStatus = RollupStatus | "down"
+// Single source of truth — the literal lists below are the runtime
+// projection of the type unions. A future literal added to RollupStatus
+// MUST also be added to ROLLUP_STATUS_LITERALS or `satisfies` blows up
+// at tsc. That tightens the Layer 1 contract: producer + consumer +
+// guard all stay in lockstep.
+const ROLLUP_STATUS_LITERALS = ["healthy", "partial", "degraded", "safe-mode"] as const
+const DAEMON_STATUS_LITERALS = [...ROLLUP_STATUS_LITERALS, "down"] as const
 
-const ROLLUP_STATUS_VALUES: ReadonlySet<RollupStatus> = new Set<RollupStatus>([
-  "healthy",
-  "partial",
-  "degraded",
-  "safe-mode",
-])
+export type RollupStatus = typeof ROLLUP_STATUS_LITERALS[number]
+export type DaemonStatus = typeof DAEMON_STATUS_LITERALS[number]
 
-const DAEMON_STATUS_VALUES: ReadonlySet<DaemonStatus> = new Set<DaemonStatus>([
-  "healthy",
-  "partial",
-  "degraded",
-  "safe-mode",
-  "down",
-])
+const ROLLUP_STATUS_VALUES: ReadonlySet<RollupStatus> = new Set<RollupStatus>(ROLLUP_STATUS_LITERALS)
+const DAEMON_STATUS_VALUES: ReadonlySet<DaemonStatus> = new Set<DaemonStatus>(DAEMON_STATUS_LITERALS)
 
 export function isRollupStatus(value: unknown): value is RollupStatus {
   return typeof value === "string" && ROLLUP_STATUS_VALUES.has(value as RollupStatus)

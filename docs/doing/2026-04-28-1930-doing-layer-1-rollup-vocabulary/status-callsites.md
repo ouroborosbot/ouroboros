@@ -92,4 +92,22 @@ After Units 1–4 land, add a 6th literal (`"experimental"`) to `RollupStatus` t
 
 ## Experiment results
 
-(Filled in during Unit 5.)
+Performed during Unit 5 (2026-04-28 15:25 PT). Steps:
+
+1. Edited `src/heart/daemon/daemon-health.ts` to add `"experimental"` to the source-of-truth `ROLLUP_STATUS_LITERALS` tuple (which derives `RollupStatus` and `DaemonStatus` via `typeof`-indexing). This automatically widens both the type unions and the runtime guard sets in lockstep — the literal tuple is the single source of truth, so consumers can't drift from the guard.
+
+2. Ran `npx tsc --noEmit`. Output:
+
+   ```
+   src/heart/daemon/cli-render.ts(567,13): error TS2322: Type '"experimental"' is not assignable to type 'never'.
+   ```
+
+   Exactly one consumer compile-errors — `renderRollupStatusLine`'s `never`-typed default branch in `cli-render.ts`. That's the goal: every render-side switch on `DaemonStatus` is forced to handle the new literal explicitly.
+
+3. The rollup function (`computeDaemonRollup` in `daemon-rollup.ts`) does not compile-error because it returns `RollupStatus` via an if-chain — widening the union doesn't constrain which subset of literals the function emits. That's correct behavior: the producer chooses which states to emit; widening the union is by design a non-blocking change for the producer. Behavior is exercised at runtime via the truth-table tests.
+
+4. The type-guard tests in `daemon-health-status.test.ts` did NOT fail — `isRollupStatus("experimental")` now returns `true` (set membership), the guard is automatically in sync because both the type and the set derive from the same literal tuple. This is the desired outcome of the literal-tuple refactor (Unit 5 hardening).
+
+5. Reverted the experimental literal. Final state: `ROLLUP_STATUS_LITERALS = ["healthy", "partial", "degraded", "safe-mode"] as const`. tsc clean; type-guard tests green.
+
+**Conclusion**: Layer 1's compiler-forced exhaustiveness contract holds. A future PR adding a new rollup state to the literal tuple WILL compile-error at every render-side `switch (status)` consumer that uses a `never`-typed default — there's currently exactly one such consumer (`renderRollupStatusLine`). Future PRs adding more consumers (e.g. inner-status / startup-tui / outlook UI) MUST follow the same `never`-default pattern; this is now the documented Layer 1 invariant.
