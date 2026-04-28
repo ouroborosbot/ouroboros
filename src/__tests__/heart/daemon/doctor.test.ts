@@ -30,12 +30,9 @@ import {
   checkSenses,
   checkHabits,
   checkSecurity,
-<<<<<<< HEAD
   checkTrips,
   checkMailroom,
-=======
   checkFriends,
->>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
   checkDisk,
   checkLifecycle,
 } from "../../../heart/daemon/doctor"
@@ -1227,7 +1224,6 @@ describe("checkSecurity", () => {
   })
 })
 
-<<<<<<< HEAD
 // ── Trip ledger checks ──
 
 describe("checkTrips", () => {
@@ -1342,16 +1338,6 @@ describe("checkMailroom", () => {
     domain: "ouro.bot",
     mailboxes: [{ agentId: "test", mailboxId: "mb_x", canonicalAddress: "test@ouro.bot", keyId: "k", publicKeyPem: "pem", defaultPlacement: "imbox" }],
     sourceGrants: [],
-=======
-// ── Friends checks ──
-
-describe("checkFriends", () => {
-  const friendJson = (overrides: Record<string, unknown> = {}): string => JSON.stringify({
-    id: "test-friend",
-    name: "Test Friend",
-    trustLevel: "friend",
-    externalIds: [],
->>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
     ...overrides,
   })
 
@@ -1360,27 +1346,17 @@ describe("checkFriends", () => {
       existsSync: existsFor(["/tmp/bundles"]),
       readdirSync: readdirFor({ "/tmp/bundles": [] }),
     })
-<<<<<<< HEAD
     const cat = checkMailroom(deps)
     expect(cat.name).toBe("Mailroom")
-=======
-    const cat = checkFriends(deps)
-    expect(cat.name).toBe("Friends")
->>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
     expect(cat.checks[0].status).toBe("warn")
     expect(cat.checks[0].detail).toContain("no agent bundles")
   })
 
-<<<<<<< HEAD
   it("passes when no mailroom dir (mail not connected)", () => {
-=======
-  it("passes when no friends directory (no friends recorded)", () => {
->>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
     const deps = createMockDeps({
       existsSync: existsFor(["/tmp/bundles"]),
       readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
     })
-<<<<<<< HEAD
     const cat = checkMailroom(deps)
     expect(cat.checks[0].status).toBe("pass")
     expect(cat.checks[0].detail).toContain("not connected")
@@ -1451,7 +1427,36 @@ describe("checkFriends", () => {
     expect(cat.checks[0].detail).toContain("1 mailbox")
     expect(cat.checks[0].detail).toContain("1 source grant")
     expect(cat.checks[0].detail).toContain("3 messages")
-=======
+  })
+})
+
+// ── Friends checks ──
+
+describe("checkFriends", () => {
+  const friendJson = (overrides: Record<string, unknown> = {}): string => JSON.stringify({
+    id: "test-friend",
+    name: "Test Friend",
+    trustLevel: "friend",
+    externalIds: [],
+    ...overrides,
+  })
+
+  it("warns when no agents found", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles"]),
+      readdirSync: readdirFor({ "/tmp/bundles": [] }),
+    })
+    const cat = checkFriends(deps)
+    expect(cat.name).toBe("Friends")
+    expect(cat.checks[0].status).toBe("warn")
+    expect(cat.checks[0].detail).toContain("no agent bundles")
+  })
+
+  it("passes when no friends directory (no friends recorded)", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles"]),
+      readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
+    })
     const cat = checkFriends(deps)
     expect(cat.checks[0].status).toBe("pass")
     expect(cat.checks[0].detail).toContain("no friends directory")
@@ -1523,7 +1528,6 @@ describe("checkFriends", () => {
     const cat = checkFriends(deps)
     expect(cat.checks[0].status).toBe("pass")
     expect(cat.checks[0].detail).toContain("1 other")
->>>>>>> 1c40ea55 (feat(doctor): Friends category — friend store health per-agent (alpha.513))
   })
 })
 
