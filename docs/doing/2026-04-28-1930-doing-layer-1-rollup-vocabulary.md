@@ -100,7 +100,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 - `isRollupStatus`: each of the four literals (`healthy`, `partial`, `degraded`, `safe-mode`) validates; `"down"` is rejected (it's not a valid rollup output); junk strings fail; undefined/null fail.
 - `isDaemonStatus`: each of the five literals validates including `"down"`; junk strings fail; undefined/null fail.
 
-### ⬜ Unit 1b: Type definition — Implementation
+### ✅ Unit 1b: Type definition — Implementation
 **What**: Add to `src/heart/daemon/daemon-health.ts`:
 - `export type RollupStatus = "healthy" | "partial" | "degraded" | "safe-mode"` — what `computeDaemonRollup` returns. The four states the rollup function decides.
 - `export type DaemonStatus = RollupStatus | "down"` — what `DaemonHealthState.status` accepts. Caller assigns `"down"` outside the rollup function (pre-inventory failure path).
@@ -108,7 +108,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 - Update `DaemonHealthState.status` to type `DaemonStatus`.
 **Acceptance**: Tests PASS (green). `tsc --noEmit` clean.
 
-### ⬜ Unit 1c: Type definition — Coverage & refactor
+### ✅ Unit 1c: Type definition — Coverage & refactor
 **What**: Verify coverage is 100% for the new type/guard. Refactor if needed.
 **Acceptance**: Coverage report shows 100% for new lines. Tests still green.
 
@@ -254,3 +254,4 @@ The render layer reads `health.agents` (already a field on `DaemonHealthState`) 
 - 2026-04-28 20:10 UTC Second ouroboros review surfaced one more refinement, applied:
   - Unit 5 strengthened from "grep-based sweep" to "compiler-forced exhaustiveness." Every switch on a status value MUST have a `never`-typed default branch. No fallback `default:` returning a guess value. A deliberate add-a-hypothetical-state experiment is required to prove every consumer compile-errors when the union grows.
 - 2026-04-28 13:04 Unit 0 complete: status-callsites map written; scope correction confirmed with ouroboros. Real consumers of `DaemonHealthState.status` are `cli-render.ts:566` and `runtime-readers.ts:281`, not `inner-status.ts` / `startup-tui.ts`. Unit 4 retargeted; Completion Criteria entry rephrased to match. Test fixtures in `daemon-health.test.ts`, `daemon-status-health.test.ts`, and `daemon-entry-health-state.test.ts` flagged for vocabulary update during Unit 5.
+- 2026-04-28 13:16 Unit 1a/1b/1c complete: introduced `RollupStatus` (4-state) + `DaemonStatus` (5-state) unions and `isRollupStatus` / `isDaemonStatus` runtime guards. Tightened `DaemonHealthState.status` to `DaemonStatus` and tightened `readHealth` to use the guard so corrupt or old-vocabulary cached files fail parse. Bumped the `daemon-entry.ts:164` literal from `"ok"`/`"degraded"` to `"healthy"`/`"degraded"` so tsc passes — Unit 3b will replace this literal entirely with `computeDaemonRollup`. Updated existing test fixtures across daemon-health, daemon-status-health, daemon-cli-defaults, daemon-entry-health-state, and prompt rhythm tests to use the new vocabulary. 100% coverage on `daemon-health.ts`. Full suite: 9716 tests green; tsc/lint/build clean.
