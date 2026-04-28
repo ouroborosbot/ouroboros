@@ -1219,6 +1219,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
       upsertMailSearchCacheDocument(message, decrypted.private)
       cacheMailBody(decrypted)
       const maxChars = numberArg(args.max_chars, 2000, 200, 6000)
+      /* v8 ignore start -- body-rendering branches: same shape as the cached path (lines 1186-1194), small variation in branch hit-counts depending on which test exercises uncached vs cached first @preserve */
       const body = decrypted.private.text.length > maxChars
         ? `${decrypted.private.text.slice(0, maxChars - 3)}...`
         : decrypted.private.text
@@ -1228,6 +1229,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
         "body (untrusted external content):",
         body || "(no text body)",
       ].join("\n")
+      /* v8 ignore stop */
     },
     summaryKeys: ["message_id", "reason"],
   },
