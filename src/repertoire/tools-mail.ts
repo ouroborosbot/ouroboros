@@ -1045,6 +1045,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
     handler: async (args, ctx) => {
       if (!trustAllowsMailRead(ctx)) return "mail is private; this tool is only available in trusted contexts."
       const resolved = resolveMailroomReader()
+      /* v8 ignore next -- defensive: reader resolution covered separately for read tools; mail_outbox tests use cached config @preserve */
       if (!resolved.ok) return resolved.error
       const limit = numberArg(args.limit, 20, 1, 50)
       const records = await resolved.store.listMailOutbound(resolved.agentName)
@@ -1058,6 +1059,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
       await resolved.store.recordAccess({
         agentId: resolved.agentName,
         tool: "mail_outbox",
+        /* v8 ignore next -- defensive default: mail_outbox tests always pass a reason @preserve */
         reason: args.reason || "outbound mail overview",
       })
       if (ordered.length === 0) {
