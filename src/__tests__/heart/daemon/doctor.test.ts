@@ -30,11 +30,8 @@ import {
   checkSenses,
   checkHabits,
   checkSecurity,
-<<<<<<< HEAD
   checkTrips,
-=======
   checkMailroom,
->>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
   checkDisk,
   checkLifecycle,
 } from "../../../heart/daemon/doctor"
@@ -1226,7 +1223,6 @@ describe("checkSecurity", () => {
   })
 })
 
-<<<<<<< HEAD
 // ── Trip ledger checks ──
 
 describe("checkTrips", () => {
@@ -1237,45 +1233,21 @@ describe("checkTrips", () => {
   })
 
   it("warns when no agents are found", () => {
-=======
-// ── Mailroom checks ──
-
-describe("checkMailroom", () => {
-  const registryJson = (overrides: Record<string, unknown> = {}): string => JSON.stringify({
-    schemaVersion: 1,
-    domain: "ouro.bot",
-    mailboxes: [{ agentId: "test", mailboxId: "mb_x", canonicalAddress: "test@ouro.bot", keyId: "k", publicKeyPem: "pem", defaultPlacement: "imbox" }],
-    sourceGrants: [],
-    ...overrides,
-  })
-
-  it("warns when no agents found", () => {
->>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
     const deps = createMockDeps({
       existsSync: existsFor(["/tmp/bundles"]),
       readdirSync: readdirFor({ "/tmp/bundles": [] }),
     })
-<<<<<<< HEAD
     const cat = checkTrips(deps)
     expect(cat.name).toBe("Trips")
-=======
-    const cat = checkMailroom(deps)
-    expect(cat.name).toBe("Mailroom")
->>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
     expect(cat.checks[0].status).toBe("warn")
     expect(cat.checks[0].detail).toContain("no agent bundles")
   })
 
-<<<<<<< HEAD
   it("passes when an agent has no trip ledger directory yet (optional feature)", () => {
-=======
-  it("passes when no mailroom dir (mail not connected)", () => {
->>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
     const deps = createMockDeps({
       existsSync: existsFor(["/tmp/bundles"]),
       readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
     })
-<<<<<<< HEAD
     const cat = checkTrips(deps)
     expect(cat.checks[0].status).toBe("pass")
     expect(cat.checks[0].detail).toContain("no ledger directory")
@@ -1302,39 +1274,10 @@ describe("checkMailroom", () => {
       readFileSync: readFileFor({ "/tmp/bundles/test.ouro/state/trips/ledger.json": "{not json" }),
     })
     const cat = checkTrips(deps)
-=======
-    const cat = checkMailroom(deps)
-    expect(cat.checks[0].status).toBe("pass")
-    expect(cat.checks[0].detail).toContain("not connected")
-  })
-
-  it("warns when state/mailroom dir exists but no registry.json", () => {
-    const deps = createMockDeps({
-      existsSync: existsFor(["/tmp/bundles", "/tmp/bundles/test.ouro/state/mailroom"]),
-      readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
-    })
-    const cat = checkMailroom(deps)
-    expect(cat.checks[0].status).toBe("warn")
-    expect(cat.checks[0].detail).toContain("registry.json missing")
-  })
-
-  it("fails when registry.json is unparseable", () => {
-    const deps = createMockDeps({
-      existsSync: existsFor([
-        "/tmp/bundles",
-        "/tmp/bundles/test.ouro/state/mailroom",
-        "/tmp/bundles/test.ouro/state/mailroom/registry.json",
-      ]),
-      readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
-      readFileSync: readFileFor({ "/tmp/bundles/test.ouro/state/mailroom/registry.json": "{not json" }),
-    })
-    const cat = checkMailroom(deps)
->>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
     expect(cat.checks[0].status).toBe("fail")
     expect(cat.checks[0].detail).toContain("not valid JSON")
   })
 
-<<<<<<< HEAD
   it("warns when ledger.json is missing the ledgerId field", () => {
     const deps = createMockDeps({
       existsSync: existsFor([
@@ -1383,7 +1326,66 @@ describe("checkMailroom", () => {
     expect(cat.checks[0].status).toBe("pass")
     expect(cat.checks[0].detail).toContain("ledger_slugger_xyz")
     expect(cat.checks[0].detail).toContain("2 records")
-=======
+  })
+})
+
+// ── Mailroom checks ──
+
+describe("checkMailroom", () => {
+  const registryJson = (overrides: Record<string, unknown> = {}): string => JSON.stringify({
+    schemaVersion: 1,
+    domain: "ouro.bot",
+    mailboxes: [{ agentId: "test", mailboxId: "mb_x", canonicalAddress: "test@ouro.bot", keyId: "k", publicKeyPem: "pem", defaultPlacement: "imbox" }],
+    sourceGrants: [],
+    ...overrides,
+  })
+
+  it("warns when no agents found", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles"]),
+      readdirSync: readdirFor({ "/tmp/bundles": [] }),
+    })
+    const cat = checkMailroom(deps)
+    expect(cat.name).toBe("Mailroom")
+    expect(cat.checks[0].status).toBe("warn")
+    expect(cat.checks[0].detail).toContain("no agent bundles")
+  })
+
+  it("passes when no mailroom dir (mail not connected)", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles"]),
+      readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
+    })
+    const cat = checkMailroom(deps)
+    expect(cat.checks[0].status).toBe("pass")
+    expect(cat.checks[0].detail).toContain("not connected")
+  })
+
+  it("warns when state/mailroom dir exists but no registry.json", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor(["/tmp/bundles", "/tmp/bundles/test.ouro/state/mailroom"]),
+      readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
+    })
+    const cat = checkMailroom(deps)
+    expect(cat.checks[0].status).toBe("warn")
+    expect(cat.checks[0].detail).toContain("registry.json missing")
+  })
+
+  it("fails when registry.json is unparseable", () => {
+    const deps = createMockDeps({
+      existsSync: existsFor([
+        "/tmp/bundles",
+        "/tmp/bundles/test.ouro/state/mailroom",
+        "/tmp/bundles/test.ouro/state/mailroom/registry.json",
+      ]),
+      readdirSync: readdirFor({ "/tmp/bundles": ["test.ouro"] }),
+      readFileSync: readFileFor({ "/tmp/bundles/test.ouro/state/mailroom/registry.json": "{not json" }),
+    })
+    const cat = checkMailroom(deps)
+    expect(cat.checks[0].status).toBe("fail")
+    expect(cat.checks[0].detail).toContain("not valid JSON")
+  })
+
   it("warns when registry has zero mailboxes", () => {
     const deps = createMockDeps({
       existsSync: existsFor([
@@ -1424,7 +1426,6 @@ describe("checkMailroom", () => {
     expect(cat.checks[0].detail).toContain("1 mailbox")
     expect(cat.checks[0].detail).toContain("1 source grant")
     expect(cat.checks[0].detail).toContain("3 messages")
->>>>>>> 977e7914 (feat(doctor): Mailroom category — registry health per-agent (alpha.510))
   })
 })
 
