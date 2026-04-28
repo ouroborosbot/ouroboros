@@ -185,5 +185,29 @@ describe("cli-render rollup vocabulary — daemonUnavailableStatusOutput", () =>
       expect(result).toContain("none ready")
       expect(result).not.toContain("no agents configured")
     })
+
+    it("'stale cache, run ouro up to refresh' copy when status='degraded' but at least one cached agent is running (legacy file from pre-Layer-1 daemon)", async () => {
+      // Pre-Layer-1 semantics: status="degraded" meant "any degraded component exists,"
+      // which could include states where some agents were healthy and some weren't.
+      // Post-Layer-1 semantics: status="degraded" means "zero enabled agents serving."
+      // A cached health file from a pre-Layer-1 daemon may therefore have status="degraded"
+      // AND a running agent in the agents map — mutually exclusive under new semantics.
+      // The render layer must NOT falsely claim "none ready" in this case; it should
+      // prompt the user to refresh the cache via `ouro up`.
+      const dir = makeTmpDir()
+      const healthPath = path.join(dir, "daemon-health.json")
+      writeHealth(healthPath, "degraded", {
+        agents: {
+          alpha: { status: "running", pid: 1234, crashes: 0 },
+          beta: { status: "crashed", pid: null, crashes: 3 },
+        },
+      })
+      const result = await runStatus(healthPath)
+      expect(result).toContain("Last known status: degraded")
+      expect(result).toContain("stale cache")
+      expect(result).toContain("ouro up")
+      expect(result).not.toContain("none ready")
+      expect(result).not.toContain("no agents configured")
+    })
   })
 })

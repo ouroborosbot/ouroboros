@@ -21,14 +21,15 @@ After this PR, `degraded` means "zero enabled agents serving" — not "any one a
 
 Both unions are projected from a single source-of-truth literal tuple (`ROLLUP_STATUS_LITERALS as const` in `daemon-health.ts`), so the type, the runtime guard `Set`s, and the `isRollupStatus` / `isDaemonStatus` guards stay in lockstep automatically — adding a future literal touches one site only.
 
-## Render-layer two-copy split for `degraded`
+## Render-layer copy split for `degraded`
 
-The status enum stays a single `degraded` literal. The render layer (`renderRollupStatusLine` in `cli-render.ts`) inspects the cached `health.agents` map size to pick a UX copy variant:
+The status enum stays a single `degraded` literal. The render layer (`renderRollupStatusLine` in `cli-render.ts`) inspects the cached `health.agents` map to pick a UX copy variant:
 
 - Empty map → `"degraded — no agents configured (run \`ouro hatch\` to add one)"` (fresh install).
-- Non-empty map → `"degraded — agents configured but none ready (run \`ouro doctor\`)"` (all-failed live-check).
+- Non-empty map + any agent reports `"running"` → `"degraded — stale cache, run \`ouro up\` to refresh"`. This handles cached health files written by pre-Layer-1 daemons, where `status: "degraded"` carried the old "any sick component" semantics and could coexist with a healthy agent. Under post-Layer-1 semantics that combination is impossible — so a cached running agent + degraded status implies the cache pre-dates this PR. The render layer prompts for `ouro up` rather than falsely asserting "none ready."
+- Non-empty map + zero agents reporting `"running"` → `"degraded — agents configured but none ready (run \`ouro doctor\`)"` (all-failed live-check).
 
-Same status, distinct UX. Avoids inflating the type union just to express copy-variant nuance.
+Same status, three distinct copy variants. Avoids inflating the type union just to express copy-variant nuance, and does not propagate stale-cache misinformation.
 
 ## Compiler-forced exhaustiveness
 

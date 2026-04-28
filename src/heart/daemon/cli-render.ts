@@ -545,11 +545,23 @@ export function renderRollupStatusLine(health: DaemonHealthState): string {
     case "partial":
       return `Last known status: partial — some agents unhealthy ${tail}`
     case "degraded": {
-      // Two-copy split: empty agents map = fresh install; non-empty =
-      // every configured agent failed its live-check.
-      const agentCount = Object.keys(health.agents).length
-      if (agentCount === 0) {
+      // Three-way copy split based on the cached agents map:
+      // - empty map → fresh install / no agents configured.
+      // - non-empty + any agent reports "running" → legacy stale cache:
+      //   pre-Layer-1, status="degraded" meant "any sick component," so a
+      //   running agent could coexist with a degraded daemon. Post-Layer-1,
+      //   degraded means "zero serving" — mutually exclusive with a running
+      //   agent. A live disagreement therefore implies the cache pre-dates
+      //   the rollup-semantics fix; prompt for `ouro up` to refresh rather
+      //   than falsely claim "none ready."
+      // - non-empty + zero agents reporting "running" → all-failed copy.
+      const agentEntries = Object.values(health.agents)
+      if (agentEntries.length === 0) {
         return `Last known status: degraded — no agents configured (run \`ouro hatch\` to add one) ${tail}`
+      }
+      const anyRunning = agentEntries.some((agent) => agent.status === "running")
+      if (anyRunning) {
+        return `Last known status: degraded — stale cache, run \`ouro up\` to refresh ${tail}`
       }
       return `Last known status: degraded — agents configured but none ready (run \`ouro doctor\`) ${tail}`
     }
