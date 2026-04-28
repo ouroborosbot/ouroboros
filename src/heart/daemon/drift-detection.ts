@@ -1,5 +1,7 @@
+import * as fs from "fs"
+import * as path from "path"
 import type { AgentConfig, AgentFacingConfig } from "../identity"
-import type { ProviderLane, ProviderState } from "../provider-state"
+import { readProviderState, type ProviderLane, type ProviderState } from "../provider-state"
 
 /**
  * Per-lane drift between intent (`agent.json`) and observation
@@ -109,4 +111,58 @@ export function detectProviderBindingDrift(input: DetectProviderBindingDriftInpu
     })
   }
   return findings
+}
+
+export interface DriftInputs {
+  agentJson: AgentConfig
+  providerState: ProviderState | null
+}
+
+function agentRootFor(bundlesRoot: string, agentName: string): string {
+  return path.join(bundlesRoot, `${agentName}.ouro`)
+}
+
+function readAgentJson(agentJsonPath: string): AgentConfig {
+  let raw: string
+  try {
+    raw = fs.readFileSync(agentJsonPath, "utf-8")
+  } catch {
+    throw new Error(`agent.json not found at ${agentJsonPath}`)
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`agent.json at ${agentJsonPath} contains invalid JSON: ${String(error)}`)
+  }
+  // The drift loader is intentionally permissive: it parses the file as a
+  // typed `AgentConfig` view but does not validate every field. The
+  // comparator (Unit 1) is the one that decides which intent fields are
+  // usable; non-conforming bindings just silently skip drift detection
+  // on that lane. Stricter validation belongs to `loadAgentConfig` in
+  // identity.ts (which also has side effects we don't want here).
+  return parsed as AgentConfig
+}
+
+/**
+ * Loader for the drift comparator. Reads the per-agent `agent.json` and
+ * `state/providers.json` off disk, returning typed inputs ready to feed
+ * into `detectProviderBindingDrift`.
+ *
+ * - Throws when `agent.json` is missing or unparseable. The caller decides
+ *   whether to swallow (drift detection has no opinion on a broken
+ *   `agent.json` — that's the existing `agent-config-check` flow's job).
+ * - Returns `providerState: null` when `state/providers.json` is missing
+ *   (fresh install) or invalid (the comparator interprets `null` as "no
+ *   observation, nothing to drift against").
+ * - Never writes to disk.
+ */
+export function loadDriftInputsForAgent(bundlesRoot: string, agentName: string): DriftInputs {
+  const agentRoot = agentRootFor(bundlesRoot, agentName)
+  const agentJsonPath = path.join(agentRoot, "agent.json")
+  const agentJson = readAgentJson(agentJsonPath)
+
+  const stateResult = readProviderState(agentRoot)
+  const providerState = stateResult.ok ? stateResult.state : null
+  return { agentJson, providerState }
 }
