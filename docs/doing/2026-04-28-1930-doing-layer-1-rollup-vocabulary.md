@@ -158,7 +158,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **What**: Verify coverage on the changed rollup code path. Run full test suite.
 **Acceptance**: 100% coverage on changed lines. All tests green.
 
-### ⬜ Unit 4a: Update consumers (`cli-render.ts`, `runtime-readers.ts`) — Tests
+### ✅ Unit 4a: Update consumers (`cli-render.ts`, `runtime-readers.ts`) — Tests
 **Scope correction (Unit 0 outcome)**: planning-doc-named files `inner-status.ts` / `startup-tui.ts` do not actually consume `DaemonHealthState.status`. Real consumers per `status-callsites.md` are `cli-render.ts:566` (`daemonUnavailableStatusOutput`) and `runtime-readers.ts:281` (`readDaemonHealthDeep`). Tests target those.
 **What**: Write failing tests that render each rollup state via `daemonUnavailableStatusOutput` and assert label/dot color is appropriate. Add a parse-validation test for `readDaemonHealthDeep` confirming it now uses `isDaemonStatus` to gate the parsed status field. Place tests in `src/__tests__/heart/daemon/cli-render-rollup-vocabulary.test.ts` and `src/__tests__/heart/outlook/readers/runtime-readers-rollup-vocabulary.test.ts` (new files).
 **Coverage**:

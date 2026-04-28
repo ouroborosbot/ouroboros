@@ -11,7 +11,7 @@ import { getRuntimeMetadata } from "./runtime-metadata"
 import { detectRuntimeMode } from "./runtime-mode"
 import { getRepoRoot } from "../identity"
 import { readDaemonTombstone } from "./daemon-tombstone"
-import { readHealth, getDefaultHealthPath } from "./daemon-health"
+import { readHealth, getDefaultHealthPath, type DaemonHealthState, type DaemonStatus } from "./daemon-health"
 import { listAllBundleAgents, listBundleSyncRows } from "./agent-discovery"
 import type { McpListCliCommand, McpCallCliCommand } from "./cli-types"
 
@@ -519,6 +519,55 @@ export function buildStoppedStatusPayload(
   }
 }
 
+/**
+ * Render the cached daemon-rollup status as a one-line string for the
+ * "daemon not running" view. Each `DaemonStatus` literal maps to a
+ * label + a brief explanatory copy fragment. The default branch is
+ * `never`-typed so future widening of `DaemonStatus` compile-errors
+ * here — Layer 1's compiler-forced exhaustiveness contract.
+ *
+ * The `degraded` literal splits into two copy variants based on the
+ * cached health file's `agents` map:
+ * - empty map → "no agents configured" (fresh-install copy).
+ * - non-empty map → "none ready" (all-agents-failed-live-check copy).
+ *
+ * The split lives at the render layer (not in the rollup status itself)
+ * so the same status can carry distinct UX copy without inflating the
+ * type union.
+ */
+export function renderRollupStatusLine(health: DaemonHealthState): string {
+  const status: DaemonStatus = health.status
+  const tail = `(pid ${health.pid}, uptime ${health.uptimeSeconds}s)`
+  switch (status) {
+    case "healthy":
+      return `Last known status: healthy ${tail}`
+    case "partial":
+      return `Last known status: partial — some agents unhealthy ${tail}`
+    case "degraded": {
+      // Two-copy split: empty agents map = fresh install; non-empty =
+      // every configured agent failed its live-check.
+      const agentCount = Object.keys(health.agents).length
+      if (agentCount === 0) {
+        return `Last known status: degraded — no agents configured (run \`ouro hatch\` to add one) ${tail}`
+      }
+      return `Last known status: degraded — agents configured but none ready (run \`ouro doctor\`) ${tail}`
+    }
+    case "safe-mode":
+      return `Last known status: safe-mode — crash loop tripped ${tail}`
+    case "down":
+      return `Last known status: down ${tail}`
+    default: {
+      // Compiler-forced exhaustiveness. If DaemonStatus grows a new
+      // literal, this `never` cast errors at tsc, forcing every
+      // consumer to handle it explicitly. NEVER replace this with a
+      // permissive `default:` returning a fallback string — that's
+      // exactly how the old "ok | degraded" semantics leaked through.
+      const _exhaustive: never = status
+      throw new Error(`unhandled daemon status: ${_exhaustive as string}`)
+    }
+  }
+}
+
 export function daemonUnavailableStatusOutput(socketPath: string, healthFilePath?: string): string {
   // Read per-agent sync config and bundle list from disk so the user still
   // sees them when the daemon is down. Best-effort: any fs error returns []
@@ -563,7 +612,7 @@ export function daemonUnavailableStatusOutput(socketPath: string, healthFilePath
   const resolvedHealthPath = healthFilePath ?? getDefaultHealthPath()
   const health = readHealth(resolvedHealthPath)
   if (health) {
-    lines.push(`Last known status: ${health.status} (pid ${health.pid}, uptime ${health.uptimeSeconds}s)`)
+    lines.push(renderRollupStatusLine(health))
 
     if (health.safeMode?.active) {
       lines.push(`SAFE MODE: ${health.safeMode.reason}`)
