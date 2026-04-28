@@ -105,7 +105,7 @@ Hard timeouts (locked O1):
 **What**: 100% branch coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 2a: Timeout wiring + AbortSignal — Tests
+### ✅ Unit 2a: Timeout wiring + AbortSignal — Tests
 **What**: Write failing tests for a helper `runWithTimeouts<T>(fn: (signal: AbortSignal) => Promise<T>, options: { softMs: number; hardMs: number; label: string }): Promise<{ result?: T; classification?: "timeout-soft" | "timeout-hard"; warnings: string[] }>` in `src/__tests__/heart/timeouts.test.ts` (new file).
 **Edge cases**:
 - Op completes before soft timeout — `classification` undefined, no warnings.
@@ -114,11 +114,11 @@ Hard timeouts (locked O1):
 - Env overrides observed — `OURO_BOOT_TIMEOUT_GIT_SOFT=1` makes soft trip immediately.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 2b: Timeout wiring — Implementation
+### ✅ Unit 2b: Timeout wiring — Implementation
 **What**: Implement `runWithTimeouts` in `src/heart/timeouts.ts` (new file, repo-root-level helper). Reads env knobs `OURO_BOOT_TIMEOUT_GIT_SOFT`, `OURO_BOOT_TIMEOUT_GIT_HARD`, `OURO_BOOT_TIMEOUT_LIVECHECK`. Uses `AbortController` + `setTimeout`. Returns warnings array on soft trip; aborts on hard trip and sets `classification`.
 **Acceptance**: Tests PASS (green).
 
-### ⬜ Unit 2c: Timeout wiring — Coverage & refactor
+### ✅ Unit 2c: Timeout wiring — Coverage & refactor
 **What**: 100% coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
@@ -220,3 +220,4 @@ Hard timeouts (locked O1):
 - 2026-04-28 19:32 UTC Created as PR 3 of 4 in the sequential rollout (1 → 4 → 2 → 3). Depends on layer 1 PR being merged.
 - 2026-04-28 Unit 0 complete: layer 1 vocabulary on main at 3c8e2c38. `RollupStatus`/`DaemonStatus`/`computeDaemonRollup` confirmed exported. Branch `harness/layer-2-sync-probe` cut from main. Artifacts dir created.
 - 2026-04-28 Unit 1a-c complete: `classifySyncFailure` taxonomy implemented in `src/heart/sync-classification.ts`. 27 tests. 100% line/branch/function/statement coverage on the new file. `PendingSyncRecord.classification` widened additively to `SyncClassification` union; existing 26 sync.ts tests still green.
+- 2026-04-28 Unit 2a-c complete: `runWithTimeouts<T>` soft/hard timeout wrapper in `src/heart/timeouts.ts`. 13 tests. 100% line/branch/function/statement coverage. Honours `OURO_BOOT_TIMEOUT_GIT_SOFT/HARD` and `OURO_BOOT_TIMEOUT_LIVECHECK` env overrides via `envKey` opt-in. Cleans up timers on resolve/reject so no dangling refs block process exit.
