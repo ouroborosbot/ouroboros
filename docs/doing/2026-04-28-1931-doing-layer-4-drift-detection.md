@@ -72,7 +72,10 @@ This PR is **read-only**: it never writes to `state/providers.json` and never in
 **Acceptance**: `git log` shows layer 1 PR merged on the base branch. `grep -rn "DaemonStatus" src/heart/daemon/daemon-health.ts` returns the type definition.
 
 ### ⬜ Unit 1a: Drift comparator — Tests
-**What**: Write failing tests for `detectProviderBindingDrift(input: { agentName: string; agentJson: AgentJson; providersState: ProvidersState | null }): DriftFinding[]` in `src/__tests__/heart/daemon/drift-detection.test.ts` (new file). Cover every edge case from "Code Coverage Requirements".
+**What**: Write failing tests for `detectProviderBindingDrift(input: { agentName: string; agentJson: AgentConfig; providerState: ProviderState | null }): DriftFinding[]` in `src/__tests__/heart/daemon/drift-detection.test.ts` (new file). Cover every edge case from "Code Coverage Requirements".
+
+Use existing types: `AgentConfig` from `src/heart/identity.ts`; `ProviderState` from `src/heart/provider-state.ts:27`. Use `readProviderState(agentRoot)` (`provider-state.ts:156`) for I/O — it returns `ProviderStateReadResult` (a discriminated union — handle the `null` case as "no observed binding for this agent").
+
 **Output shape**:
 ```ts
 interface DriftFinding {
@@ -97,11 +100,11 @@ interface DriftFinding {
 **Acceptance**: Coverage 100%. Tests green.
 
 ### ⬜ Unit 2a: Drift loader — Tests
-**What**: Write failing tests for `loadDriftInputsForAgent(bundleRoot: string, agentName: string): { agentJson: AgentJson; providersState: ProvidersState | null }` in `src/__tests__/heart/daemon/drift-loader.test.ts`. Cover: missing `state/providers.json`, malformed `state/providers.json`, missing `agent.json`, malformed `agent.json` (these last two should throw — caller decides whether to swallow), legacy/new key handling.
+**What**: Write failing tests for `loadDriftInputsForAgent(bundleRoot: string, agentName: string): { agentJson: AgentConfig; providerState: ProviderState | null }` in `src/__tests__/heart/daemon/drift-loader.test.ts`. Cover: missing `state/providers.json` (use `readProviderState` which returns `ProviderStateReadResult` — map the absent/error cases to null), malformed `state/providers.json`, missing `agent.json`, malformed `agent.json` (these last two should throw — caller decides whether to swallow), legacy `humanFacing/agentFacing` keys handled by `normalizeProviderLane`, new `outward/inner` keys handled.
 **Acceptance**: Tests exist and FAIL (red).
 
 ### ⬜ Unit 2b: Drift loader — Implementation
-**What**: Implement `loadDriftInputsForAgent` in `src/heart/daemon/drift-detection.ts` (same file). Reads files; never writes.
+**What**: Implement `loadDriftInputsForAgent` in `src/heart/daemon/drift-detection.ts` (same file). Use `readProviderState(agentRoot)` from `provider-state.ts:156` for the observed-state read. Use the existing `agent.json` reader path (`agent-config-check.ts` or `agent-discovery.ts` already have one — pick the most appropriate; do not reinvent). Reads files; never writes.
 **Acceptance**: Tests PASS (green).
 
 ### ⬜ Unit 2c: Drift loader — Coverage & refactor
@@ -164,9 +167,13 @@ Place in `src/__tests__/heart/daemon/drift-rollup.test.ts` and extend `inner-sta
 
 ## Reference: load-bearing source paths
 
-- `src/heart/provider-binding-resolver.ts` (lines 64-67 for `EffectiveProviderReadiness`; lines 248-279 for `staleReadiness("provider-model-changed", ...)` — this is the existing scaffold to populate)
+- `src/heart/provider-binding-resolver.ts:64-67` (`EffectiveProviderReadiness`; `reason` enum already includes `provider-model-changed` and `credential-revision-changed`)
+- `src/heart/provider-binding-resolver.ts:246-285` (`staleReadiness` already used in production code at line 277 when `input.readiness.provider !== input.provider || input.readiness.model !== input.model`. This is a different comparison than Layer 4's intent-vs-observed; Layer 4 does NOT modify the existing `resolveReadiness` flow. Layer 4 is a SEPARATE diagnostic pass that emits its own `DriftFinding[]`.)
 - `src/heart/provider-binding-resolver.ts` (`normalizeProviderLane` — handles legacy `humanFacing`/`agentFacing` ↔ new `outward`/`inner`)
-- `src/heart/daemon/agent-config-check.ts` (`checkAgentConfigWithProviderHealth` — entry point for per-agent boot validation)
+- `src/heart/provider-state.ts:27` (`ProviderState` — the on-disk shape of `state/providers.json`)
+- `src/heart/provider-state.ts:114` (`validateProviderState` — use this when reading)
+- `src/heart/provider-state.ts:152-156` (`getProviderStatePath`, `readProviderState`)
+- `src/heart/daemon/agent-config-check.ts` (`checkAgentConfigWithProviderHealth` — entry point for per-agent boot validation; Layer 4 hooks here)
 - `src/heart/daemon/agent-discovery.ts` (`listEnabledBundleAgents`)
 - `src/heart/daemon/daemon-health.ts` (`DaemonStatus`, `computeDaemonRollup` from layer 1)
 - `src/heart/daemon/inner-status.ts` (rendering — drift advisory display)

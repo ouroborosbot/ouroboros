@@ -15,9 +15,15 @@
 
 ## Objective
 
-Replace today's overloaded "degraded" daemon-wide rollup signal — set whenever any non-empty `degradedComponents[]` exists in `daemon-entry.ts:183-217`'s `recordRecoverableBootstrapFailure` — with the locked five-state vocabulary: `healthy` / `partial` / `degraded` / `safe-mode` / `down`.
+Replace today's binary `"degraded" | "ok"` daemon-wide rollup — written at `daemon-entry.ts:164` (`status: degraded.length > 0 ? "degraded" : "ok"`) — with the locked five-state vocabulary: `healthy` / `partial` / `degraded` / `safe-mode` / `down`.
 
-The per-agent live-check loop in `cli-exec.ts:287` is already try/catch-isolated. **Do NOT redesign that loop.** This PR changes how its output rolls up into the daemon-wide status field.
+The current rollup merges two sources into one `degraded[]` array:
+1. `degradedComponents[]` — written by `recordRecoverableBootstrapFailure` (`daemon-entry.ts:183-217`) for bootstrap-time failures.
+2. `agentDegradedComponents[]` — derived from `processManager.listAgentSnapshots()` for agents whose `status !== "running"`.
+
+Today the rollup is "any entry in either source promotes daemon to `degraded`." This is the slugger-symptom: one sick agent tips the whole harness to `degraded`. The fix is to compute a richer rollup that distinguishes "zero agents serving" (genuinely `degraded`) from "some agents unhealthy, others serving" (`partial`).
+
+The per-agent live-check loop in `cli-exec.ts:287` is already try/catch-isolated. **Do NOT redesign that loop.** This PR changes how the output of `processManager.listAgentSnapshots()` + `degradedComponents[]` roll up into the daemon-wide `status` field at `daemon-entry.ts:163-180`'s `buildDaemonHealthState`.
 
 After this PR: `degraded` means "zero enabled agents serving" (genuinely no working agents), not "any one agent is unhealthy."
 
@@ -117,7 +123,11 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **Acceptance**: Tests exist and FAIL (red).
 
 ### ⬜ Unit 3b: Wire rollup into `daemon-entry.ts` — Implementation
-**What**: Replace the current overloaded rollup logic in `daemon-entry.ts` (the writer side reading `degradedComponents[]` to set the daemon-wide status). Wire `computeDaemonRollup` as the single decision point. Keep `recordRecoverableBootstrapFailure` (line 183-217) as-is — it still records into `degradedComponents[]`; only the rollup interpretation changes.
+**What**:
+- In `buildDaemonHealthState()` at `daemon-entry.ts:143-181`, replace the literal `status: degraded.length > 0 ? "degraded" : "ok"` at line 164 with a call to `computeDaemonRollup({ snapshots, bootstrapDegraded: degradedComponents, safeMode: ... })`.
+- Keep `recordRecoverableBootstrapFailure` (line 183-217) as-is — it still records into `degradedComponents[]`; only the rollup interpretation changes.
+- Keep `agentDegradedComponents` derivation as-is — `computeDaemonRollup` reads `snapshots` directly and applies its own logic.
+- Note: today's rollup includes both bootstrap-degraded and agent-snapshot-derived entries in the unified `degraded[]` field of `DaemonHealthState`. Preserve that field for backwards-compatible inspection (consumers may still read it). The `status` field is what changes meaning.
 **Acceptance**: Tests from 3a now PASS (green). Existing daemon-bootstrap tests (`serpentguide-bootstrap.test.ts` and similar) still pass.
 
 ### ⬜ Unit 3c: Wire rollup into `daemon-entry.ts` — Coverage & refactor
@@ -165,7 +175,9 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 ## Reference: load-bearing source paths
 
 - `src/heart/daemon/daemon-health.ts` (lines 30-40 for `DaemonHealthState`)
-- `src/heart/daemon/daemon-entry.ts` (lines 141, 159, 183-217, 285-296 for `degradedComponents[]` and `recordRecoverableBootstrapFailure`)
+- `src/heart/daemon/daemon-entry.ts:143-181` (`buildDaemonHealthState` — the rollup writer; line 164 is the literal `status: degraded.length > 0 ? "degraded" : "ok"` that this PR replaces)
+- `src/heart/daemon/daemon-entry.ts:141` (`degradedComponents[]` declaration)
+- `src/heart/daemon/daemon-entry.ts:183-217` (`recordRecoverableBootstrapFailure` — DO NOT MODIFY, only the rollup interpretation of its output changes)
 - `src/heart/daemon/cli-exec.ts:287` (per-agent live-check loop — DO NOT MODIFY in this PR)
 - `src/heart/daemon/inner-status.ts` (consumer)
 - `src/heart/daemon/startup-tui.ts` (consumer)

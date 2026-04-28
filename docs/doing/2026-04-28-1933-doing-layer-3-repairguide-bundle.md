@@ -28,13 +28,20 @@ Ship four distinct things in a single coherent PR (because they all trade in the
 
 ## Activation contract (LOCKED — O4)
 
-RepairGuide repair fires when:
-- `untypedDegraded.length > 0` (any agent has an untyped/unclassified degraded finding) **OR**
-- `typedIssues >= 3` (three or more typed issues across the inventory).
+The existing code already partitions degraded findings into typed vs untyped at `cli-exec.ts:6693-6694`:
+```ts
+const typedDegraded   = daemonResult.stability.degraded.filter((entry) =>  isKnownReadinessIssue(entry.issue))
+const untypedDegraded = daemonResult.stability.degraded.filter((entry) => !isKnownReadinessIssue(entry.issue))
+```
+And today's `runAgenticRepair` is gated at `cli-exec.ts:6706` on `untypedDegraded.length > 0`.
+
+**This PR extends that gate to**: fire when `untypedDegraded.length > 0` **OR** `typedDegraded.length >= 3`.
 
 Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-needed) from firing on every boot.
 
 `--no-repair` flag (`cli-parse.ts:1435`, `cli-exec.ts:6621,6680`) is the existing escape hatch. NO new env knob.
+
+**Naming**: the doing doc occasionally uses the term `typedIssues` for ergonomics. The actual existing variable is `typedDegraded`. Wherever the activation function refers to "typed issue count," it means `typedDegraded.length`.
 
 ## Completion Criteria
 
@@ -212,16 +219,16 @@ interface RepairGuideContent {
 **Acceptance**: Coverage 100%. Tests green.
 
 ### ⬜ Unit 5a: Activation contract — Tests
-**What**: Write failing tests for `shouldFireRepairGuide(input: { untypedDegraded: UntypedFinding[]; typedIssues: TypedIssue[]; noRepair: boolean }): boolean` in `src/__tests__/heart/daemon/repair-guide-activation.test.ts` (new file).
+**What**: Write failing tests for `shouldFireRepairGuide(input: { untypedDegraded: DegradedAgent[]; typedDegraded: DegradedAgent[]; noRepair: boolean }): boolean` in `src/__tests__/heart/daemon/repair-guide-activation.test.ts` (new file). Use the existing `DegradedAgent` type from `cli-exec.ts` for the input shape so the function plugs in cleanly at the existing call site.
 **Test cases**:
 - `noRepair: true` → false unconditionally.
-- `untypedDegraded.length > 0` → true.
-- `typedIssues.length === 0` → false.
-- `typedIssues.length === 1` → false.
-- `typedIssues.length === 2` → false (threshold is 3, not 2 — this is the lock).
-- `typedIssues.length === 3` → true.
-- `typedIssues.length === 5` → true.
-- `untypedDegraded.length === 0 && typedIssues.length === 2 && noRepair: false` → false (the canonical "common pair" case from the lock — vault-locked + provider-auth-needed).
+- `untypedDegraded.length > 0` → true (matches today's behavior — preserved).
+- `typedDegraded.length === 0` → false.
+- `typedDegraded.length === 1` → false.
+- `typedDegraded.length === 2` → false (threshold is 3, not 2 — this is the lock; canonical "common pair" case from the lock — vault-locked + provider-auth-needed).
+- `typedDegraded.length === 3` → true.
+- `typedDegraded.length === 5` → true.
+- `untypedDegraded.length === 0 && typedDegraded.length === 2 && noRepair: false` → false.
 **Acceptance**: Tests exist and FAIL (red).
 
 ### ⬜ Unit 5b: Activation contract — Implementation
@@ -259,13 +266,12 @@ interface RepairGuideContent {
 **Acceptance**: Tests exist and FAIL (red).
 
 ### ⬜ Unit 7b: Wire RepairGuide — Implementation
-**What**: Modify the existing one-shot LLM diagnostic call in `agentic-repair.ts`:
-- Before the call, check `shouldFireRepairGuide`. If false, run the existing pre-RepairGuide flow (text-blob output unchanged).
-- If true, load RepairGuide content via `loadRepairGuideContent`. Prepend `psyche/SOUL.md` + `psyche/IDENTITY.md` + relevant skills (selected based on the finding mix — skills act as instructions for the LLM) to the system prompt.
-- Invoke the LLM call as today.
-- Pass output through `parseRepairProposals`. If actions extracted, hand them to `interactive-repair.ts` (existing surface). If only `fallbackBlob`, surface that as today.
-- Honor `--no-repair` (existing flag at `cli-parse.ts:1435` and `cli-exec.ts:6621,6680`).
-**Acceptance**: Tests from 7a PASS. Existing `agentic-repair` tests still pass.
+**What**:
+- Modify the gate at `cli-exec.ts:6706` from `if (untypedDegraded.length > 0)` to `if (shouldFireRepairGuide({ untypedDegraded, typedDegraded, noRepair: command.noRepair === true }))`. This is the single-line gate change that activates the new contract.
+- Inside the existing one-shot LLM diagnostic call in `agentic-repair.ts`, load RepairGuide content via `loadRepairGuideContent` and prepend `psyche/SOUL.md` + `psyche/IDENTITY.md` + relevant skills (selected based on the finding mix — skills act as instructions for the LLM) to the system prompt.
+- Pass `runAgenticRepair`'s output through `parseRepairProposals`. If actions extracted, hand them to `interactive-repair.ts` (existing surface). If only `fallbackBlob`, surface that as today.
+- Honor `--no-repair` — already encoded in the gate function via the `noRepair` arg.
+**Acceptance**: Tests from 7a PASS. Existing `agentic-repair` tests still pass. Existing `cli-exec.ts:6706` regression tests still pass.
 
 ### ⬜ Unit 7c: Wire RepairGuide — Coverage & refactor
 **What**: 100% coverage on changed lines.
