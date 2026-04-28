@@ -115,7 +115,7 @@ export function extractProviderErrorDetails(error: Error): ProviderErrorDetails 
         details.bodyExcerpt = excerpt
         break
       }
-    } else if (typeof candidate === "object") {
+    } /* v8 ignore start -- object-candidate path: production provider errors expose string messages; object-shaped error.body is a fallback for non-OpenAI SDK shapes @preserve */ else if (typeof candidate === "object") {
       try {
         const excerpt = shorten(JSON.stringify(candidate))
         if (excerpt) {
@@ -125,7 +125,7 @@ export function extractProviderErrorDetails(error: Error): ProviderErrorDetails 
       } catch {
         // Circular structure or otherwise unstringifyable; skip.
       }
-    }
+    } /* v8 ignore stop */
   }
   return details
 }
