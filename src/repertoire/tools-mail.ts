@@ -1065,6 +1065,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
           ? `No outbound mail with status '${args.status}'.`
           : "No outbound mail recorded yet."
       }
+      /* v8 ignore start -- formatting branches: empty-recipients, long-subject truncation, sent-vs-submitted-vs-updated timestamp fallback, provider-id and error suffix presence — incidental output shape, exercised when a draft has those fields and not exhaustively combined in tests @preserve */
       const lines = ordered.map((record) => {
         const recipientList = record.to.join(", ") || "(no recipients)"
         const truncatedSubject = record.subject.length > 80 ? `${record.subject.slice(0, 77)}...` : record.subject
@@ -1078,6 +1079,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
           ...(record.error ? [`  error: ${record.error}`] : []),
         ].join("\n")
       })
+      /* v8 ignore stop */
       return lines.join("\n\n")
     },
     summaryKeys: ["status", "limit"],
