@@ -178,9 +178,31 @@ The render layer reads enabled-agents count + per-agent statuses to pick the rig
 **What**: Verify 100% coverage on touched render paths.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 5: Sweep remaining call sites
-**What**: Walk the `status-callsites.md` map from Unit 0. For every call site not yet updated, update it to the new vocabulary. Most are reads (display only) — confirm each renders correctly. Any string-literal writes outside `daemon-entry.ts` / `computeDaemonRollup` are rule violations — file a follow-up issue and fix in this PR if trivial.
-**Acceptance**: Every entry in `status-callsites.md` is checked off. `grep -rn '"running"\|"degraded"\|"healthy"' src/heart/daemon/ src/heart/cli/` produces only references through the type system or in tests.
+### ⬜ Unit 5: Sweep remaining call sites — compiler-forced exhaustiveness
+**What**: Walk the `status-callsites.md` map from Unit 0. For every call site:
+1. Update to the new vocabulary using `RollupStatus` or `DaemonStatus` typed values — no string literals.
+2. **Every switch/match on a status value MUST be exhaustive with a `never`-typed default branch:**
+   ```ts
+   switch (status) {
+     case "healthy": return ...
+     case "partial":  return ...
+     case "degraded": return ...
+     case "safe-mode": return ...
+     case "down":      return ...   // only for DaemonStatus consumers
+     default: {
+       const _exhaustive: never = status
+       throw new Error(`unhandled daemon status: ${_exhaustive as string}`)
+     }
+   }
+   ```
+   The `never` cast at default forces a compile error if the union ever grows and a consumer isn't updated. **No `default` branch that returns a fallback value or coerces unknown values to a "best-guess" status.** That kind of permissiveness is exactly how the old "ok | degraded" semantics will leak through.
+3. String-literal writes outside `daemon-entry.ts` / `computeDaemonRollup` are rule violations — file a follow-up issue and fix in this PR if trivial.
+
+**Acceptance**:
+- Every entry in `status-callsites.md` is checked off.
+- `grep -rn '"running"\|"degraded"\|"healthy"\|"ok"' src/heart/daemon/ src/heart/cli/` produces only references through the type system, in tests, or inside the new `computeDaemonRollup` body itself.
+- `grep -rn 'default:.*return\|default:.*=>' src/heart/daemon/inner-status.ts src/heart/daemon/startup-tui.ts src/heart/daemon/cli-render.ts` shows zero non-`never`-typed default branches in status-rendering paths.
+- A deliberate "add a hypothetical 6th state" experiment confirms `tsc --noEmit` errors at every consumer (test artifact: a comment in `status-callsites.md` describing the experiment + which files errored).
 
 ### ⬜ Unit 6: Full-suite green + PR description
 **What**:
@@ -219,3 +241,5 @@ The render layer reads enabled-agents count + per-agent statuses to pick the rig
   - `computeDaemonRollup` returns `RollupStatus`, not `DaemonStatus` — `down` is set by the daemon-entry caller path before the rollup function is reachable. The function is post-inventory and cannot represent pre-inventory failure.
   - Pinned input contract: `enabledAgents` is pre-filtered by the caller; the function does not re-filter.
   - Render-layer copy split for `degraded` ("no enabled agents configured" vs "all enabled agents failed") so the same status surfaces distinct UX without inflating the type union.
+- 2026-04-28 20:10 UTC Second ouroboros review surfaced one more refinement, applied:
+  - Unit 5 strengthened from "grep-based sweep" to "compiler-forced exhaustiveness." Every switch on a status value MUST have a `never`-typed default branch. No fallback `default:` returning a guess value. A deliberate add-a-hypothetical-state experiment is required to prove every consumer compile-errors when the union grows.
