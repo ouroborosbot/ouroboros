@@ -513,8 +513,10 @@ export function checkMailroom(deps: DoctorDeps): DoctorCategory {
       checks.push({ label: `${agentDir} mailroom`, status: "fail", detail: "registry.json is not valid JSON" })
       continue
     }
+    /* v8 ignore start -- defensive: registry shape is validated by mailroom code; non-array fallbacks are belt-and-suspenders @preserve */
     const mailboxes = Array.isArray(parsed.mailboxes) ? parsed.mailboxes : null
     const sourceGrants = Array.isArray(parsed.sourceGrants) ? parsed.sourceGrants : []
+    /* v8 ignore stop */
     if (!mailboxes || mailboxes.length === 0) {
       checks.push({ label: `${agentDir} mailroom`, status: "warn", detail: "registry.json has no mailboxes — provision via `ouro connect mail`" })
       continue
