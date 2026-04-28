@@ -2,7 +2,7 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.515",
+      "version": "0.1.0-alpha.516",
       "changes": [
         "`ouro up` now prints the current runtime version in the update-check phase before asking npm for newer bits, so a stalled registry or update path no longer hides what is actually running.",
         "Production `ouro up` starts or refreshes the daemon before provider health checks and repair prompts. Broken credentials for one agent are reported as degraded provider state after the daemon is answering instead of preventing every agent from coming online.",
@@ -12,7 +12,9 @@
         "`ouro up` now times out unresolved daemon startup polling instead of spinning forever, and daemon worker startup ignores duplicate start attempts while a provider/config check is already in flight. Stopping during a pending config check no longer lets that worker spawn afterward.",
         "BlueBubbles self-handle filtering is now group-echo scoped and bypasses known non-self friends, so a stale `ownHandles` entry cannot make real Ari messages disappear from Slugger's iMessage turn loop.",
         "`ouro up` now trusts daemon-published provider readiness after startup instead of doing a second foreground vault read, so a slow Bitwarden provider check cannot freeze the command or report a false auth prompt after the daemon is already healthy.",
-        "Bitwarden vault login/unlock now passes the saved vault unlock secret through `bw --passwordenv` instead of process arguments, so the secret does not appear in `ps` output while `ouro up` or a sense startup is unlocking the agent vault."
+        "Bitwarden vault login/unlock now passes the saved vault unlock secret through `bw --passwordenv` instead of process arguments, so the secret does not appear in `ps` output while `ouro up` or a sense startup is unlocking the agent vault.",
+        "Daemon health recovery no longer cancels an agent whose config check is still in flight, so a slow provider/vault check cannot leave the inner-dialog worker stopped after `ouro up`.",
+        "`ouro up` now keeps its startup poll finite while allowing enough time for bounded Bitwarden retry paths before labeling an otherwise-progressing worker as timed out."
       ]
     },
     {

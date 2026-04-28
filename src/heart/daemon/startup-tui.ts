@@ -20,7 +20,7 @@ import { renderOverwriteFrame } from "./terminal-ui"
 const SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 const STABILITY_THRESHOLD_MS = 5_000
 const POLL_INTERVAL_MS = 500
-const STARTUP_POLL_TIMEOUT_MS = 60_000
+const STARTUP_POLL_TIMEOUT_MS = 180_000
 
 // ── ANSI helpers ──
 

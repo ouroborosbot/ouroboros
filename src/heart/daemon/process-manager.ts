@@ -386,6 +386,16 @@ export class DaemonProcessManager {
   }
 
   async restartAgent(agent: string): Promise<void> {
+    const state = this.requireAgent(agent)
+    if (state.startInFlight && !state.process) {
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_restart_deferred",
+        message: "managed agent restart skipped while startup is already in flight",
+        meta: { agent },
+      })
+      return
+    }
     await this.stopAgent(agent)
     await this.startAgent(agent)
   }

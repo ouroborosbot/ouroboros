@@ -222,6 +222,38 @@ describe("daemon process manager", () => {
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
   })
 
+  it("does not cancel a pending startup when restartAgent is called during config check", async () => {
+    const deferred = createDeferred<{ ok: boolean }>()
+    const configCheck = vi.fn(() => deferred.promise)
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck,
+      statusWriter: () => {},
+    })
+
+    const start = manager.startAgent("slugger")
+    await Promise.resolve()
+    await manager.restartAgent("slugger")
+
+    expect(configCheck).toHaveBeenCalledTimes(1)
+    expect(spawn).not.toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("starting")
+
+    deferred.resolve({ ok: true })
+    await start
+
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
+  })
+
   it("does not spawn after stopAgent is called during a pending config check", async () => {
     const deferred = createDeferred<{ ok: boolean }>()
     const configCheck = vi.fn(() => deferred.promise)
