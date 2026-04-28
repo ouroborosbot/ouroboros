@@ -623,7 +623,15 @@ describe("ouro up: interactive repair wiring", () => {
       })
       .mockResolvedValueOnce({
         ok: false,
-        error: "other-agent provider failed without a repair hint",
+        error: "outward provider openai-codex model gpt-5.5 has no credentials in other-agent's vault.",
+        fix: "Run 'ouro auth --agent other-agent --provider openai-codex' to authenticate this machine.",
+        issue: providerCredentialMissingIssue({
+          agentName: "other-agent",
+          lane: "outward",
+          provider: "openai-codex",
+          model: "gpt-5.5",
+          credentialPath: "vault:other-agent:providers/*",
+        }),
       })
       .mockResolvedValueOnce({ ok: true })
     providerCredentialMocks.refreshProviderCredentialPool.mockResolvedValue({
@@ -644,7 +652,7 @@ describe("ouro up: interactive repair wiring", () => {
     const writeStdout = vi.fn()
     const promptInput = vi.fn()
       .mockResolvedValueOnce("1")
-      .mockResolvedValueOnce("1")
+      .mockResolvedValueOnce("3")
     const runAuthFlow = vi.fn(async ({ agentName, provider }: { agentName: string; provider: string }) => ({
       message: `authenticated ${agentName} with ${provider}`,
     }))
@@ -665,7 +673,8 @@ describe("ouro up: interactive repair wiring", () => {
     const output = writeStdout.mock.calls.map((call: any[]) => call[0]).join("\n")
     expect(output).toContain("authenticated test-agent with anthropic")
     expect(output).toContain("Still needs attention")
-    expect(output).toContain("other-agent: other-agent provider failed without a repair hint")
+    expect(output).toContain("other-agent: missing openai-codex credentials (outward, gpt-5.5)")
+    expect(output).toContain("source: vault:other-agent:providers/*")
     expect(result).toContain("daemon started")
   })
 

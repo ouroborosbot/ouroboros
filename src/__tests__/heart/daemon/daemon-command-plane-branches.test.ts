@@ -113,6 +113,91 @@ describe("daemon command plane branches", () => {
     await daemon.stop()
   })
 
+  it("uses nonblocking autostart trigger hooks when managers provide them", async () => {
+    const socketPath = tmpSocketPath("daemon-start-trigger-hooks")
+    const { daemon, processManager, senseManager } = make(socketPath)
+    ;(processManager as any).triggerAutoStartAgents = vi.fn()
+    ;(senseManager as any).triggerAutoStartSenses = vi.fn()
+
+    await daemon.start()
+
+    expect((processManager as any).triggerAutoStartAgents).toHaveBeenCalledTimes(1)
+    expect((senseManager as any).triggerAutoStartSenses).toHaveBeenCalledTimes(1)
+    expect(processManager.startAutoStartAgents).not.toHaveBeenCalled()
+    expect(senseManager.startAutoStartSenses).not.toHaveBeenCalled()
+
+    await daemon.stop()
+  })
+
+  it("contains fallback autostart errors after opening the command socket", async () => {
+    const firstSocketPath = tmpSocketPath("daemon-start-autostart-error-a")
+    const first = make(firstSocketPath)
+    first.processManager.startAutoStartAgents.mockRejectedValueOnce(new Error("agent start boom"))
+    first.senseManager.startAutoStartSenses.mockRejectedValueOnce("sense start raw")
+
+    try {
+      await first.daemon.start()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(first.processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    } finally {
+      await first.daemon.stop()
+    }
+
+    const secondSocketPath = tmpSocketPath("daemon-start-autostart-error-b")
+    const second = make(secondSocketPath)
+    second.processManager.startAutoStartAgents.mockRejectedValueOnce("agent start raw")
+    second.senseManager.startAutoStartSenses.mockRejectedValueOnce(new Error("sense start boom"))
+
+    try {
+      await second.daemon.start()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(second.processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    } finally {
+      await second.daemon.stop()
+    }
+  })
+
+  it("starts cleanly when no sense manager is installed", async () => {
+    const socketPath = tmpSocketPath("daemon-start-no-sense-manager")
+    const processManager = {
+      listAgentSnapshots: vi.fn(() => []),
+      startAutoStartAgents: vi.fn(async () => undefined),
+      stopAll: vi.fn(async () => undefined),
+      startAgent: vi.fn(async () => undefined),
+      sendToAgent: vi.fn(),
+    }
+    const daemon = new OuroDaemon({
+      socketPath,
+      processManager,
+      scheduler: {
+        listJobs: vi.fn(() => []),
+        triggerJob: vi.fn(async () => ({ ok: true, message: "triggered" })),
+        reconcile: vi.fn(async () => undefined),
+        recordTaskRun: vi.fn(async () => undefined),
+      },
+      healthMonitor: {
+        runChecks: vi.fn(async () => []),
+      },
+      router: {
+        send: vi.fn(async () => ({ id: "msg-1", queuedAt: "2026-03-05T23:00:00.000Z" })),
+        pollInbox: vi.fn(() => []),
+      },
+      outlookServerFactory: vi.fn(async () => ({
+        url: "http://127.0.0.1:6876",
+        stop: async () => undefined,
+      })),
+    } as any)
+
+    try {
+      await daemon.start()
+      expect(processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    } finally {
+      await daemon.stop()
+    }
+  })
+
   it("returns structured status data with separate senses and workers", async () => {
     const socketPath = tmpSocketPath("daemon-status")
     // Use an empty bundlesRoot so listBundleSyncRows returns [] (no leak to real ~/AgentBundles)

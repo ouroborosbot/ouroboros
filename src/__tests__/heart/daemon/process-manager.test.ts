@@ -65,6 +65,69 @@ describe("daemon process manager", () => {
     expect(manager.getAgentSnapshot("ouroboros")?.status).toBe("stopped")
   })
 
+  it("triggers autoStart agents without awaiting worker startup", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    manager.triggerAutoStartAgents()
+    await Promise.resolve()
+
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
+    expect(manager.getAgentSnapshot("ouroboros")?.status).toBe("stopped")
+  })
+
+  it("contains thrown trigger startup failures per autoStart agent", async () => {
+    const onSnapshotChange = vi.fn()
+    spawn
+      .mockImplementationOnce(() => {
+        throw new Error("spawn exploded")
+      })
+      .mockImplementationOnce(() => {
+        throw "raw spawn failure"
+      })
+    now.mockReturnValue(1_000)
+
+    const first = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      statusWriter: () => {},
+      onSnapshotChange,
+    })
+    const second = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      statusWriter: () => {},
+      onSnapshotChange,
+    })
+
+    first.triggerAutoStartAgents()
+    second.triggerAutoStartAgents()
+    await Promise.resolve()
+
+    expect(first.getAgentSnapshot("slugger")?.status).toBe("crashed")
+    expect(first.getAgentSnapshot("slugger")?.errorReason).toContain("spawn exploded")
+    expect(second.getAgentSnapshot("slugger")?.status).toBe("crashed")
+    expect(second.getAgentSnapshot("slugger")?.errorReason).toContain("raw spawn failure")
+    expect(first.getAgentSnapshot("ouroboros")?.status).toBe("stopped")
+    expect(onSnapshotChange).toHaveBeenCalled()
+  })
+
   it("notifies onSnapshotChange after startAgent succeeds", async () => {
     const child = new MockChild()
     spawn.mockReturnValue(child)
@@ -117,6 +180,28 @@ describe("daemon process manager", () => {
     expect(snap?.status).toBe("crashed")
     expect(snap?.errorReason).toBe("missing github-copilot creds")
     expect(snap?.fixHint).toContain("ouro auth")
+  })
+
+  it("records thrown string config check failures as agent-local crashes", async () => {
+    const configCheck = vi.fn().mockRejectedValue("raw config failure")
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck,
+      statusWriter: () => {},
+    })
+
+    await manager.startAgent("slugger")
+
+    expect(spawn).not.toHaveBeenCalled()
+    const snap = manager.getAgentSnapshot("slugger")
+    expect(snap?.status).toBe("crashed")
+    expect(snap?.errorReason).toContain("raw config failure")
+    expect(manager.getAgentSnapshot("ouroboros")?.status).toBe("stopped")
   })
 
   it("turns thrown config checks into per-agent crashed snapshots", async () => {

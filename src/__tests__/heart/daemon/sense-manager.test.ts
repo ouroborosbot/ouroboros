@@ -56,6 +56,66 @@ describe("daemon sense manager", () => {
     expect(processManager.stopAll).toHaveBeenCalledTimes(1)
   })
 
+  it("uses the process-manager trigger hook for nonblocking sense autostart", async () => {
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-bundles-"))
+    const processManager = {
+      startAutoStartAgents: vi.fn(async () => undefined),
+      triggerAutoStartAgents: vi.fn(),
+      stopAll: vi.fn(async () => undefined),
+      listAgentSnapshots: vi.fn(() => []),
+    }
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    const manager = new DaemonSenseManager({
+      agents: ["slugger"],
+      bundlesRoot,
+      processManager,
+    })
+
+    manager.triggerAutoStartSenses()
+
+    expect(processManager.triggerAutoStartAgents).toHaveBeenCalledTimes(1)
+    expect(processManager.startAutoStartAgents).not.toHaveBeenCalled()
+  })
+
+  it("contains fallback sense autostart errors", async () => {
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-bundles-"))
+    const firstProcessManager = {
+      startAutoStartAgents: vi.fn(async () => {
+        throw new Error("sense worker start boom")
+      }),
+      stopAll: vi.fn(async () => undefined),
+      listAgentSnapshots: vi.fn(() => []),
+    }
+    const secondProcessManager = {
+      startAutoStartAgents: vi.fn(async () => {
+        throw "sense worker start raw"
+      }),
+      stopAll: vi.fn(async () => undefined),
+      listAgentSnapshots: vi.fn(() => []),
+    }
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    const first = new DaemonSenseManager({
+      agents: ["slugger"],
+      bundlesRoot,
+      processManager: firstProcessManager,
+    })
+    const second = new DaemonSenseManager({
+      agents: ["slugger"],
+      bundlesRoot,
+      processManager: secondProcessManager,
+    })
+
+    first.triggerAutoStartSenses()
+    second.triggerAutoStartSenses()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(firstProcessManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    expect(secondProcessManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+  })
+
   it("reports needs_config for Teams and not_attached for local BlueBubbles when vault runtime/config is missing", async () => {
     const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-bundles-"))
     writeAgentJson(bundlesRoot, "slugger", {
