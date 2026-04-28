@@ -1,8 +1,9 @@
 # Planning: Four-Layer Hardening of the Daemon Agent-Loading Path + RepairGuide Library Bundle
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-04-28 19:14 UTC
 **Ideation**: ./2026-04-28-1830-ideation-harness-hardening-and-repair-agent.md
+**Open questions**: ALL RESOLVED (operator + ouroboros joint sign-off, 2026-04-28 19:30 UTC). See "Open Questions" section — each marked RESOLVED with locked answer.
 
 ## Goal
 
@@ -22,15 +23,26 @@ Make the ouroboros daemon's `ouro up` path resilient to a single bad agent bundl
 - Wire the existing `preTurnPull` from `src/heart/sync.ts` into `ouro up`'s per-agent loop, gated on each bundle's `sync.enabled: true` (read from `agent-discovery.ts`'s `listBundleSyncRows`).
 - Run the sync probe BEFORE per-agent live-checks, so live-check reads the post-pull `agent.json` if a pull succeeded.
 - Surface (do not crash) on: 404 remote, no network, dirty working tree, non-fast-forward, merge conflict, auth failure (distinguished from genuine 404).
-- Hard timeout on every `git fetch`/`git pull` invocation (concrete value is open question O1).
+- Hard timeouts on every `git fetch`/`git pull` invocation (O1 RESOLVED): 8s soft (warn) / 15s hard (cut). `AbortSignal` threaded end-to-end so a stuck op cannot deadlock boot. Env override knobs: `OURO_BOOT_TIMEOUT_GIT_SOFT`, `OURO_BOOT_TIMEOUT_GIT_HARD` (env is override, not the design centre).
 - Never touch `state/` (gitignored, per-machine).
 
 **Layer 3 — `RepairGuide.ouro/` library bundle (NOT a real agent)**
 - Sibling directory to `SerpentGuide.ouro/` at the repo root. Same shape: ships with the repo, has `agent.json` with `enabled: false`, contains markdown content under `psyche/` and `skills/`.
 - Loaded as a *content source* by the existing `src/heart/daemon/agentic-repair.ts` pipeline. The pipeline already does one-shot LLM diagnostics during `ouro up` and already solves the chicken-and-egg via `discoverWorkingProvider()` — RepairGuide content rides in on top of that pipeline.
-- RepairGuide must NOT be picked up by `agent-discovery.ts` as a regular agent. Concretely: confirmed absent from `listEnabledBundleAgents`, `ouro status`, daemon process spawn, and the `degraded[]` rollup. Mechanism is open question O3 (filter by `enabled: false` like SerpentGuide does today, or stronger "library bundle never instantiated" signal).
+- RepairGuide must NOT be picked up by `agent-discovery.ts` as a regular agent. Concretely: confirmed absent from `listEnabledBundleAgents`, `ouro status`, daemon process spawn, and the `degraded[]` rollup. Mechanism (O3 RESOLVED): explicit `"kind": "library"` field in bundle's `agent.json`. `agent-discovery.ts` skips bundles where `kind === "library"`. SerpentGuide.ouro/agent.json gets `"kind": "library"` retroactively; RepairGuide ships with it from day one. Reasoning: don't conflate "agent off" (transient `enabled: false`) with "this isn't an agent" (architectural).
 - RepairGuide's outputs flow through the existing typed `RepairAction` catalog in `readiness-repair.ts` (`vault-unlock`, `provider-auth`, `provider-use`, etc.). v1 introduces NO new action kinds.
 - v1 has zero tool surface for the LLM. The persona produces structured proposals; the harness validates each against the typed catalog; unknown kinds drop with a warning. Fallback path on unparseable output: today's text-blob behavior in `agentic-repair.ts`.
+- **Layer 3 v1 file shape (O5 RESOLVED)**: Bundle (`RepairGuide.ouro/`) + loader integrated directly into `src/heart/daemon/agentic-repair.ts`. NO standalone `repair-persona.ts` module unless the structured-output validator grows large enough on its own to deserve a separate file (judgment call during implementation; default = inline).
+- **RepairGuide bundle contents (O2 RESOLVED — five skills, not four)**:
+  - `RepairGuide.ouro/agent.json` — `enabled: false`, `kind: "library"`, no provider config (it doesn't run as an agent).
+  - `RepairGuide.ouro/psyche/SOUL.md` — orientation: structured-proposal generator, never an actor.
+  - `RepairGuide.ouro/psyche/IDENTITY.md` — diagnostician persona.
+  - `RepairGuide.ouro/skills/diagnose-bootstrap-drift.md` — `agent.json` ↔ `state/providers.json` mismatch.
+  - `RepairGuide.ouro/skills/diagnose-broken-remote.md` — 404, unreachable origin, auth-context errors.
+  - `RepairGuide.ouro/skills/diagnose-sync-blocked.md` — merge conflicts, dirty working tree, non-FF (NEW; separate from broken-remote so git failures don't junk-drawer together).
+  - `RepairGuide.ouro/skills/diagnose-vault-expired.md` — credential expiry.
+  - `RepairGuide.ouro/skills/diagnose-stacked-typed-issues.md` — compound situations / catch-all.
+- **Layer 3 activation contract (O4 RESOLVED)**: Fire RepairGuide repair when `untypedDegraded.length > 0` OR `typedIssues >= 3` (threshold bumped from the ideator's `>= 2` to prevent common pairs like vault-locked + provider-auth-needed from firing on every boot). NO new env flag for repair-agent-on/off — the existing `--no-repair` flag (`cli-parse.ts:1435`, `cli-exec.ts:6621,6680`) is the escape hatch.
 
 **Layer 3a — remove `~/AgentBundles/` override fallback for library bundles**
 - Modify `getSpecialistIdentitySourceDir()` in `src/heart/hatch/hatch-specialist.ts` to remove the `~/AgentBundles/SerpentGuide.ouro/` override path. In-repo is the only source.
@@ -44,8 +56,12 @@ Make the ouroboros daemon's `ouro up` path resilient to a single bad agent bundl
 - Read side tolerates legacy `humanFacing`/`agentFacing` keys; write side emits `outward`/`inner`.
 
 **Cross-cutting**
-- Hard timeout/time-bound semantics on every external operation in `ouro up` (`git fetch`, `git pull`, provider live-checks). Concrete values resolved via open question O1.
-- Test fixture reproducing slugger-shaped compound failure (bootstrap drift + expired cred + 404 remote + dirty tree). Pattern follows `src/__tests__/heart/daemon/serpentguide-bootstrap.test.ts`.
+- Hard timeouts on every external op in `ouro up` (O1 RESOLVED):
+  - `git fetch` / `git pull`: 8s soft (warn) / 15s hard (cut).
+  - Provider live-check: 10s.
+  - `AbortSignal` threaded end-to-end through every external call so a single stuck op cannot deadlock boot.
+  - Env override knobs (overrides only — env is not the design centre): `OURO_BOOT_TIMEOUT_GIT_SOFT`, `OURO_BOOT_TIMEOUT_GIT_HARD`, `OURO_BOOT_TIMEOUT_LIVECHECK`.
+- Test fixture reproducing slugger-shaped compound failure (O6 RESOLVED): single compound integration fixture mirroring today's slugger incident — bad bootstrap state + expired creds + broken remote + drift between `agent.json` and `state/providers.json`. This is the primary acceptance test. Per-condition unit tests cover taxonomy/rollup classification logic. Precedent: `src/__tests__/heart/daemon/serpentguide-bootstrap.test.ts`.
 
 ### Out of Scope
 
@@ -89,14 +105,26 @@ Make the ouroboros daemon's `ouro up` path resilient to a single bad agent bundl
 
 ## Open Questions
 
-- [ ] **O1: Concrete timeout values.** What are the time bounds on `git fetch`, `git pull`, and provider live-checks during `ouro up`? Need numbers (seconds), not vibes. Slugger's 404 remote case must time out cleanly; healthy remotes on slow connections must not false-positive. Suggest decision: `git fetch`/`git pull` 8s soft / 15s hard; live-check 10s. Operator to confirm or override.
-- [ ] **O2: RepairGuide skill enumeration.** What lives in `RepairGuide.ouro/psyche/` (identity / orientation content) vs `RepairGuide.ouro/skills/` (named recipes)? Ideator suggested skills like `diagnose-bootstrap-drift.md`, `diagnose-broken-remote.md`, `diagnose-vault-expired.md`, `diagnose-stacked-typed-issues.md`. Operator to confirm initial skill list and naming convention.
-- [ ] **O3: How is RepairGuide excluded from agent discovery?** Two options: (a) reuse SerpentGuide's `enabled: false` filter — works today but is implicit ("library bundles happen to be disabled"); (b) stronger explicit signal in `agent.json` like `"kind": "library"` or a sibling marker file. (b) is more honest about intent; (a) is zero-net-new-mechanism. Operator to choose.
-- [ ] **O4: Activation contract — when does layers 1/2/4 hand off to layer 3?** Sync-only? Live-check failures? Drift only? All three? Ideator recommended: layer 3 activates when `untypedDegraded.length > 0` OR any agent has ≥2 typed issues stacked. Operator to confirm or override the trigger condition.
-- [ ] **O5: v1 vs v2 scope split — what stays in v1 of the bundle?** The bundle decision (locked #4) supersedes the ideator's recommendation of an in-repo `repair-persona.ts` + `.md` prompt file. Confirm: v1 ships `RepairGuide.ouro/{agent.json, psyche/, skills/}` + a loader in `agentic-repair.ts` that reads them. No `repair-persona.ts` standalone module unless needed for parsing/validation. Operator to confirm.
-- [ ] **O6: Test strategy — fixture realism.** `serpentguide-bootstrap.test.ts` is the precedent. The slugger fixture needs: (a) bundle on disk with bootstrap drift, (b) mocked vault state with expired credential revision, (c) mocked git remote returning 404, (d) dirty working tree. Operator to confirm: build a single integration test fixture, or one fixture per condition + one compound? Recommend compound as primary acceptance signal + per-condition unit tests for classification logic.
-- [ ] **O7: Single PR or multiple PRs?** The four layers are coupled (rollup vocabulary touches everything; layer 3 consumes layers 1/2/4 outputs) but could ship sequentially: layer 1 (rollup) → layer 2 (sync probe) → layer 4 (drift) → layer 3 (RepairGuide). Sequential ships value earlier and reduces review surface; single PR avoids intermediate states where the rollup vocabulary is half-migrated. Operator to choose. Recommend sequential with hard ordering: 1 → 4 → 2 → 3 (rollup first; drift before sync because drift is read-only and sync mutates working tree; RepairGuide last because it consumes the others).
-- [ ] **O8: Layer 3a removal — any test fixture that exercises the `~/AgentBundles/` override path?** Need to verify before removal. If a test asserts the override is honored, that test changes too. Operator to confirm grep is clean.
+All eight open questions resolved 2026-04-28 19:30 UTC by joint operator + ouroboros review (operator hands-off; review authority delegated). Summarized below; full lock detail also embedded inline in the relevant Scope and Decisions Made sections.
+
+- [x] **O1 RESOLVED — Concrete timeout values.** `git fetch` / `git pull`: 8s soft (warn) / 15s hard (cut). Provider live-check: 10s. `AbortSignal` threaded end-to-end so a stuck op cannot deadlock boot. Env override knobs: `OURO_BOOT_TIMEOUT_GIT_SOFT`, `OURO_BOOT_TIMEOUT_GIT_HARD`, `OURO_BOOT_TIMEOUT_LIVECHECK` (overrides only; env is not the design centre).
+- [x] **O2 RESOLVED — RepairGuide bundle contents (FIVE skills, not four).** `psyche/SOUL.md` (orientation: structured-proposal generator, never an actor) + `psyche/IDENTITY.md` (diagnostician persona) + five skills: `diagnose-bootstrap-drift.md`, `diagnose-broken-remote.md`, `diagnose-sync-blocked.md` (NEW — split out from broken-remote so git failures don't junk-drawer together), `diagnose-vault-expired.md`, `diagnose-stacked-typed-issues.md`.
+- [x] **O3 RESOLVED — Library-bundle exclusion mechanism.** Add explicit `"kind": "library"` field to bundle's `agent.json`. Update `agent-discovery.ts` to skip bundles where `kind === "library"`. Set on SerpentGuide.ouro/agent.json retroactively; RepairGuide ships with it from day one. Reasoning: don't conflate "agent off" (transient `enabled: false`) with "this isn't an agent" (architectural). Today's slugger incident demonstrated the cost of overloaded semantics.
+- [x] **O4 RESOLVED — Layer 3 activation contract.** Fire RepairGuide repair when `untypedDegraded.length > 0` OR `typedIssues >= 3`. No new env flag for repair-on/off — the existing `--no-repair` flag (`cli-parse.ts:1435`, `cli-exec.ts:6621,6680`) is the escape hatch. Bumping the threshold from the ideator's `>= 2` prevents common pairs (vault-locked + provider-auth-needed) from firing on every boot.
+- [x] **O5 RESOLVED — v1 file shape.** Bundle (`RepairGuide.ouro/`) + loader integrated into `src/heart/daemon/agentic-repair.ts`. No standalone `repair-persona.ts` module unless the structured-output validator grows large enough on its own to deserve a separate file (judgment call during implementation; default = inline).
+- [x] **O6 RESOLVED — Test fixtures.** Compound integration fixture mirroring today's slugger incident (bad bootstrap state + expired creds + broken remote + drift between `agent.json` and `state/providers.json`) as the primary acceptance signal. Per-condition unit tests for taxonomy / rollup classification logic. Precedent: `src/__tests__/heart/daemon/serpentguide-bootstrap.test.ts`.
+- [x] **O7 RESOLVED — Sequential PRs, ordered: layer 1 → layer 4 → layer 2 → layer 3.** Reasoning:
+  - Layer 1 (rollup vocabulary fix in `daemon-entry.ts:183-217` + `daemon-health.ts`): establishes the new `healthy/partial/degraded/safe-mode/down` vocabulary that everything inherits.
+  - Layer 4 (drift detection, read-only): builds on layer 1's vocabulary to surface drift warnings; mutates nothing.
+  - Layer 2 (sync probe wiring `preTurnPull` into `ouro up`): consumes layer 1's vocabulary; first layer that mutates working trees.
+  - Layer 3 (RepairGuide bundle + `agentic-repair.ts` loader + `kind: library` exclusion + override-fallback removal): consumes outputs of all three preceding.
+- [x] **O8 RESOLVED — Override-path removal scope.** Five files touch `getSpecialistIdentitySourceDir()` or the `~/AgentBundles/SerpentGuide.ouro/` override fallback path:
+  - `src/heart/hatch/hatch-specialist.ts` — implementation; primary edit (remove the `userSource` branch).
+  - `src/heart/hatch/hatch-flow.ts` — transitive caller; may need update.
+  - `src/heart/daemon/cli-defaults.ts` — uses; comment at line 451 references the override; may need update.
+  - `src/__tests__/heart/hatch/hatch-specialist.test.ts` — has explicit override-path tests at lines 78-92 (expects override to win when present, falls back when absent). These tests change.
+  - `src/__tests__/heart/hatch/hatch-flow.test.ts` — transitive test; uses `~/AgentBundles/SerpentGuide.ouro/` paths in fixtures.
+  - Override-removal lands as part of layer 3's PR (groups with the `kind: library` mechanism).
 
 ## Decisions Made
 
@@ -110,7 +138,17 @@ Make the ouroboros daemon's `ouro up` path resilient to a single bad agent bundl
 - **Layer 4 uses `EffectiveProviderReadiness.reason: "provider-model-changed"`** for drift detection, comparing `agent.json` intent vs `state/providers.json` observed.
 - **Five-state rollup**: `healthy` / `partial` / `degraded` / `safe-mode` / `down`. `degraded` now means *zero enabled agents serving* (not "any agent is unhealthy").
 - **Source-of-truth model**: `agent.json` = intent (committed, portable). `state/providers.json` = observed/cache (gitignored, per-machine).
-- **Hard timeouts on every external op in `ouro up`** are non-negotiable (concrete values are O1).
+- **Hard timeouts on every external op in `ouro up`** are non-negotiable. Concrete values (O1 LOCKED): git 8s soft / 15s hard, live-check 10s, all wired through `AbortSignal`. Env override knobs available but env is not the design centre.
+
+**Locks added 2026-04-28 19:30 UTC** (operator + ouroboros joint sign-off; resolves the eight open questions):
+
+- **Library-bundle exclusion via explicit kind field (O3 LOCKED).** `agent.json` gains `"kind": "library"`. `agent-discovery.ts` skips library bundles. Applied retroactively to SerpentGuide.ouro; ships native on RepairGuide. Resolves the slugger-shaped semantic overload of `enabled: false`.
+- **RepairGuide skill set is FIVE, not four (O2 LOCKED).** `diagnose-sync-blocked.md` is split out from `diagnose-broken-remote.md` so dirty-tree / non-FF / merge-conflict don't junk-drawer with 404 / auth-failed / unreachable.
+- **Layer 3 activation threshold = `untypedDegraded.length > 0` OR `typedIssues >= 3` (O4 LOCKED).** No new env knob; existing `--no-repair` flag is the escape hatch.
+- **Layer 3 v1 shape: bundle + loader inlined into `agentic-repair.ts` (O5 LOCKED).** Standalone `repair-persona.ts` only if the structured-output validator grows large.
+- **Compound integration fixture is the primary acceptance test (O6 LOCKED).** Per-condition unit tests for taxonomy logic. Precedent: `serpentguide-bootstrap.test.ts`.
+- **Sequential PRs in order layer 1 → 4 → 2 → 3 (O7 LOCKED).** Each PR is independently reviewable and mergeable. Each subsequent PR depends on prior PRs being merged.
+- **Layer 3a (override-path removal) groups into the layer 3 PR (O8 LOCKED).** Five known files touched; explicit test fixture changes documented.
 
 ## Context / References
 
@@ -169,3 +207,4 @@ Make the ouroboros daemon's `ouro up` path resilient to a single bad agent bundl
 ## Progress Log
 
 - 2026-04-28 19:14 UTC Created from ideation handoff (locked decisions + 8 open questions surfaced)
+- 2026-04-28 19:30 UTC All 8 open questions RESOLVED (joint operator + ouroboros sign-off). Status moved drafting → NEEDS_REVIEW. Locks integrated into Scope (Layer 2 timeouts, Layer 3 kind:library mechanism + bundle contents + activation contract + v1 shape) and Decisions Made (eight new locks). Test strategy + PR shape + override-path removal scope all settled.
