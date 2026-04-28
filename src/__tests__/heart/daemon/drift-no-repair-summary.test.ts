@@ -53,7 +53,11 @@ describe("writeDriftAdvisorySummary (Unit 4a)", () => {
   it("writes multiple advisory blocks separated visibly when multiple findings exist", () => {
     const writeStdout = vi.fn()
     const findings: DriftFinding[] = [
-      finding({ agent: "alpha", lane: "outward" }),
+      finding({
+        agent: "alpha",
+        lane: "outward",
+        repairCommand: "ouro use --agent alpha --lane outward --provider openai --model claude-opus-4-7",
+      }),
       finding({
         agent: "beta",
         lane: "inner",
