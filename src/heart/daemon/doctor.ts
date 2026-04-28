@@ -431,12 +431,14 @@ export function checkTrips(deps: DoctorDeps): DoctorCategory {
       continue
     }
     let raw: string
+    /* v8 ignore start -- defensive: readFileSync failure after existsSync passes is a race-condition fallback @preserve */
     try {
       raw = deps.readFileSync(ledgerPath)
     } catch {
       checks.push({ label: `${agentDir} trip ledger`, status: "fail", detail: "ledger.json could not be read" })
       continue
     }
+    /* v8 ignore stop */
     let parsed: Record<string, unknown>
     try {
       parsed = JSON.parse(raw) as Record<string, unknown>
