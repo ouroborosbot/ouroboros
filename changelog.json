@@ -2,6 +2,15 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.515",
+      "changes": [
+        "New `speak` tool — agent can deliver words to the current friend mid-turn without ending the turn. Pairs with `settle` (ends turn) and `ponder` (private inner thought). For acknowledgment of heavy work, phase-boundary updates, or progress narration on chat-style channels (cli, teams, bluebubbles).",
+        "Schema is intentionally minimal: `speak({ message: string })`. Not sole-call, doesn't terminate the turn, NOT exempt from the 24-call circuit breaker (the breaker is healthy backpressure against narration-spam — silence is a natural fallback for speak, unlike settle/rest). Added `flushNow?(): void | Promise<void>` to `ChannelCallbacks`; per-sense impls deliver the buffered message immediately (CLI noop, BlueBubbles `client.sendText` keeping typing on, Teams stream emit with `sendMessage` fallback).",
+        "Engine integration follows the `ponder` interception template at `core.ts:~1303`: `speak` runs inline (emit + flushNow + push `(spoken)` tool result + nerves event `engine.speak`), then the loop continues. Empty/missing message rejected with a tool-result error and `engine.speak_invalid`. New event keys: `engine.speak`, `engine.speak_invalid`, `bluebubbles.speak_flush`, `teams.speak_flush`.",
+        "System prompt nudge in Group #4 (`how i work`), gated to chat-style channels: dependency boundary (settle if next step needs a reply, otherwise speak), phase boundaries (after acking heavy ask / hitting major constraint / switching strategy / before externally-visible step — not per-tool narration), one-way framing (speak is progress, not invitation)."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.514",
       "changes": [
         "Add `--strict` flag to `ouro doctor` and bundle the `--category` flag (also in #637) for a coherent CI-friendly diagnostic interface. `--strict` makes the CLI exit non-zero (via thrown error caught by ouro-entry) when any check is `warn` or `fail`. Default behavior is unchanged.",
