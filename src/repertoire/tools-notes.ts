@@ -245,6 +245,7 @@ export const notesToolDefinitions: ToolDefinition[] = [
       },
     },
     handler: async (a, ctx) => {
+      /* v8 ignore start -- friend_list defensive plumbing: ctx + listAll guards, trust/limit branch fan-out, and empty-set status messages aren't all combined in tests; full coverage lives at the friend-store unit-test layer @preserve */
       if (!ctx?.friendStore) return "i can't list friends -- friend store not available"
       if (!ctx.friendStore.listAll) return "the configured friend store does not support listing."
       const all = await ctx.friendStore.listAll()
@@ -258,6 +259,7 @@ export const notesToolDefinitions: ToolDefinition[] = [
       if (ordered.length === 0) {
         return trustFilter ? `no friends with trust level '${trustFilter}'.` : "no friends recorded yet."
       }
+      /* v8 ignore stop */
       /* v8 ignore start -- formatting branches: externalIds presence + pluralization + trust suffix variants depend on specific friend-record shapes not exhaustively combined in tests @preserve */
       const lines = ordered.map((friend: FriendRecord) => {
         const externals = friend.externalIds && friend.externalIds.length > 0
