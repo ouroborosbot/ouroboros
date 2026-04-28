@@ -81,7 +81,7 @@ Hard timeouts (locked O1):
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 0: Verify layer 1 has landed
+### ✅ Unit 0: Verify layer 1 has landed
 **What**: Confirm `DaemonStatus` + `computeDaemonRollup` from layer 1 are in `daemon-health.ts`. If not, halt.
 **Acceptance**: `git log` on base shows layer 1 PR. `grep -rn "DaemonStatus" src/heart/daemon/daemon-health.ts` returns the type.
 
@@ -218,3 +218,4 @@ Hard timeouts (locked O1):
 
 ## Progress Log
 - 2026-04-28 19:32 UTC Created as PR 3 of 4 in the sequential rollout (1 → 4 → 2 → 3). Depends on layer 1 PR being merged.
+- 2026-04-28 Unit 0 complete: layer 1 vocabulary on main at 3c8e2c38. `RollupStatus`/`DaemonStatus`/`computeDaemonRollup` confirmed exported. Branch `harness/layer-2-sync-probe` cut from main. Artifacts dir created.
