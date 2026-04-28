@@ -7,7 +7,8 @@
         "`ouro up` now prints the current runtime version in the update-check phase before asking npm for newer bits, so a stalled registry or update path no longer hides what is actually running.",
         "Production `ouro up` starts or refreshes the daemon before provider health checks and repair prompts. Broken credentials for one agent are reported as degraded provider state after the daemon is answering instead of preventing every agent from coming online.",
         "Daemon startup now opens the command socket before autostarting provider-dependent workers and kicks agent/sense autostart concurrently. A thrown or stalled config check is contained to that agent's crashed snapshot, leaving the daemon and sibling agents reachable.",
-        "BlueBubbles no longer auto-learns a one-to-one chat partner as the agent's own iMessage handle after an outbound reply, so the next inbound text from that person is not filtered as self-talk."
+        "BlueBubbles no longer auto-learns a one-to-one chat partner as the agent's own iMessage handle after an outbound reply, so the next inbound text from that person is not filtered as self-talk.",
+        "Mail tools and the Ouro Mailbox now retry runtime/config resolution when a sense process cached a transient vault-unavailable state, and prompt sense-status rendering reads the same cached vault runtime truth instead of stale local config."
       ]
     },
     {
