@@ -332,6 +332,9 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       /* v8 ignore stop */
       textDirty = text.length > 0 && !text.endsWith("\n")
     },
+    flushNow: () => {
+      // CLI flushes immediately on each onTextChunk; nothing buffered to push.
+    },
     onReasoningChunk: (_text: string) => {
       // Keep reasoning private in the CLI surface. The spinner continues to
       // represent active thinking until actual tool or answer output arrives.
