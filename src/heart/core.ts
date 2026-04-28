@@ -3,7 +3,7 @@ import {
   getContextConfig,
 } from "./config";
 import { loadAgentConfig } from "./identity";
-import { execTool, summarizeArgs, buildToolResultSummary, settleTool, observeTool, ponderTool, restTool, getToolsForChannel } from "../repertoire/tools";
+import { execTool, summarizeArgs, buildToolResultSummary, settleTool, observeTool, ponderTool, restTool, speakTool, getToolsForChannel } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities, channelToFacing, type Facing } from "../mind/friends/channel";
 import { surfaceToolDef } from "../repertoire/tools";
@@ -357,6 +357,13 @@ export type RunAgentOutcome =
   | "errored"
   | "observed"
   | "rested";
+
+/** Chat-style channels expose the `speak` tool — outer human-conversation channels
+ *  where mid-turn delivery is meaningful. Inner dialog has `ponder`. MCP returns
+ *  synchronously. Mail is batch. Anything else (unknown channel) treats as non-chat. */
+export function isChatStyleChannel(channel: string): boolean {
+  return channel === "cli" || channel === "teams" || channel === "bluebubbles";
+}
 
 // Sole-call tools must be the only tool call in a turn. When they appear
 // alongside other tools, the sole-call tool is rejected with this message.
@@ -898,6 +905,7 @@ export async function runAgent(
       ...(isInnerDialog ? [surfaceToolDef, restTool] : []),
       ...(!isInnerDialog ? [observeTool] : []),
       ...(!isInnerDialog ? [settleTool] : []),
+      ...(isChatStyleChannel(channel ?? "") ? [speakTool] : []),
     ];
     const steeringFollowUps = options?.drainSteeringFollowUps?.() ?? [];
     if (steeringFollowUps.length > 0) {
