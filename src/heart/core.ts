@@ -274,7 +274,14 @@ export interface ChannelCallbacks {
   onClearText?(): void;
   /** Deliver any buffered output to the friend now. Called by the `speak` tool
    *  to push mid-turn messages immediately rather than waiting for the natural
-   *  end-of-turn flush. Senses with no buffering (e.g. CLI) implement as noop. */
+   *  end-of-turn flush. Senses with no buffering (e.g. CLI) implement as noop.
+   *
+   *  Contract: best-effort delivery. THROWS if the message could not be delivered
+   *  through any available path (e.g. Teams when both stream emit AND sendMessage
+   *  fallback fail; BlueBubbles when client.sendText rejects). The engine catches
+   *  these throws to mark the speak tool call as failed and tell the agent the
+   *  message did NOT reach the friend — preventing the agent from assuming
+   *  silent success when delivery actually failed. */
   flushNow?(): void | Promise<void>;
 }
 
@@ -1333,7 +1340,26 @@ export async function runAgent(
               continue;
             }
             callbacks.onTextChunk(speakMessage);
-            await callbacks.flushNow?.();
+            let speakDeliveryError: Error | null = null;
+            try {
+              await callbacks.flushNow?.();
+            } catch (err) {
+              speakDeliveryError = err instanceof Error ? err : new Error(String(err));
+            }
+            if (speakDeliveryError) {
+              callbacks.onToolEnd("speak", argSummary, false);
+              const failMsg = `speak delivery failed: ${speakDeliveryError.message}. the message did not reach your friend; do not assume they saw it.`;
+              messages.push({ role: "tool", tool_call_id: tc.id, content: failMsg });
+              providerRuntime.appendToolOutput(tc.id, failMsg);
+              emitNervesEvent({
+                level: "error",
+                component: "engine",
+                event: "engine.speak_delivery_failed",
+                message: "speak delivery failed",
+                meta: { error: speakDeliveryError.message, messageLength: speakMessage.length },
+              });
+              continue;
+            }
             callbacks.onToolEnd("speak", argSummary, true);
             const ack = "(spoken)";
             messages.push({ role: "tool", tool_call_id: tc.id, content: ack });

@@ -414,18 +414,21 @@ export function createTeamsCallbacks(
       firstContentEmitted = true
       textBuffer = ""
       // Try the stream first; on failure, fall back to sendMessage (mirrors flush()).
+      // Contract: throws if the message could not be delivered through any available path.
       let delivered = false
+      let lastError: Error | null = null
       if (!stopped) {
         const ok = await tryEmit(trimmed)
         if (ok) delivered = true
-        else markStopped()
+        else { markStopped(); lastError = new Error("stream emit failed") }
       }
       if (!delivered && sendMessage) {
         try {
           await sendMessage(trimmed)
           delivered = true
-        } catch {
-          /* both paths failed; we already marked stopped — surface no further */
+          lastError = null
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err))
         }
       }
       emitNervesEvent({
@@ -434,6 +437,11 @@ export function createTeamsCallbacks(
         message: "teams flushed mid-turn speak",
         meta: { messageLength: trimmed.length, delivered },
       })
+      if (!delivered) {
+        throw new Error(
+          `teams speak delivery failed: ${lastError?.message ?? "no fallback available"}`,
+        )
+      }
     },
     ...(() => {
       const toolCbs = createToolActivityCallbacks({

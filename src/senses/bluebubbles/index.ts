@@ -645,6 +645,10 @@ export function createBlueBubblesCallbacks(
     },
 
     async flushNow(): Promise<void> {
+      // Contract: throws if delivery fails. We deliberately let `client.sendText`
+      // rejections propagate so the engine's speak interception can mark the
+      // tool call as failed and tell the agent the message did not reach the
+      // friend (rather than silently logging and pretending success).
       const trimmed = textBuffer.trim()
       if (!trimmed) return
       textBuffer = ""
