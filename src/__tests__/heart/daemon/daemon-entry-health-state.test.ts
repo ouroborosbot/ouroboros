@@ -223,7 +223,9 @@ describe("daemon entry health state wiring", () => {
 
     expect(capturedHealthStates).toHaveLength(1)
     expect(capturedHealthStates[0]).toMatchObject({
-      status: "ok",
+      // Layer 1: rollup vocabulary — was "ok", now "healthy". Unit 3b will
+      // replace the literal entirely with computeDaemonRollup.
+      status: "healthy",
       pid: process.pid,
       safeMode: null,
       degraded: [],

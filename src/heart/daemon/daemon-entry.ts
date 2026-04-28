@@ -161,7 +161,10 @@ function buildDaemonHealthState(): DaemonHealthState {
   ]
 
   return {
-    status: degraded.length > 0 ? "degraded" : "ok",
+    // Placeholder bump to satisfy the new DaemonStatus union. Unit 3b
+    // replaces this with a proper computeDaemonRollup(...) call; this line
+    // exists only so Unit 1b's tsc --noEmit gate passes.
+    status: degraded.length > 0 ? "degraded" : "healthy",
     mode,
     pid: process.pid,
     startedAt: daemonStartedAt,

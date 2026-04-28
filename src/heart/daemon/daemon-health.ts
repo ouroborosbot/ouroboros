@@ -28,8 +28,51 @@ export interface SafeModeState {
   enteredAt: string
 }
 
+/**
+ * Daemon-wide rollup vocabulary — locked layer-1 contract.
+ *
+ * - `RollupStatus` is what `computeDaemonRollup` returns (post-inventory,
+ *   four-state). The function never returns `"down"` because by the time
+ *   the rollup is reachable the daemon has already started, opened its
+ *   socket, and read its agent inventory — pre-inventory failure is the
+ *   caller's domain.
+ * - `DaemonStatus` is what `DaemonHealthState.status` accepts. The caller
+ *   widens the rollup result with `"down"` along the daemon-entry failure
+ *   path (e.g. when the daemon process can't read inventory at all).
+ *
+ * `isRollupStatus` and `isDaemonStatus` are runtime guards used both by
+ * `readHealth` (validating cached health files on disk) and by render-side
+ * consumers that want to narrow `unknown` JSON into the typed union before
+ * branching on it.
+ */
+export type RollupStatus = "healthy" | "partial" | "degraded" | "safe-mode"
+export type DaemonStatus = RollupStatus | "down"
+
+const ROLLUP_STATUS_VALUES: ReadonlySet<RollupStatus> = new Set<RollupStatus>([
+  "healthy",
+  "partial",
+  "degraded",
+  "safe-mode",
+])
+
+const DAEMON_STATUS_VALUES: ReadonlySet<DaemonStatus> = new Set<DaemonStatus>([
+  "healthy",
+  "partial",
+  "degraded",
+  "safe-mode",
+  "down",
+])
+
+export function isRollupStatus(value: unknown): value is RollupStatus {
+  return typeof value === "string" && ROLLUP_STATUS_VALUES.has(value as RollupStatus)
+}
+
+export function isDaemonStatus(value: unknown): value is DaemonStatus {
+  return typeof value === "string" && DAEMON_STATUS_VALUES.has(value as DaemonStatus)
+}
+
 export interface DaemonHealthState {
-  status: string
+  status: DaemonStatus
   mode: string
   pid: number
   startedAt: string
@@ -123,7 +166,7 @@ export function readHealth(healthPath: string): DaemonHealthState | null {
     const parsed = JSON.parse(raw) as Record<string, unknown>
 
     if (
-      typeof parsed.status !== "string" ||
+      !isDaemonStatus(parsed.status) ||
       typeof parsed.mode !== "string" ||
       typeof parsed.pid !== "number" ||
       typeof parsed.startedAt !== "string" ||

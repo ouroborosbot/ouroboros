@@ -94,7 +94,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **Acceptance**: Map is complete; every site is accounted for. No "unknown — TBD" items.
 **Outcome**: Survey surfaced a scope correction. The planning doc named `inner-status.ts` and `startup-tui.ts` as "consumers of the daemon status string," but neither file currently reads `DaemonHealthState.status` — they render per-agent inner-runtime and per-agent worker status respectively (different concepts). The real consumers of the rollup `status` field are `cli-render.ts:566` (`daemonUnavailableStatusOutput`) and `runtime-readers.ts:281` (`readDaemonHealthDeep`). Confirmed with ouroboros 2026-04-28; Unit 4 retargeted accordingly. Test fixtures in `daemon-health.test.ts`, `daemon-status-health.test.ts`, and `daemon-entry-health-state.test.ts` will need vocabulary updates as part of Unit 5.
 
-### ⬜ Unit 1a: Type definition — Tests
+### ✅ Unit 1a: Type definition — Tests
 **What**: Write failing tests for the new `RollupStatus` and `DaemonStatus` union types AND their type guards (`isRollupStatus`, `isDaemonStatus`). Tests in `src/__tests__/heart/daemon/daemon-health-status.test.ts` (new file).
 **Acceptance**: Tests exist and FAIL (red). Test cases include:
 - `isRollupStatus`: each of the four literals (`healthy`, `partial`, `degraded`, `safe-mode`) validates; `"down"` is rejected (it's not a valid rollup output); junk strings fail; undefined/null fail.
