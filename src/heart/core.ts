@@ -272,6 +272,10 @@ export interface ChannelCallbacks {
   // Clear any buffered text accumulated during streaming. Called before emitting
   // the settle answer so streamed noise (e.g. refusal text) is discarded.
   onClearText?(): void;
+  /** Deliver any buffered output to the friend now. Called by the `speak` tool
+   *  to push mid-turn messages immediately rather than waiting for the natural
+   *  end-of-turn flush. Senses with no buffering (e.g. CLI) implement as noop. */
+  flushNow?(): void | Promise<void>;
 }
 
 export interface RunAgentOptions {
