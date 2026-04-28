@@ -42,15 +42,19 @@ After this PR: `degraded` means "zero enabled agents serving" (genuinely no work
 
 ### Rollup state table (the contract this PR must encode)
 
-| Daemon-wide state | When it fires |
-| --- | --- |
-| `healthy` | All enabled agents healthy. No bootstrap-degraded components. No safe-mode. |
-| `partial` | At least one enabled agent healthy AND at least one enabled agent unhealthy. (Today's incorrect "degraded".) |
-| `degraded` | Zero enabled agents serving (every enabled agent failed live-check). |
-| `safe-mode` | Crash-loop tripped (3 in 5min) per `safe-mode.ts`. Overrides everything else. |
-| `down` | Daemon process itself can't start / can't read agent inventory / fatal pre-rollup error. |
+| Daemon-wide state | Owner | When it fires |
+| --- | --- | --- |
+| `healthy` | rollup fn | All enabled agents healthy. No bootstrap-degraded components. No safe-mode. |
+| `partial` | rollup fn | At least one enabled agent healthy AND at least one enabled agent unhealthy. (Today's incorrect "degraded".) |
+| `degraded` | rollup fn | Zero enabled agents serving — covers BOTH "no enabled agents configured" (fresh install) AND "all enabled agents failed live-check." Same status, distinct UX copy at render time (Unit 4b). |
+| `safe-mode` | rollup fn | Crash-loop tripped (3 in 5min) per `safe-mode.ts`. Overrides everything else. |
+| `down` | **caller** | Daemon process itself can't start / can't read agent inventory / fatal pre-rollup error. **NOT returned by `computeDaemonRollup` — by the time the rollup function is called, the daemon has reached post-inventory state. `down` is set elsewhere in the daemon-entry flow before the rollup is reachable.** |
 
-Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBootstrapFailure`) influence the rollup but never escalate it past `partial` on their own — they downgrade `healthy` to `partial`, never below.
+Type structure (encoded in Unit 1):
+- `RollupStatus = "healthy" | "partial" | "degraded" | "safe-mode"` — what `computeDaemonRollup` returns.
+- `DaemonStatus = RollupStatus | "down"` — what `DaemonHealthState.status` accepts.
+
+Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBootstrapFailure`) influence the rollup but never escalate it past `partial` on their own — they downgrade `healthy` to `partial`, never below. If a bootstrap failure is severe enough to halt inventory or startup, that's `down`, set by the caller, not the rollup function.
 
 ## Code Coverage Requirements
 
@@ -90,11 +94,17 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **Acceptance**: Map is complete; every site is accounted for. No "unknown — TBD" items.
 
 ### ⬜ Unit 1a: Type definition — Tests
-**What**: Write failing tests for the new `DaemonStatus` union type and a type guard `isDaemonStatus(value: unknown): value is DaemonStatus`. Tests in `src/__tests__/heart/daemon/daemon-health-status.test.ts` (new file).
-**Acceptance**: Tests exist and FAIL (red). Test cases include: each of the five literals validates, junk strings fail, undefined/null fail.
+**What**: Write failing tests for the new `RollupStatus` and `DaemonStatus` union types AND their type guards (`isRollupStatus`, `isDaemonStatus`). Tests in `src/__tests__/heart/daemon/daemon-health-status.test.ts` (new file).
+**Acceptance**: Tests exist and FAIL (red). Test cases include:
+- `isRollupStatus`: each of the four literals (`healthy`, `partial`, `degraded`, `safe-mode`) validates; `"down"` is rejected (it's not a valid rollup output); junk strings fail; undefined/null fail.
+- `isDaemonStatus`: each of the five literals validates including `"down"`; junk strings fail; undefined/null fail.
 
 ### ⬜ Unit 1b: Type definition — Implementation
-**What**: Add `export type DaemonStatus = "healthy" | "partial" | "degraded" | "safe-mode" | "down"` to `src/heart/daemon/daemon-health.ts`. Add `isDaemonStatus` guard. Update `DaemonHealthState.status` to type `DaemonStatus`.
+**What**: Add to `src/heart/daemon/daemon-health.ts`:
+- `export type RollupStatus = "healthy" | "partial" | "degraded" | "safe-mode"` — what `computeDaemonRollup` returns. The four states the rollup function decides.
+- `export type DaemonStatus = RollupStatus | "down"` — what `DaemonHealthState.status` accepts. Caller assigns `"down"` outside the rollup function (pre-inventory failure path).
+- `export function isRollupStatus(value: unknown): value is RollupStatus` and `export function isDaemonStatus(value: unknown): value is DaemonStatus` guards.
+- Update `DaemonHealthState.status` to type `DaemonStatus`.
 **Acceptance**: Tests PASS (green). `tsc --noEmit` clean.
 
 ### ⬜ Unit 1c: Type definition — Coverage & refactor
@@ -102,11 +112,24 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **Acceptance**: Coverage report shows 100% for new lines. Tests still green.
 
 ### ⬜ Unit 2a: Rollup function — Tests
-**What**: Write failing tests for `computeDaemonRollup(input: { agents: AgentLiveCheckResult[]; bootstrapDegraded: DegradedComponent[]; safeMode: boolean }): DaemonStatus`. Tests in `src/__tests__/heart/daemon/daemon-rollup.test.ts` (new file). Cover every row of the rollup state table above + every edge case from "Code Coverage Requirements".
-**Acceptance**: Tests exist and FAIL (red). All eight+ canonical scenarios from the edge-case list are present.
+**What**: Write failing tests for `computeDaemonRollup(input: { enabledAgents: AgentLiveCheckResult[]; bootstrapDegraded: DegradedComponent[]; safeMode: boolean }): RollupStatus`. Tests in `src/__tests__/heart/daemon/daemon-rollup.test.ts` (new file). Cover every row of the rollup state table above + every edge case from "Code Coverage Requirements".
+
+**Input contract — pin explicitly**: `enabledAgents` contains ONLY agents whose `enabled` flag is true. The rollup function does NOT filter — the caller is responsible for filtering via `listEnabledBundleAgents` (or equivalent) before invoking. This keeps the function purely declarative on the data it receives.
+
+**Required truth-table coverage** (each its own test):
+1. All enabled agents healthy + no bootstrap-degraded + no safe-mode → `healthy`.
+2. All enabled agents healthy + ≥1 bootstrap-degraded component + no safe-mode → `partial` (downgrade rule).
+3. ≥1 healthy + ≥1 unhealthy enabled agent → `partial`.
+4. Zero enabled agents in input (fresh install, none configured) → `degraded`.
+5. ≥1 enabled agent, all unhealthy → `degraded`.
+6. Any input with `safeMode: true` → `safe-mode` (overrides everything).
+7. Empty enabled-agents + bootstrap-degraded + no safe-mode → `degraded` (zero serving wins; bootstrap-degraded can't escalate past partial but partial requires ≥1 healthy).
+8. All unhealthy + bootstrap-degraded → `degraded` (zero serving wins).
+
+**Acceptance**: Tests exist and FAIL (red). All eight scenarios above are present as named test cases.
 
 ### ⬜ Unit 2b: Rollup function — Implementation
-**What**: Implement `computeDaemonRollup` in `src/heart/daemon/daemon-rollup.ts` (new file). Place it next to `daemon-health.ts`. Pure function — no I/O, no side effects, deterministic on inputs.
+**What**: Implement `computeDaemonRollup` in `src/heart/daemon/daemon-rollup.ts` (new file). Place it next to `daemon-health.ts`. Pure function — no I/O, no side effects, deterministic on inputs. Returns `RollupStatus` (4-state union — never `"down"`; that's caller-owned, set elsewhere in the daemon-entry flow before this function is reachable).
 **Acceptance**: Tests PASS (green). Function is < ~50 lines (rollup is genuinely a small decision tree).
 
 ### ⬜ Unit 2c: Rollup function — Coverage & refactor
@@ -142,10 +165,14 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **What**: Update render switch / mapping logic in `inner-status.ts` and `startup-tui.ts`. New affordances:
 - `healthy` — green / OK label (existing healthy convention).
 - `partial` — yellow / warning label (NEW; replace today's incorrect "degraded" rendering for this case).
-- `degraded` — red / failure label (kept; semantics narrowed to "zero serving").
+- `degraded` — red / failure label. **Two sub-cases distinguished by render copy** (NOT by status field):
+  - "no enabled agents configured" — when the enabled-agents inventory is empty (fresh install, nothing wired up). Copy: e.g. "no agents configured — run `ouro hatch` to add one".
+  - "all enabled agents failed" — when ≥1 enabled agent exists but all live-checks failed. Copy: e.g. "agents configured but none ready — N agents failed live-check; run `ouro doctor`".
 - `safe-mode` — distinct red+lock affordance (existing).
 - `down` — red+stop affordance (existing or close to it).
-**Acceptance**: Tests from 4a PASS (green).
+
+The render layer reads enabled-agents count + per-agent statuses to pick the right copy variant for `degraded`. This avoids inflating the status enum just to express a UX nuance.
+**Acceptance**: Tests from 4a PASS (green). Tests cover BOTH `degraded` sub-cases (zero-enabled vs all-unhealthy) and assert distinct rendered copy.
 
 ### ⬜ Unit 4c: Update consumers — Coverage & refactor
 **What**: Verify 100% coverage on touched render paths.
@@ -187,3 +214,8 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 
 ## Progress Log
 - 2026-04-28 19:30 UTC Created from planning doc as PR 1 of 4 in the sequential rollout (1 → 4 → 2 → 3).
+- 2026-04-28 19:55 UTC Post-planner review pass with ouroboros surfaced four refinements applied to this doc:
+  - Split type union: `RollupStatus` (4-state, function output) + `DaemonStatus = RollupStatus | "down"` (full daemon-status, caller-owned).
+  - `computeDaemonRollup` returns `RollupStatus`, not `DaemonStatus` — `down` is set by the daemon-entry caller path before the rollup function is reachable. The function is post-inventory and cannot represent pre-inventory failure.
+  - Pinned input contract: `enabledAgents` is pre-filtered by the caller; the function does not re-filter.
+  - Render-layer copy split for `degraded` ("no enabled agents configured" vs "all enabled agents failed") so the same status surfaces distinct UX without inflating the type union.
