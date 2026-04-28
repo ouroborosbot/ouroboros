@@ -298,6 +298,25 @@ describe("Teams createTeamsCallbacks - flushNow (speak tool)", () => {
     expect(speakFlushCalls[0][0].meta.delivered).toBe(true)
   })
 
+  it("tryEmitNoAbort awaits stream.emit when it returns a Promise (Teams SDK async path)", async () => {
+    // The Teams SDK's stream.emit() is typed as void but actually returns a Promise
+    // for the async HTTP under the hood. tryEmitNoAbort must await that Promise so
+    // an async failure (e.g. rejected 413) propagates back to flushNow as
+    // ok=false rather than swallowing it. Hits the `result.then` branch (line 294
+    // in src/senses/teams.ts).
+    const teams = await import("../../senses/teams")
+    let resolveEmit!: () => void
+    const emitPromise = new Promise<void>((resolve) => { resolveEmit = resolve })
+    mockStream.emit = vi.fn(() => emitPromise as unknown as void)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("async path")
+    const flushPromise = (callbacks as any).flushNow()
+    // Resolve the Teams SDK's async emit; flushNow's await must complete before resolving.
+    resolveEmit()
+    await expect(flushPromise).resolves.toBeUndefined()
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+  })
+
   it("flushNow wraps non-Error throws from sendMessage in Error (lastError coercion)", async () => {
     // Stream emit fails, and sendMessage throws a NON-Error value (string).
     // The catch on line 432 must coerce it via `err instanceof Error ? err : new Error(String(err))`.

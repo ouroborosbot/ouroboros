@@ -284,9 +284,9 @@ export function createTeamsCallbacks(
   // primary-stream failure followed by a successful sendMessage fallback does NOT
   // poison the rest of the turn. tryEmit's abort-on-failure behavior is correct for
   // end-of-turn flush() (no fallback path forward) but wrong for mid-turn speak,
-  // which has a sendMessage fallback that may still succeed.
+  // which has a sendMessage fallback that may still succeed. Caller (flushNow) is
+  // responsible for the `!stopped` precondition; no defensive guard here.
   async function tryEmitNoAbort(text: string): Promise<boolean> {
-    if (stopped) return false
     try {
       const result: unknown = stream.emit({ text, entities: aiLabelEntities(), channelData: { feedbackLoopEnabled: true } })
       streamHasContent = true
