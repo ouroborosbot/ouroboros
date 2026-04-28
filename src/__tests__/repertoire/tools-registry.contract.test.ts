@@ -202,13 +202,9 @@ describe("tool registry contract", () => {
     expect(names).toContain("trip_remove_leg");
     expect(names).toContain("trip_new_id");
 
-<<<<<<< HEAD
     expect(names).toContain("mail_outbox");
-    // Exact count: 77 tools total — trip ledger at 8 with trip_remove_leg, plus mail_outbox addition
-    expect(names).toHaveLength(77);
-=======
-    // Exact count: 74 tools total including Mailroom status, outbound mail, attachment, image recovery, and trip ledger tools
-    expect(names).toHaveLength(75);
->>>>>>> 063d9ef0 (feat(repertoire): friend_list tool — enumerate the friend graph (alpha.512))
+    expect(names).toContain("friend_list");
+    // Exact count: 78 tools (77 prior + friend_list)
+    expect(names).toHaveLength(78);
   });
 });
