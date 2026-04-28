@@ -16,6 +16,7 @@ import { ensureBwCli } from "./bw-installer"
 
 const MAX_ERROR_DETAIL_LENGTH = 500
 const LONG_ENCODED_TOKEN_PATTERN = /[A-Za-z0-9+/=]{32,}/g
+const BW_PASSWORD_ENV = "OURO_BW_MASTER_PASSWORD"
 
 function uniqueSecrets(secrets: Array<string | undefined>): string[] {
   return [...new Set(
@@ -236,11 +237,19 @@ async function withBwLock<T>(appDataDir: string | undefined, fn: () => Promise<T
   }
 }
 
-function execBw(args: string[], sessionToken?: string, appDataDir?: string, stdin?: string, bwBinaryPath = "bw"): Promise<string> {
+function execBw(
+  args: string[],
+  sessionToken?: string,
+  appDataDir?: string,
+  stdin?: string,
+  bwBinaryPath = "bw",
+  extraEnv: Record<string, string> = {},
+): Promise<string> {
   const env = {
     ...process.env,
     ...(sessionToken ? { BW_SESSION: sessionToken } : {}),
     ...(appDataDir ? { BITWARDENCLI_APPDATA_DIR: appDataDir } : {}),
+    ...extraEnv,
   }
 
   const runCommand = (): Promise<string> =>
@@ -417,6 +426,17 @@ export class BitwardenCredentialStore implements CredentialStore {
     return execBw(args, sessionToken, this.appDataDir, stdin, this.bwBinaryPath)
   }
 
+  private execBwWithPasswordEnv(args: string[]): Promise<string> {
+    return execBw(
+      [...args, "--passwordenv", BW_PASSWORD_ENV],
+      undefined,
+      this.appDataDir,
+      undefined,
+      this.bwBinaryPath,
+      { [BW_PASSWORD_ENV]: this.masterPassword },
+    )
+  }
+
   /**
    * Ensure the bw CLI is authenticated and unlocked.
    * Handles three states: logged out → login, locked → unlock, already unlocked → no-op.
@@ -492,11 +512,11 @@ export class BitwardenCredentialStore implements CredentialStore {
 
     if (status.status === "locked") {
       // Already logged in, just needs unlock
-      const unlockOutput = await this.execBw(["unlock", this.masterPassword, "--raw"])
+      const unlockOutput = await this.execBwWithPasswordEnv(["unlock", "--raw"])
       this.sessionToken = unlockOutput.trim()
     } else if (status.status === "unauthenticated" || !status.status) {
       // Not logged in — full login
-      const loginOutput = await this.execBw(["login", this.email, this.masterPassword, "--raw"])
+      const loginOutput = await this.execBwWithPasswordEnv(["login", this.email, "--raw"])
       try {
         const parsed = JSON.parse(loginOutput)
         this.sessionToken = parsed.access_token ?? loginOutput.trim()
@@ -505,7 +525,7 @@ export class BitwardenCredentialStore implements CredentialStore {
       }
     } else {
       // Status is "unlocked" — already good, just need the session token
-      const unlockOutput = await this.execBw(["unlock", this.masterPassword, "--raw"])
+      const unlockOutput = await this.execBwWithPasswordEnv(["unlock", "--raw"])
       this.sessionToken = unlockOutput.trim()
     }
 

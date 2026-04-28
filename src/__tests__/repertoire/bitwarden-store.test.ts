@@ -82,6 +82,7 @@ describe("BitwardenCredentialStore", () => {
       // Third call: bw login
       expect(calls[2][0]).toBe("login")
       expect(calls[2][1]).toBe("ouroboros@ouro.bot")
+      expect(calls.flat()).not.toContain("masterpass123")
     })
 
     it("caches the session token", async () => {
@@ -162,8 +163,34 @@ describe("BitwardenCredentialStore", () => {
       expect(calls[0]).toEqual(["status"])
       expect(calls[1][0]).toBe("unlock")
       expect(calls[1]).toContain("--raw")
+      expect(calls[1]).toContain("--passwordenv")
+      expect(calls.flat()).not.toContain("masterpass123")
       // Should NOT have called login
       expect(calls.find((c) => c[0] === "login")).toBeUndefined()
+    })
+
+    it("passes the master password through child environment instead of process argv", async () => {
+      const calls: Array<{ args: string[]; env: Record<string, string | undefined> }> = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], opts: any, cb: Function) => {
+        calls.push({ args, env: opts?.env ?? {} })
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "locked", serverUrl: "https://vault.ouroboros.bot" }), "")
+          return
+        }
+        if (args[0] === "unlock") {
+          cb(null, "unlocked-session-token", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      const unlockCall = calls.find((call) => call.args[0] === "unlock")
+      expect(unlockCall).toBeDefined()
+      expect(calls.flatMap((call) => call.args)).not.toContain("masterpass123")
+      expect(unlockCall?.args).toEqual(["unlock", "--raw", "--passwordenv", "OURO_BW_MASTER_PASSWORD"])
+      expect(unlockCall?.env.OURO_BW_MASTER_PASSWORD).toBe("masterpass123")
     })
 
     it("handles login failure", async () => {
@@ -235,7 +262,7 @@ describe("BitwardenCredentialStore", () => {
 
       expect(calls[0]).toEqual(["status"])
       expect(calls[1]).toEqual(["config", "server", "https://vault.ouroboros.bot"])
-      expect(calls[2]).toEqual(["login", "ouroboros@ouro.bot", "masterpass123", "--raw"])
+      expect(calls[2]).toEqual(["login", "ouroboros@ouro.bot", "--raw", "--passwordenv", "OURO_BW_MASTER_PASSWORD"])
     })
 
     it("uses an isolated Bitwarden app data directory when configured", async () => {

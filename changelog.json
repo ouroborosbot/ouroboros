@@ -11,7 +11,8 @@
         "Mail tools and the Ouro Mailbox now retry runtime/config resolution when a sense process cached a transient vault-unavailable state, and prompt sense-status rendering reads the same cached vault runtime truth instead of stale local config.",
         "`ouro up` now times out unresolved daemon startup polling instead of spinning forever, and daemon worker startup ignores duplicate start attempts while a provider/config check is already in flight. Stopping during a pending config check no longer lets that worker spawn afterward.",
         "BlueBubbles self-handle filtering is now group-echo scoped and bypasses known non-self friends, so a stale `ownHandles` entry cannot make real Ari messages disappear from Slugger's iMessage turn loop.",
-        "`ouro up` now trusts daemon-published provider readiness after startup instead of doing a second foreground vault read, so a slow Bitwarden provider check cannot freeze the command or report a false auth prompt after the daemon is already healthy."
+        "`ouro up` now trusts daemon-published provider readiness after startup instead of doing a second foreground vault read, so a slow Bitwarden provider check cannot freeze the command or report a false auth prompt after the daemon is already healthy.",
+        "Bitwarden vault login/unlock now passes the saved vault unlock secret through `bw --passwordenv` instead of process arguments, so the secret does not appear in `ps` output while `ouro up` or a sense startup is unlocking the agent vault."
       ]
     },
     {
