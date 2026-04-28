@@ -125,6 +125,7 @@ import {
   daemonUnavailableStatusOutput,
   isDaemonUnavailableError,
   formatMcpResponse,
+  type StatusPayload,
 } from "./cli-render"
 import { readFirstBundleMetaVersion, createDefaultOuroCliDeps, defaultListDiscoveredAgents } from "./cli-defaults"
 import { checkAgentConfigWithProviderHealth, type LiveConfigCheckDeps } from "./agent-config-check"
@@ -277,10 +278,9 @@ async function runCliUpdateCheckWithTimeout(
 
 async function checkAgentProviders(
   deps: OuroCliDeps,
-  agentsOverride?: string[],
+  agents: string[],
   onProgress?: (message: string) => void,
 ): Promise<DegradedAgent[]> {
-  const agents = agentsOverride ?? await listCliAgents(deps)
   const bundlesRoot = deps.bundlesRoot ?? getAgentBundlesRoot()
   const degraded: DegradedAgent[] = []
 
@@ -315,6 +315,61 @@ async function checkAgentProviders(
     }
   }
 
+  return degraded
+}
+
+type StatusProviderRow = StatusPayload["providers"][number]
+
+function degradedFromStatusProviderRow(row: StatusProviderRow): DegradedAgent {
+  const binding = row.provider === "unconfigured" ? row.provider : `${row.provider} / ${row.model}`
+  const detail = row.detail ? `: ${row.detail}` : ""
+  const fixHint = row.detail && row.detail.startsWith("ouro ")
+    ? `Run \`${row.detail}\`.`
+    : "Run `ouro status` or `ouro doctor` for provider details."
+  return {
+    agent: row.agent,
+    errorReason: `${row.lane} provider ${binding} readiness is ${row.readiness}${detail}`,
+    fixHint,
+  }
+}
+
+function providerStatusRowsCoverAgents(rows: StatusProviderRow[], agents: string[]): boolean {
+  for (const agent of agents) {
+    const lanes = new Set(rows.filter((row) => row.agent === agent).map((row) => row.lane))
+    if (!lanes.has("outward") || !lanes.has("inner")) return false
+  }
+  return true
+}
+
+async function checkAgentProvidersFromDaemonStatus(
+  deps: OuroCliDeps,
+  agents: string[],
+  onProgress?: (message: string) => void,
+): Promise<DegradedAgent[] | null> {
+  const uniqueAgents = [...new Set(agents)]
+  if (uniqueAgents.length === 0) return []
+  let response
+  try {
+    response = await deps.sendCommand(deps.socketPath, { kind: "daemon.status" })
+  } catch {
+    // Fall through to the same foreground-check fallback used for empty status responses.
+  }
+  if (!response || !response.ok) return null
+  const payload = parseStatusPayload(response.data)
+  if (!payload) return null
+  const rows = payload.providers.filter((row) => uniqueAgents.includes(row.agent))
+  if (!providerStatusRowsCoverAgents(rows, uniqueAgents)) return null
+
+  const degraded: DegradedAgent[] = []
+  const degradedAgents = new Set<string>()
+  for (const row of rows) {
+    if (row.readiness === "ready" || degradedAgents.has(row.agent)) continue
+    degraded.push(degradedFromStatusProviderRow(row))
+    degradedAgents.add(row.agent)
+  }
+  onProgress?.(degraded.length === 0
+    ? "provider readiness confirmed by daemon status"
+    : "provider readiness reported by daemon status")
   return degraded
 }
 
@@ -569,7 +624,10 @@ function managedAgentsSignature(agentNames: string[]): string {
 }
 
 async function checkAlreadyRunningAgentProviders(deps: OuroCliDeps, onProgress?: (message: string) => void): Promise<DegradedAgent[]> {
-  return checkAgentProviders(deps, undefined, onProgress)
+  const agents = await listCliAgents(deps)
+  const statusResult = await checkAgentProvidersFromDaemonStatus(deps, agents, onProgress)
+  if (statusResult) return statusResult
+  return checkAgentProviders(deps, agents, onProgress)
 }
 
 function readinessIssueFromDegraded(entry: DegradedAgent): AgentReadinessIssue {

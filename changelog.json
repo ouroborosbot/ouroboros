@@ -10,7 +10,8 @@
         "BlueBubbles no longer auto-learns a one-to-one chat partner as the agent's own iMessage handle after an outbound reply, so the next inbound text from that person is not filtered as self-talk.",
         "Mail tools and the Ouro Mailbox now retry runtime/config resolution when a sense process cached a transient vault-unavailable state, and prompt sense-status rendering reads the same cached vault runtime truth instead of stale local config.",
         "`ouro up` now times out unresolved daemon startup polling instead of spinning forever, and daemon worker startup ignores duplicate start attempts while a provider/config check is already in flight. Stopping during a pending config check no longer lets that worker spawn afterward.",
-        "BlueBubbles self-handle filtering is now group-echo scoped and bypasses known non-self friends, so a stale `ownHandles` entry cannot make real Ari messages disappear from Slugger's iMessage turn loop."
+        "BlueBubbles self-handle filtering is now group-echo scoped and bypasses known non-self friends, so a stale `ownHandles` entry cannot make real Ari messages disappear from Slugger's iMessage turn loop.",
+        "`ouro up` now trusts daemon-published provider readiness after startup instead of doing a second foreground vault read, so a slow Bitwarden provider check cannot freeze the command or report a false auth prompt after the daemon is already healthy."
       ]
     },
     {
