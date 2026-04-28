@@ -767,6 +767,45 @@ export function recordDiscoveredOwnHandle(senderExternalId: string | undefined):
   return true
 }
 
+function isSelfFriendRecord(friend: FriendRecord | null, agentName: string): boolean {
+  if (!friend || friend.kind !== "agent") return false
+  const normalizedAgent = agentName.trim().toLowerCase()
+  const name = friend.name?.trim().toLowerCase()
+  const bundleName = friend.agentMeta?.bundleName?.trim().toLowerCase()
+  return name === normalizedAgent || bundleName === normalizedAgent
+}
+
+async function shouldFilterAgentSelfHandle(
+  event: BlueBubblesNormalizedEvent,
+  resolvedDeps: RuntimeDeps,
+): Promise<boolean> {
+  if (!event.chat.isGroup) return false
+  if (!isAgentSelfHandle(event.sender.externalId, resolvedDeps.getOwnHandles())) return false
+
+  const store = resolvedDeps.createFriendStore()
+  const knownFriend = await store
+    .findByExternalId("imessage-handle", event.sender.externalId)
+    .catch(() => null)
+
+  if (knownFriend && !isSelfFriendRecord(knownFriend, resolvedDeps.getAgentName())) {
+    emitNervesEvent({
+      level: "warn",
+      component: "senses",
+      event: "senses.bluebubbles_self_handle_bypassed_known_friend",
+      message: "did not filter bluebubbles sender even though it matched ownHandles because it resolves to a known non-self friend",
+      meta: {
+        messageGuid: event.messageGuid,
+        kind: event.kind,
+        senderExternalId: event.sender.externalId,
+        friendId: knownFriend.id,
+      },
+    })
+    return false
+  }
+
+  return true
+}
+
 async function handleBlueBubblesNormalizedEvent(
   event: BlueBubblesNormalizedEvent,
   resolvedDeps: RuntimeDeps,
@@ -791,8 +830,10 @@ async function handleBlueBubblesNormalizedEvent(
   // outbound message back through the webhook with `isFromMe` missing/false.
   // Without this guard the agent ingests its own message and replies to it
   // ("Slugger talking to himself"). Compare the sender's externalId against
-  // the agent's known iMessage handles.
-  if (isAgentSelfHandle(event.sender.externalId, resolvedDeps.getOwnHandles())) {
+  // the agent's known iMessage handles. Keep this group-only: 1:1 outbound
+  // echoes can be attributed to the peer handle, and stale ownHandles entries
+  // must not make real DMs disappear.
+  if (await shouldFilterAgentSelfHandle(event, resolvedDeps)) {
     emitNervesEvent({
       level: "warn",
       component: "senses",

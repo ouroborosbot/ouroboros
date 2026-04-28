@@ -8,7 +8,9 @@
         "Production `ouro up` starts or refreshes the daemon before provider health checks and repair prompts. Broken credentials for one agent are reported as degraded provider state after the daemon is answering instead of preventing every agent from coming online.",
         "Daemon startup now opens the command socket before autostarting provider-dependent workers and kicks agent/sense autostart concurrently. A thrown or stalled config check is contained to that agent's crashed snapshot, leaving the daemon and sibling agents reachable.",
         "BlueBubbles no longer auto-learns a one-to-one chat partner as the agent's own iMessage handle after an outbound reply, so the next inbound text from that person is not filtered as self-talk.",
-        "Mail tools and the Ouro Mailbox now retry runtime/config resolution when a sense process cached a transient vault-unavailable state, and prompt sense-status rendering reads the same cached vault runtime truth instead of stale local config."
+        "Mail tools and the Ouro Mailbox now retry runtime/config resolution when a sense process cached a transient vault-unavailable state, and prompt sense-status rendering reads the same cached vault runtime truth instead of stale local config.",
+        "`ouro up` now times out unresolved daemon startup polling instead of spinning forever, and daemon worker startup ignores duplicate start attempts while a provider/config check is already in flight. Stopping during a pending config check no longer lets that worker spawn afterward.",
+        "BlueBubbles self-handle filtering is now group-echo scoped and bypasses known non-self friends, so a stale `ownHandles` entry cannot make real Ari messages disappear from Slugger's iMessage turn loop."
       ]
     },
     {

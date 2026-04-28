@@ -17,6 +17,14 @@ class MockChild extends EventEmitter {
   send = vi.fn((_message: unknown, _callback?: (error: Error | null) => void) => true)
 }
 
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T | PromiseLike<T>) => void } {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
+}
+
 describe("daemon process manager", () => {
   const spawn = vi.fn()
   const now = vi.fn()
@@ -180,6 +188,90 @@ describe("daemon process manager", () => {
     expect(snap?.status).toBe("crashed")
     expect(snap?.errorReason).toBe("missing github-copilot creds")
     expect(snap?.fixHint).toContain("ouro auth")
+  })
+
+  it("does not start duplicate config checks while an agent is already starting", async () => {
+    const deferred = createDeferred<{ ok: boolean }>()
+    const configCheck = vi.fn(() => deferred.promise)
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck,
+      statusWriter: () => {},
+    })
+
+    const firstStart = manager.startAgent("slugger")
+    await Promise.resolve()
+    await manager.startAgent("slugger")
+
+    expect(configCheck).toHaveBeenCalledTimes(1)
+    expect(spawn).not.toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("starting")
+
+    deferred.resolve({ ok: true })
+    await firstStart
+
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
+  })
+
+  it("does not spawn after stopAgent is called during a pending config check", async () => {
+    const deferred = createDeferred<{ ok: boolean }>()
+    const configCheck = vi.fn(() => deferred.promise)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck,
+      statusWriter: () => {},
+    })
+
+    const start = manager.startAgent("slugger")
+    await Promise.resolve()
+    await manager.stopAgent("slugger")
+    deferred.resolve({ ok: true })
+    await start
+
+    expect(configCheck).toHaveBeenCalledTimes(1)
+    expect(spawn).not.toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("stopped")
+  })
+
+  it("does not spawn when stopAgent is requested after config validation but before spawn", async () => {
+    now.mockReturnValue(1_000)
+    let manager!: DaemonProcessManager
+    const existsSync = vi.fn(() => {
+      void manager.stopAgent("slugger")
+      return true
+    })
+
+    manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      existsSync,
+      configCheck: vi.fn(() => ({ ok: true })),
+      statusWriter: () => {},
+    })
+
+    await manager.startAgent("slugger")
+
+    expect(existsSync).toHaveBeenCalled()
+    expect(spawn).not.toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("stopped")
   })
 
   it("records thrown string config check failures as agent-local crashes", async () => {
