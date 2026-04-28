@@ -161,6 +161,41 @@ describe("preTurnPullAsync (signal-aware)", () => {
     )
   })
 
+  it("returns ok=false when the remote check itself throws (async path)", async () => {
+    vi.mocked(childProcess.execFileSync).mockImplementation(() => {
+      throw new Error("fatal: not a git repository")
+    })
+    const { preTurnPullAsync } = await import("../../heart/sync")
+    const result = await preTurnPullAsync("/fake/agent/root", defaultConfig)
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain("not a git repository")
+  })
+
+  it("returns ok=false with stringified error when the remote check throws a non-Error value", async () => {
+    vi.mocked(childProcess.execFileSync).mockImplementation(() => {
+      // Throw a plain string — exercises the `err instanceof Error ? ... : String(err)` branch.
+      throw "raw-string-error"
+    })
+    const { preTurnPullAsync } = await import("../../heart/sync")
+    const result = await preTurnPullAsync("/fake/agent/root", defaultConfig)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe("raw-string-error")
+  })
+
+  it("returns ok=false with stringified error when execFile callback returns a non-Error", async () => {
+    vi.mocked(childProcess.execFile).mockImplementation(((...args: unknown[]) => {
+      const callback = args[args.length - 1] as (err: unknown, stdout: string, stderr: string) => void
+      // Pass a non-Error truthy value as err — exercises the `err instanceof Error ? ... : String(err)` branch.
+      queueMicrotask(() => callback("plain string failure", "", ""))
+      return {} as unknown
+    }) as typeof childProcess.execFile)
+
+    const { preTurnPullAsync } = await import("../../heart/sync")
+    const result = await preTurnPullAsync("/fake/agent/root", defaultConfig)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe("plain string failure")
+  })
+
   it("propagates an injected signal to the child even when the signal never aborts", async () => {
     const ac = new AbortController()
     const { preTurnPullAsync } = await import("../../heart/sync")
