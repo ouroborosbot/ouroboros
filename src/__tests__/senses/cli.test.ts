@@ -68,6 +68,22 @@ describe("CLI adapter - createCliCallbacks", () => {
     expect(typeof callbacks.onToolEnd).toBe("function")
     expect(typeof callbacks.onError).toBe("function")
   })
+
+  it("exposes flushNow as a function (for the `speak` tool)", async () => {
+    const agent = await import("../../senses/cli")
+    const callbacks = agent.createCliCallbacks()
+    expect(typeof callbacks.flushNow).toBe("function")
+  })
+
+  it("flushNow after onTextChunk does not throw and writes nothing additional", async () => {
+    const agent = await import("../../senses/cli")
+    const callbacks = agent.createCliCallbacks()
+    callbacks.onTextChunk("hello")
+    const writesBefore = stdoutChunks.length
+    expect(() => callbacks.flushNow!()).not.toThrow()
+    // CLI flushes on every onTextChunk (via streamer/wrapper) — flushNow is a noop
+    expect(stdoutChunks.length).toBe(writesBefore)
+  })
 })
 
 describe("CLI adapter - continuity ingress texts", () => {
