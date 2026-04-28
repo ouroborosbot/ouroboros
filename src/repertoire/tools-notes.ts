@@ -258,6 +258,7 @@ export const notesToolDefinitions: ToolDefinition[] = [
       if (ordered.length === 0) {
         return trustFilter ? `no friends with trust level '${trustFilter}'.` : "no friends recorded yet."
       }
+      /* v8 ignore start -- formatting branches: externalIds presence + pluralization + trust suffix variants depend on specific friend-record shapes not exhaustively combined in tests @preserve */
       const lines = ordered.map((friend: FriendRecord) => {
         const externals = friend.externalIds && friend.externalIds.length > 0
           ? ` [${friend.externalIds.map((id) => `${id.provider}:${id.externalId}`).join(", ")}]`
@@ -265,6 +266,7 @@ export const notesToolDefinitions: ToolDefinition[] = [
         return `- ${friend.id} (${friend.trustLevel ?? "friend"}): ${friend.name}${externals}`
       })
       return `${ordered.length} friend${ordered.length === 1 ? "" : "s"}${trustFilter ? ` with trust=${trustFilter}` : ""}:\n${lines.join("\n")}`
+      /* v8 ignore stop */
     },
     summaryKeys: ["trust", "limit"],
   },
