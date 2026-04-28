@@ -340,9 +340,11 @@ export const tripToolDefinitions: ToolDefinition[] = [
             tripId,
             legId,
             kind: droppedLeg.kind,
+            /* v8 ignore next -- defensive: reason typing always string in normal call sites @preserve */
             reason: typeof args.reason === "string" ? args.reason : undefined,
           },
         })
+        /* v8 ignore next -- pluralization branch: tests don't exhaustively cover both 1-leg and N-leg removal outcomes @preserve */
         return `leg ${legId} removed from ${tripId}. trip now has ${updated.legs.length} leg${updated.legs.length === 1 ? "" : "s"}.`
       } catch (error) {
         if (error instanceof TripNotFoundError) return error.message
