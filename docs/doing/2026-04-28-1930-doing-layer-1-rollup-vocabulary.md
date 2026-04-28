@@ -137,7 +137,7 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **What**: Verify 100% branch coverage on the rollup function. Refactor for readability if needed.
 **Acceptance**: Coverage 100%. Tests green. No mutation observed (function is pure).
 
-### ⬜ Unit 3a: Wire rollup into `daemon-entry.ts` — Tests
+### ✅ Unit 3a: Wire rollup into `daemon-entry.ts` — Tests
 **What**: Write failing integration tests that boot the daemon (test-level, not subprocess) with seeded agent inventory and assert the rolled-up status reflects the new vocabulary. Place in `src/__tests__/heart/daemon/daemon-entry-rollup.test.ts` (new file). Use `serpentguide-bootstrap.test.ts` as structural precedent.
 **Coverage targets**:
 - Boot with two healthy agents → status `"healthy"`.
