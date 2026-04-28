@@ -85,7 +85,7 @@ Hard timeouts (locked O1):
 **What**: Confirm `DaemonStatus` + `computeDaemonRollup` from layer 1 are in `daemon-health.ts`. If not, halt.
 **Acceptance**: `git log` on base shows layer 1 PR. `grep -rn "DaemonStatus" src/heart/daemon/daemon-health.ts` returns the type.
 
-### ⬜ Unit 1a: Sync taxonomy classifier — Tests
+### ✅ Unit 1a: Sync taxonomy classifier — Tests
 **What**: Write failing tests for `classifySyncFailure(error: unknown, context: SyncContext): SyncClassification` in `src/__tests__/heart/sync-classification.test.ts` (new file). Cover every taxonomy variant from "Completion Criteria":
 - `auth-failed` from a 401/403 git error.
 - `not-found-404` from a 404 git error.
@@ -97,11 +97,11 @@ Hard timeouts (locked O1):
 - `unknown` for anything else.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 1b: Sync taxonomy classifier — Implementation
+### ✅ Unit 1b: Sync taxonomy classifier — Implementation
 **What**: Implement `classifySyncFailure` in `src/heart/sync-classification.ts` (new file, sibling to `sync.ts`). Pure function — pattern-matches on stderr / error codes. Uses `collectRebaseConflictFiles` (existing primitive at `sync.ts:44-63`) for conflict file enumeration. Extend the existing `PendingSyncRecord.classification` enum (`sync.ts:20-25`) to include the new variants — additive, no breaking changes.
 **Acceptance**: Tests PASS (green).
 
-### ⬜ Unit 1c: Sync taxonomy classifier — Coverage & refactor
+### ✅ Unit 1c: Sync taxonomy classifier — Coverage & refactor
 **What**: 100% branch coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
@@ -219,3 +219,4 @@ Hard timeouts (locked O1):
 ## Progress Log
 - 2026-04-28 19:32 UTC Created as PR 3 of 4 in the sequential rollout (1 → 4 → 2 → 3). Depends on layer 1 PR being merged.
 - 2026-04-28 Unit 0 complete: layer 1 vocabulary on main at 3c8e2c38. `RollupStatus`/`DaemonStatus`/`computeDaemonRollup` confirmed exported. Branch `harness/layer-2-sync-probe` cut from main. Artifacts dir created.
+- 2026-04-28 Unit 1a-c complete: `classifySyncFailure` taxonomy implemented in `src/heart/sync-classification.ts`. 27 tests. 100% line/branch/function/statement coverage on the new file. `PendingSyncRecord.classification` widened additively to `SyncClassification` union; existing 26 sync.ts tests still green.
