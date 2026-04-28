@@ -1458,8 +1458,14 @@ describe("mail tools", () => {
     const longThread = await tool("mail_body").handler({ message_id: seeded.longId, reason: "clip", max_chars: "200" }, trustedContext())
     expect(longThread).toContain("body (untrusted external content):")
     expect(String(longThread).endsWith("...")).toBe(true)
+    // Second mail_body call against the same id exercises the in-memory body cache hit path.
+    const longThreadCached = await tool("mail_body").handler({ message_id: seeded.longId, reason: "clip-again", max_chars: "200" }, trustedContext())
+    expect(longThreadCached).toContain("body (untrusted external content):")
+    expect(String(longThreadCached).endsWith("...")).toBe(true)
     const emptyThread = await tool("mail_body").handler({ message_id: seeded.emptyId, reason: "inspect empty" }, trustedContext())
     expect(emptyThread).toContain("(no text body)")
+    const emptyThreadCached = await tool("mail_body").handler({ message_id: seeded.emptyId, reason: "inspect empty cached" }, trustedContext())
+    expect(emptyThreadCached).toContain("(no text body)")
 
     await seeded.store.recordAccess({
       agentId: "slugger",

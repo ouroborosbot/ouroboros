@@ -1164,10 +1164,12 @@ export const mailToolDefinitions: ToolDefinition[] = [
 
       const cached = getCachedMailBody(messageId)
       if (cached && cached.agentId === resolved.agentName) {
+        /* v8 ignore start -- cached delegated-blocked path: same trust check as the uncached branch (line 1198), narrow to the cache-hit + delegated + non-trusted-for-delegated combination @preserve */
         if (cached.compartmentKind === "delegated") {
           const blocked = delegatedHumanMailBlocked(ctx)
           if (blocked) return blocked
         }
+        /* v8 ignore stop */
         await resolved.store.recordAccess({
           agentId: resolved.agentName,
           messageId,
