@@ -1312,6 +1312,40 @@ export async function runAgent(
           if (tc.name === "send_message" && args.friendId === "self") {
             sawSendMessageSelf = true;
           }
+          if (tc.name === "speak") {
+            let speakArgs: { message?: unknown } = {};
+            try { speakArgs = JSON.parse(tc.arguments) as { message?: unknown }; } catch { /* malformed */ }
+            const speakMessage = typeof speakArgs.message === "string" ? speakArgs.message : "";
+            const argSummary = summarizeArgs("speak", { message: speakMessage });
+            callbacks.onToolStart("speak", { message: speakMessage });
+            if (speakMessage.trim().length === 0) {
+              const err = "speak requires a non-empty `message` string.";
+              callbacks.onToolEnd("speak", argSummary, false);
+              messages.push({ role: "tool", tool_call_id: tc.id, content: err });
+              providerRuntime.appendToolOutput(tc.id, err);
+              emitNervesEvent({
+                level: "warn",
+                component: "engine",
+                event: "engine.speak_invalid",
+                message: "speak rejected: missing or empty message",
+                meta: {},
+              });
+              continue;
+            }
+            callbacks.onTextChunk(speakMessage);
+            await callbacks.flushNow?.();
+            callbacks.onToolEnd("speak", argSummary, true);
+            const ack = "(spoken)";
+            messages.push({ role: "tool", tool_call_id: tc.id, content: ack });
+            providerRuntime.appendToolOutput(tc.id, ack);
+            emitNervesEvent({
+              component: "engine",
+              event: "engine.speak",
+              message: "agent spoke mid-turn",
+              meta: { messageLength: speakMessage.length },
+            });
+            continue;
+          }
           if (tc.name === "ponder") {
             const parsedArgs = normalizeLegacyPonderArgs(parsePonderPayload(tc.arguments));
             const argSummary = summarizeArgs(tc.name, parsedArgs as Record<string, string>);
