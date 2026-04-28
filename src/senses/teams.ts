@@ -279,6 +279,26 @@ export function createTeamsCallbacks(
     }
   }
 
+  // Non-aborting awaitable emit — returns true on success, false on failure WITHOUT
+  // calling markStopped() / aborting the controller. Used by flushNow (speak) so a
+  // primary-stream failure followed by a successful sendMessage fallback does NOT
+  // poison the rest of the turn. tryEmit's abort-on-failure behavior is correct for
+  // end-of-turn flush() (no fallback path forward) but wrong for mid-turn speak,
+  // which has a sendMessage fallback that may still succeed.
+  async function tryEmitNoAbort(text: string): Promise<boolean> {
+    if (stopped) return false
+    try {
+      const result: unknown = stream.emit({ text, entities: aiLabelEntities(), channelData: { feedbackLoopEnabled: true } })
+      streamHasContent = true
+      if (result && typeof (result as { then?: Function }).then === "function") {
+        await (result as Promise<unknown>)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
   // Safely send a status update to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
   function safeUpdate(text: string): void {
@@ -415,14 +435,18 @@ export function createTeamsCallbacks(
       // Bypass MIN_INITIAL_CHARS threshold — speak delivers immediately.
       firstContentEmitted = true
       textBuffer = ""
-      // Try the stream first; on failure, fall back to sendMessage (mirrors flush()).
+      // Try the stream first via the NON-ABORTING variant; on failure, fall back
+      // to sendMessage. Critical: do NOT call markStopped() / abort the controller
+      // when only the primary stream fails — the sendMessage fallback may still
+      // deliver the speak, and a successful fallback must not poison the rest of
+      // the turn. Only abort when ALL delivery paths fail (handled below).
       // Contract: throws if the message could not be delivered through any available path.
       let delivered = false
       let lastError: Error | null = null
       if (!stopped) {
-        const ok = await tryEmit(trimmed)
+        const ok = await tryEmitNoAbort(trimmed)
         if (ok) delivered = true
-        else { markStopped(); lastError = new Error("stream emit failed") }
+        else lastError = new Error("stream emit failed")
       }
       if (!delivered && sendMessage) {
         try {
@@ -440,6 +464,10 @@ export function createTeamsCallbacks(
         meta: { messageLength: trimmed.length, delivered },
       })
       if (!delivered) {
+        // All delivery paths exhausted — now it is correct to abort the turn.
+        // markStopped() halts further stream activity and aborts the controller
+        // so the engine catches up and ends the turn cleanly.
+        markStopped()
         throw new Error(
           `teams speak delivery failed: ${lastError?.message ?? "no fallback available"}`,
         )
