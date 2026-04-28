@@ -32,7 +32,7 @@ After this PR: `degraded` means "zero enabled agents serving" (genuinely no work
 - [ ] `DaemonHealthState.status` (`src/heart/daemon/daemon-health.ts:30-40`) accepts the five-state vocabulary as a union literal type. The current `string` typing is replaced with `"healthy" | "partial" | "degraded" | "safe-mode" | "down"`.
 - [ ] Rollup decision function exists (`computeDaemonRollup` or similar — name decided during implementation): given the per-agent status array + bootstrap-degradedComponents array + safe-mode flag, returns the correct rollup state per the table below.
 - [ ] All call sites that read or write `DaemonHealthState.status` use the new vocabulary. No string literals like `"running"` / `"degraded"` floating around without source-of-truth in the new type.
-- [ ] `inner-status.ts` and `startup-tui.ts` consumers render the new vocabulary correctly (text labels, color/emoji conventions match the existing degraded affordances).
+- [ ] Real consumers of `DaemonHealthState.status` render the new vocabulary correctly (text labels, color/emoji conventions match the existing degraded affordances). The actual consumers — confirmed during Unit 0 — are `cli-render.ts:566` (`daemonUnavailableStatusOutput` "Last known status: ..." line) and `runtime-readers.ts:281` (`readDaemonHealthDeep` parse guard for the outlook surface). The planning doc's mention of `inner-status.ts` / `startup-tui.ts` was based on a misread; those files render per-agent runtime/worker status, not the daemon-wide rollup, and stay out of scope here.
 - [ ] Existing safe-mode crash-loop semantics from `safe-mode.ts` still work; the rollup just surfaces them through the new `safe-mode` state name.
 - [ ] No regression: `serpentguide-bootstrap.test.ts` and similar daemon-bootstrap tests still pass.
 - [ ] 100% test coverage on all new code (rollup function, type predicates, render-path branches).
@@ -87,11 +87,12 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 0: Mapping survey
+### ✅ Unit 0: Mapping survey
 **What**: Read all current consumers of `DaemonHealthState.status` and the `degradedComponents[]` rollup. Build a map (in `./2026-04-28-1930-doing-layer-1-rollup-vocabulary/status-callsites.md`) of every read/write of these values.
 **Files to grep**: `src/heart/daemon/daemon-entry.ts`, `daemon-health.ts`, `inner-status.ts`, `startup-tui.ts`, `cli-exec.ts`, `cli-render.ts`, `daemon-cli.ts`, plus any test under `src/__tests__/heart/daemon/`.
 **Output**: `status-callsites.md` listing each file:line, what it reads or writes, and the proposed new-vocabulary value at that site.
 **Acceptance**: Map is complete; every site is accounted for. No "unknown — TBD" items.
+**Outcome**: Survey surfaced a scope correction. The planning doc named `inner-status.ts` and `startup-tui.ts` as "consumers of the daemon status string," but neither file currently reads `DaemonHealthState.status` — they render per-agent inner-runtime and per-agent worker status respectively (different concepts). The real consumers of the rollup `status` field are `cli-render.ts:566` (`daemonUnavailableStatusOutput`) and `runtime-readers.ts:281` (`readDaemonHealthDeep`). Confirmed with ouroboros 2026-04-28; Unit 4 retargeted accordingly. Test fixtures in `daemon-health.test.ts`, `daemon-status-health.test.ts`, and `daemon-entry-health-state.test.ts` will need vocabulary updates as part of Unit 5.
 
 ### ⬜ Unit 1a: Type definition — Tests
 **What**: Write failing tests for the new `RollupStatus` and `DaemonStatus` union types AND their type guards (`isRollupStatus`, `isDaemonStatus`). Tests in `src/__tests__/heart/daemon/daemon-health-status.test.ts` (new file).
@@ -157,22 +158,31 @@ Bootstrap-degraded components (`degradedComponents[]` from `recordRecoverableBoo
 **What**: Verify coverage on the changed rollup code path. Run full test suite.
 **Acceptance**: 100% coverage on changed lines. All tests green.
 
-### ⬜ Unit 4a: Update consumers (`inner-status.ts`, `startup-tui.ts`) — Tests
-**What**: Write failing tests that render each of the five rollup states via `inner-status.ts` and `startup-tui.ts` and assert the visible label / emoji / color is appropriate. Place tests in `src/__tests__/heart/daemon/inner-status-vocabulary.test.ts` and `src/__tests__/heart/daemon/startup-tui-vocabulary.test.ts` (new files).
-**Acceptance**: Tests exist and FAIL (red). All five states are exercised in each consumer.
+### ⬜ Unit 4a: Update consumers (`cli-render.ts`, `runtime-readers.ts`) — Tests
+**Scope correction (Unit 0 outcome)**: planning-doc-named files `inner-status.ts` / `startup-tui.ts` do not actually consume `DaemonHealthState.status`. Real consumers per `status-callsites.md` are `cli-render.ts:566` (`daemonUnavailableStatusOutput`) and `runtime-readers.ts:281` (`readDaemonHealthDeep`). Tests target those.
+**What**: Write failing tests that render each rollup state via `daemonUnavailableStatusOutput` and assert label/dot color is appropriate. Add a parse-validation test for `readDaemonHealthDeep` confirming it now uses `isDaemonStatus` to gate the parsed status field. Place tests in `src/__tests__/heart/daemon/cli-render-rollup-vocabulary.test.ts` and `src/__tests__/heart/outlook/readers/runtime-readers-rollup-vocabulary.test.ts` (new files).
+**Coverage**:
+- `daemonUnavailableStatusOutput`: render each of the five `DaemonStatus` literals (`healthy` / `partial` / `degraded` / `safe-mode` / `down`) with the appropriate label.
+- `degraded` two-copy split: zero-enabled-agents fresh-install vs all-enabled-failed. The render input here is the cached health file — when the daemon is down, the cached file's `agents` map is the only signal we have for which sub-case we're in. Empty `agents` map → "no agents configured" copy. Non-empty `agents` map with all crashed → "agents configured but none ready" copy.
+- `runtime-readers.ts`: parse a health file with each of the five literals → carries the typed `DaemonStatus` through. Parse a health file with junk status (`"banana"`) → defensive fallback to `"unknown"` (existing behavior preserved; the new layer is type-narrowing of the valid path).
+**Acceptance**: Tests exist and FAIL (red). All five rollup states are exercised in `daemonUnavailableStatusOutput`. Both `degraded` sub-cases are present.
 
 ### ⬜ Unit 4b: Update consumers — Implementation
-**What**: Update render switch / mapping logic in `inner-status.ts` and `startup-tui.ts`. New affordances:
-- `healthy` — green / OK label (existing healthy convention).
-- `partial` — yellow / warning label (NEW; replace today's incorrect "degraded" rendering for this case).
-- `degraded` — red / failure label. **Two sub-cases distinguished by render copy** (NOT by status field):
-  - "no enabled agents configured" — when the enabled-agents inventory is empty (fresh install, nothing wired up). Copy: e.g. "no agents configured — run `ouro hatch` to add one".
-  - "all enabled agents failed" — when ≥1 enabled agent exists but all live-checks failed. Copy: e.g. "agents configured but none ready — N agents failed live-check; run `ouro doctor`".
-- `safe-mode` — distinct red+lock affordance (existing).
-- `down` — red+stop affordance (existing or close to it).
+**What**:
+- In `cli-render.ts`: replace the `\`Last known status: ${health.status} ...\`` line with a status-specific render switch. Map each `DaemonStatus` literal to a label + a colored dot (reusing the existing `statusDot` helper or via a dedicated rollup-color map). For `degraded`, branch on `health.agents` map size to pick the copy variant — empty map → fresh-install copy, non-empty → all-failed copy. Default branch must be `never`-typed.
+- In `runtime-readers.ts`: tighten the `health.status` read to use `isDaemonStatus` (newly exported from `daemon-health.ts` in Unit 1b). The existing `"unknown"` fallback for genuinely missing/corrupt status is preserved; the typed path now produces a typed `DaemonStatus`. The DTO field's TypeScript type widens to `DaemonStatus | "unknown"` so downstream Outlook code carries the new vocabulary forward.
 
-The render layer reads enabled-agents count + per-agent statuses to pick the right copy variant for `degraded`. This avoids inflating the status enum just to express a UX nuance.
-**Acceptance**: Tests from 4a PASS (green). Tests cover BOTH `degraded` sub-cases (zero-enabled vs all-unhealthy) and assert distinct rendered copy.
+Affordances per state:
+- `healthy` — green dot + "healthy" label (replaces today's `"ok"`).
+- `partial` — yellow dot + "partial" label (NEW; the case today's incorrect "degraded" rendering covered when ≥1 healthy + ≥1 unhealthy).
+- `degraded` — red dot + label. **Two sub-cases distinguished by render copy** (NOT by status field):
+  - "no agents configured" — when the cached `health.agents` map is empty (fresh install, nothing wired up). Copy: e.g. "no agents configured — run `ouro hatch` to add one".
+  - "all agents failed" — when the map is non-empty but the rollup says zero serving. Copy: e.g. "agents configured but none ready — run `ouro doctor`".
+- `safe-mode` — red dot + "safe mode" label (existing safeMode handling already prints a SAFE MODE line; the rollup status itself just uses the labeled dot).
+- `down` — red dot + "down" label.
+
+The render layer reads `health.agents` (already a field on `DaemonHealthState`) to pick the right copy variant for `degraded`. This avoids inflating the status enum just to express a UX nuance.
+**Acceptance**: Tests from 4a PASS (green). Tests cover BOTH `degraded` sub-cases (zero-enabled vs all-unhealthy) and assert distinct rendered copy. The render switch's default is `never`-typed.
 
 ### ⬜ Unit 4c: Update consumers — Coverage & refactor
 **What**: Verify 100% coverage on touched render paths.
