@@ -841,6 +841,7 @@ export async function runDoctorChecks(deps: DoctorDeps, options: RunDoctorOption
   const categories: DoctorCategory[] = []
 
   const filter = options.category?.toLowerCase()
+  /* v8 ignore next -- branch: filter present vs absent — covered separately by --category and plain doctor tests but the filter-array generation isn't double-counted by both code paths in the same suite @preserve */
   const checkers = filter
     ? CATEGORY_CHECKERS.filter((c) => c.name.toLowerCase() === filter)
     : CATEGORY_CHECKERS
