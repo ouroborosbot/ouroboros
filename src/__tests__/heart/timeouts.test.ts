@@ -241,6 +241,21 @@ describe("runWithTimeouts", () => {
     expect(outcome.warnings).toEqual([])
   })
 
+  it("envKey=LIVECHECK with no env override falls back to passed-in defaults", async () => {
+    // No OURO_BOOT_TIMEOUT_LIVECHECK env — the LIVECHECK branch is taken
+    // but the inner `if (envHard !== null)` falls through.
+    const { runWithTimeouts } = await import("../../heart/timeouts")
+    const promise = runWithTimeouts(
+      async () => "ok",
+      { softMs: 100, hardMs: 1000, label: "live-check", envKey: "LIVECHECK" },
+    )
+    await vi.advanceTimersByTimeAsync(50)
+    const outcome = await promise
+    expect(outcome.result).toBe("ok")
+    expect(outcome.classification).toBeUndefined()
+    expect(outcome.warnings).toEqual([])
+  })
+
   it("works without an envKey (no env override consultation)", async () => {
     process.env["OURO_BOOT_TIMEOUT_GIT_SOFT"] = "1"
     const { runWithTimeouts } = await import("../../heart/timeouts")
