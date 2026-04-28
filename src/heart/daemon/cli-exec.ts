@@ -8099,7 +8099,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       homedir: os.homedir(),
       envPath: process.env.PATH ?? "",
     }
-    const doctorResult = await runDoctorChecks(doctorDeps, command.category ? { category: command.category } : {})
+    const doctorResult = command.category
+      ? await runDoctorChecks(doctorDeps, { category: command.category })
+      : await runDoctorChecks(doctorDeps)
     if (command.category && doctorResult.categories.length === 0) {
       const message = `unknown doctor category '${command.category}'. known categories: CLI, Daemon, Agents, Senses, Habits, Security, Trips, Mailroom, Friends, Disk.\n`
       deps.writeStdout(message)

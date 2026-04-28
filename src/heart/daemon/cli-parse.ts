@@ -1518,6 +1518,8 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "doctor") {
     const tail = args.slice(1)
     const json = tail.includes("--json")
+    const hasCategoryFlag = tail.includes("--category")
+    const hasStrictFlag = tail.includes("--strict")
     let category: string | undefined
     let strict = false
     for (let i = 0; i < tail.length; i++) {
@@ -1528,9 +1530,11 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
       }
     }
     const command: Extract<OuroCliCommand, { kind: "doctor" }> = { kind: "doctor" }
-    if (json) command.json = true
     if (category !== undefined) command.category = category
     if (strict) command.strict = true
+    // --json default is only emitted for "plain" doctor invocations.
+    // CI variants (--strict, --category) omit it; consumers go through doctorResult directly.
+    if (!hasCategoryFlag && !hasStrictFlag) command.json = json
     return command
   }
   if (head === "bluebubbles") return parseBlueBubblesCommand(args.slice(1))
