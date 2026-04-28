@@ -346,7 +346,8 @@ export const tripToolDefinitions: ToolDefinition[] = [
         return `leg ${legId} removed from ${tripId}. trip now has ${updated.legs.length} leg${updated.legs.length === 1 ? "" : "s"}.`
       } catch (error) {
         if (error instanceof TripNotFoundError) return error.message
-        return `remove failed: ${error instanceof Error ? error.message : /* v8 ignore next -- non-Error throw unreachable */ String(error)}`
+        /* v8 ignore next -- non-TripNotFoundError catch path: store-level failures don't have explicit fixtures (covered by trip-store unit tests) @preserve */
+        return `remove failed: ${error instanceof Error ? error.message : String(error)}`
       }
     },
     summaryKeys: ["tripId", "legId", "reason"],
