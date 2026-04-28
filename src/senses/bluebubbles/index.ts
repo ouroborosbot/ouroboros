@@ -752,6 +752,7 @@ export function recordDiscoveredOwnHandle(senderExternalId: string | undefined):
   if (!senderExternalId || !senderExternalId.trim()) return false
   const trimmed = senderExternalId.trim()
   const normalized = normalizeHandleForSelfMatch(trimmed)
+  /* v8 ignore next -- defensive: normalizeHandleForSelfMatch only returns falsy for empty input, already guarded above @preserve */
   if (!normalized) return false
   for (const existing of discoveredOwnHandles) {
     if (normalizeHandleForSelfMatch(existing) === normalized) return false
