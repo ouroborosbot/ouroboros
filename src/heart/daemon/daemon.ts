@@ -26,10 +26,10 @@ import {
 } from "./agent-service"
 import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
 import { getSharedMcpManager, shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
-import { startOutlookHttpServer, type OutlookHttpServerHandle } from "../outlook/outlook-http"
-import { OUTLOOK_DEFAULT_PORT } from "../outlook/outlook-types"
-import { readOutlookAgentState, readOutlookMachineState } from "../outlook/outlook-read"
-import { buildOutlookAgentView, buildOutlookMachineView } from "../outlook/outlook-view"
+import { startMailboxHttpServer, type MailboxHttpServerHandle } from "../mailbox/mailbox-http"
+import { MAILBOX_DEFAULT_PORT } from "../mailbox/mailbox-types"
+import { readMailboxAgentState, readMailboxMachineState } from "../mailbox/mailbox-read"
+import { buildMailboxAgentView, buildMailboxMachineView } from "../mailbox/mailbox-view"
 import { buildAgentProviderVisibility, providerVisibilityStatusRows, type ProviderStatusRow } from "../provider-visibility"
 import { DEFAULT_DAEMON_SOCKET_PATH } from "./socket-client"
 
@@ -397,13 +397,13 @@ export interface OuroDaemonOptions {
   bundlesRoot?: string
   mode?: "dev" | "production"
   /**
-   * Factory for the Outlook HTTP server. Tests inject a stub so they can
+   * Factory for the Mailbox HTTP server. Tests inject a stub so they can
    * exercise the full start/stop lifecycle without binding to port 6876
    * (which is held by a running production daemon on dev machines and
-   * causes EADDRINUSE flakes). Defaults to the real `startOutlookHttpServer`
+   * causes EADDRINUSE flakes). Defaults to the real `startMailboxHttpServer`
    * wired with the daemon's bundlesRoot and view builders.
    */
-  outlookServerFactory?: () => Promise<OutlookHttpServerHandle>
+  mailboxServerFactory?: () => Promise<MailboxHttpServerHandle>
 }
 
 interface DaemonWorkerRow {
@@ -423,6 +423,7 @@ interface DaemonStatusOverview {
   daemon: "running" | "stopped"
   health: "ok" | "warn"
   socketPath: string
+  mailboxUrl: string
   outlookUrl: string
   version: string
   lastUpdated: string
@@ -564,10 +565,10 @@ export class OuroDaemon {
   private readonly bundlesRoot: string
   private readonly mode: "dev" | "production"
   private server: net.Server | null = null
-  private outlookServer: OutlookHttpServerHandle | null = null
+  private mailboxServer: MailboxHttpServerHandle | null = null
   private socketIdentity: SocketIdentity | null = null
   private senseAutostartTimer: ReturnType<typeof setTimeout> | null = null
-  private readonly outlookServerFactory: () => Promise<OutlookHttpServerHandle>
+  private readonly mailboxServerFactory: () => Promise<MailboxHttpServerHandle>
 
   constructor(options: OuroDaemonOptions) {
     this.socketPath = options.socketPath
@@ -578,36 +579,36 @@ export class OuroDaemon {
     this.senseManager = options.senseManager ?? null
     this.bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
     this.mode = options.mode ?? "production"
-    this.outlookServerFactory = options.outlookServerFactory ?? this.createDefaultOutlookServer.bind(this)
+    this.mailboxServerFactory = options.mailboxServerFactory ?? this.createDefaultMailboxServer.bind(this)
   }
 
-  /* v8 ignore start -- default outlook server wiring: production-only path, tests inject outlookServerFactory stub instead. startOutlookHttpServer itself has full coverage in outlook-http.test.ts @preserve */
-  private createDefaultOutlookServer(): Promise<OutlookHttpServerHandle> {
-    return startOutlookHttpServer({
+  /* v8 ignore start -- default mailbox server wiring: production-only path, tests inject mailboxServerFactory stub instead. startMailboxHttpServer itself has full coverage in mailbox-http.test.ts @preserve */
+  private createDefaultMailboxServer(): Promise<MailboxHttpServerHandle> {
+    return startMailboxHttpServer({
       host: "127.0.0.1",
-      port: OUTLOOK_DEFAULT_PORT,
+      port: MAILBOX_DEFAULT_PORT,
       bundlesRoot: this.bundlesRoot,
-      readMachineState: () => readOutlookMachineState({ bundlesRoot: this.bundlesRoot }),
+      readMachineState: () => readMailboxMachineState({ bundlesRoot: this.bundlesRoot }),
       readMachineView: ({ machine }) => {
         const overview = this.buildStatusPayload().overview
-        return buildOutlookMachineView({
+        return buildMailboxMachineView({
           machine,
           daemon: {
             status: overview.daemon,
             health: overview.health,
             mode: overview.mode,
             socketPath: overview.socketPath,
-            outlookUrl: overview.outlookUrl,
+            mailboxUrl: overview.mailboxUrl,
             entryPath: overview.entryPath,
             workerCount: overview.workerCount,
             senseCount: overview.senseCount,
           },
         })
       },
-      readAgentState: (agentName) => readOutlookAgentState(agentName, { bundlesRoot: this.bundlesRoot }),
+      readAgentState: (agentName) => readMailboxAgentState(agentName, { bundlesRoot: this.bundlesRoot }),
       readAgentView: (agentName) => {
-        const agent = readOutlookAgentState(agentName, { bundlesRoot: this.bundlesRoot })
-        return buildOutlookAgentView({
+        const agent = readMailboxAgentState(agentName, { bundlesRoot: this.bundlesRoot })
+        return buildMailboxAgentView({
           agent,
           viewer: { kind: "human" },
         })
@@ -630,12 +631,14 @@ export class OuroDaemon {
       })),
     )
 
+    const mailboxUrl = this.mailboxServer?.origin ?? "http://127.0.0.1:0"
     return {
       overview: {
         daemon: "running",
         health: workers.every((worker) => worker.status === "running") ? "ok" : "warn",
         socketPath: this.socketPath,
-        outlookUrl: this.outlookServer?.origin ?? "http://127.0.0.1:0",
+        mailboxUrl,
+        outlookUrl: mailboxUrl,
         ...getRuntimeMetadata(),
         workerCount: workers.length,
         senseCount: senses.length,
@@ -781,17 +784,17 @@ export class OuroDaemon {
     await this.drainPendingBundleMessages()
     await this.drainPendingSenseMessages()
     // startInner is only reachable when this.server is null (guarded in
-    // start()), and stop() nulls out this.outlookServer alongside this.server,
-    // so outlookServer is guaranteed unset here — no need for a guard.
+    // start()), and stop() nulls out this.mailboxServer alongside this.server,
+    // so mailboxServer is guaranteed unset here — no need for a guard.
     try {
-      this.outlookServer = await this.outlookServerFactory()
+      this.mailboxServer = await this.mailboxServerFactory()
     } catch (error) {
       emitNervesEvent({
         level: "warn",
         component: "daemon",
-        event: "daemon.outlook_start_failed",
-        message: `Outlook server failed to start: ${String(error)}`,
-        meta: { port: OUTLOOK_DEFAULT_PORT },
+        event: "daemon.mailbox_start_failed",
+        message: `Mailbox server failed to start: ${String(error)}`,
+        meta: { port: MAILBOX_DEFAULT_PORT },
       })
     }
   }
@@ -1125,9 +1128,9 @@ export class OuroDaemon {
       this.server.close()
       this.server = null
     }
-    if (this.outlookServer) {
-      await this.outlookServer.stop()
-      this.outlookServer = null
+    if (this.mailboxServer) {
+      await this.mailboxServer.stop()
+      this.mailboxServer = null
     }
 
     const socketPathExists = fs.existsSync(this.socketPath)
