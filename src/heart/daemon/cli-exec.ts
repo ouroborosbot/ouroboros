@@ -6880,7 +6880,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           // prompt receives them as a structured JSON block. Drift is
           // already collected for the no-repair path above; we collect
           // again here because the repair path is a separate branch.
-          const repairDriftFindings = await collectAgentDriftAdvisories(deps)
+          // Filter to agents in repairInput so the diagnostic prompt
+          // doesn't carry drift from healthy peers — narrows the
+          // signal to the set being diagnosed.
+          const repairAgentNames = new Set(repairInput.map((entry) => entry.agent))
+          const repairDriftFindings = (await collectAgentDriftAdvisories(deps))
+            .filter((finding) => repairAgentNames.has(finding.agent))
           const repairResult = await runAgenticRepair(repairInput, {
             /* v8 ignore start -- production provider discovery wiring @preserve */
             discoverWorkingProvider: async (agentName: string) => {
