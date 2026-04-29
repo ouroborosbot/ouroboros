@@ -277,7 +277,7 @@ interface RepairGuideContent {
 **What**: 100% coverage on changed lines.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 8a: Override-path removal — Tests
+### ✅ Unit 8a: Override-path removal — Tests
 **What**: Write tests asserting the new behavior in `src/__tests__/heart/hatch/hatch-specialist.test.ts` (modified file):
 - `getSpecialistIdentitySourceDir()` returns the in-repo path unconditionally.
 - Even when `~/AgentBundles/SerpentGuide.ouro/psyche/identities` exists on disk (test fixture), the function ignores it and returns the in-repo path.
@@ -285,7 +285,7 @@ interface RepairGuideContent {
 - Existing override-path test (lines 78-85 in current test file) is removed or rewritten.
 **Acceptance**: Updated tests exist and FAIL (red) against the current (override-honoring) implementation.
 
-### ⬜ Unit 8b: Override-path removal — Implementation
+### ✅ Unit 8b: Override-path removal — Implementation
 **What**:
 - `src/heart/hatch/hatch-specialist.ts:21-31` — remove the `userSource` branch from `getSpecialistIdentitySourceDir()`. Keep only the in-repo path (`getRepoSpecialistIdentitiesDir()`).
 - `src/heart/hatch/hatch-flow.ts` — verify nothing depends on the override; update if needed.
@@ -293,7 +293,7 @@ interface RepairGuideContent {
 - `src/__tests__/heart/hatch/hatch-flow.test.ts` — fixture paths that used `~/AgentBundles/SerpentGuide.ouro/` to populate identities should now write to the in-repo path (or the test should mock `getRepoSpecialistIdentitiesDir`).
 **Acceptance**: Tests from 8a PASS. All existing hatch tests still pass.
 
-### ⬜ Unit 8c: Override-path removal — Coverage & refactor
+### ✅ Unit 8c: Override-path removal — Coverage & refactor
 **What**: 100% coverage on the changed lines. Run `grep -rn "AgentBundles.*SerpentGuide.*identities\|AgentBundles.*SerpentGuide.*psyche" src/ src/__tests__/` and confirm only legitimate references remain (i.e., not the removed override).
 **Acceptance**: Coverage 100%. Tests green. Grep is clean of the override pattern.
 
