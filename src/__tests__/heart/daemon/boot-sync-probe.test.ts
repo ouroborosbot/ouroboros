@@ -277,6 +277,17 @@ describe("runBootSyncProbe", () => {
     expect(abortFiredAt).toBeLessThan(16000)
   })
 
+  it("emits an unknown finding when the probe result has ok=false but no error string", async () => {
+    // Edge case: preTurnPullAsync returned `{ ok: false }` with no `error`.
+    // The orchestrator should fall back to the placeholder error text.
+    preTurnPullAsyncMock.mockResolvedValue({ ok: false })
+    const { runBootSyncProbe } = await import("../../../heart/daemon/boot-sync-probe")
+    const result = await runBootSyncProbe([row("alice")], { bundlesRoot: "/fake/bundles" })
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].classification).toBe("unknown")
+    expect(result.findings[0].error).toMatch(/unknown sync error/)
+  })
+
   it("aggregates findings sorted by agent name for stable rendering", async () => {
     preTurnPullAsyncMock.mockImplementation((root: string) => {
       if (root.includes("zelda")) return Promise.resolve({ ok: false, error: "404 not found" })

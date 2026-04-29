@@ -665,7 +665,7 @@ function providerRepairCountSummary(count: number): string {
  * first, then advisories" so the operator's eye lands on the actionable
  * items before the warnings.
  */
-function writeSyncProbeSummary(
+export function writeSyncProbeSummary(
   deps: Pick<OuroCliDeps, "writeStdout">,
   findings: readonly BootSyncProbeFinding[],
 ): void {
@@ -691,7 +691,7 @@ function bootPhasePlan(daemonAlive: boolean): readonly string[] {
  * `inner-status.ts` / `startup-tui.ts` consumers; this helper is just for
  * the progress phase blurb.
  */
-function summarizeSyncProbeFindings(findings: readonly BootSyncProbeFinding[]): string {
+export function summarizeSyncProbeFindings(findings: readonly BootSyncProbeFinding[]): string {
   if (findings.length === 0) return "all sync-enabled bundles healthy"
   const blocking = findings.filter((f) => !f.advisory).length
   const advisory = findings.filter((f) => f.advisory).length

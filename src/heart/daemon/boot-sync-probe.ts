@@ -150,10 +150,8 @@ export async function runBootSyncProbe(
     }
 
     const result = outcome.result
+    /* v8 ignore start -- defensive: exclusive state from runWithTimeouts contract — either result or classification, never both undefined @preserve */
     if (!result) {
-      // Defensive — should not happen because runWithTimeouts either yields
-      // a result or a classification.
-      /* v8 ignore start -- defensive: exclusive state from runWithTimeouts contract @preserve */
       findings.push({
         agent: bundle.agent,
         classification: "unknown",
@@ -163,8 +161,8 @@ export async function runBootSyncProbe(
         advisory: true,
       })
       continue
-      /* v8 ignore stop */
     }
+    /* v8 ignore stop */
 
     if (!result.ok) {
       const classification = classifySyncFailure(

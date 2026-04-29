@@ -24,9 +24,10 @@ vi.mock("child_process", () => ({
   execFile: vi.fn(),
 }))
 
-vi.mock("../../nerves/runtime", () => ({
-  emitNervesEvent: vi.fn(),
-}))
+// Intentionally NOT mocking ../../nerves/runtime so the global capture
+// sees the events we emit (e.g., heart.sync_pull_aborted from the
+// already-aborted-signal path). Mocking the runtime would make the
+// nerves source-coverage gate flag the events as declared-but-not-observed.
 
 const existsSyncMock = vi.hoisted(() => vi.fn())
 vi.mock("fs", async (importOriginal) => {
