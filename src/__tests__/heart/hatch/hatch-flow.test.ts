@@ -370,18 +370,23 @@ describe("hatch flow", () => {
   })
 
   it("uses default home, source, and target paths when optional deps are omitted", async () => {
+    // Layer 3: the `~/AgentBundles/SerpentGuide.ouro/` override is gone —
+    // `getSpecialistIdentitySourceDir()` now returns the in-repo path
+    // unconditionally. This test mirrors the previous fixture but provides
+    // the source via `specialistIdentitySourceDir` (since the in-repo path
+    // would otherwise resolve to the actual repo at runtime, polluting
+    // test state).
     const tempCwd = makeTempDir("hatch-default-cwd")
     cleanup.push(tempCwd)
 
     const homeDir = os.homedir()
-    const specialistBundleDir = path.join(homeDir, "AgentBundles", "SerpentGuide.ouro")
-    const sourceDir = path.join(specialistBundleDir, "psyche", "identities")
-    fs.mkdirSync(sourceDir, { recursive: true })
-    fs.writeFileSync(path.join(sourceDir, "python.md"), "# Python\n", "utf-8")
+    const explicitSourceDir = makeTempDir("hatch-default-source")
+    cleanup.push(explicitSourceDir)
+    fs.writeFileSync(path.join(explicitSourceDir, "python.md"), "# Python\n", "utf-8")
 
     const agentName = `DefaultsBot-${Date.now()}`
     const bundleRoot = path.join(homeDir, "AgentBundles", `${agentName}.ouro`)
-    cleanup.push(bundleRoot, specialistBundleDir)
+    cleanup.push(bundleRoot)
 
     const originalCwd = process.cwd()
     try {
@@ -393,7 +398,7 @@ describe("hatch flow", () => {
         credentials: {
           setupToken: `sk-ant-oat01-${"b".repeat(80)}`,
         },
-      })
+      }, { specialistIdentitySourceDir: explicitSourceDir })
 
       expect(result.bundleRoot).toBe(bundleRoot)
       expect(fs.existsSync(path.join(tempCwd, "SerpentGuide.ouro", "psyche", "identities", "python.md"))).toBe(true)
