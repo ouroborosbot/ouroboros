@@ -2901,6 +2901,18 @@ describe("BlueBubbles sense runtime", () => {
     )
   })
 
+  it("does not emit a backlog recovery completion event when no recovery candidates exist", async () => {
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const result = await bluebubbles.recoverMissedBlueBubblesMessages()
+
+    expect(result).toEqual({ recovered: 0, skipped: 0, pending: 0, failed: 0 })
+    expect(mocks.emitNervesEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "senses.bluebubbles_recovery_complete",
+      }),
+    )
+  })
+
   it("catches up recent upstream messages after BlueBubbles recovers from an outage", async () => {
     const tempAgentRoot = makeTempDir()
     const { getAgentRoot } = await import("../../../heart/identity")
@@ -3512,6 +3524,104 @@ describe("BlueBubbles sense runtime", () => {
     closableServer.close()
     await vi.advanceTimersByTimeAsync(30_000)
     expect(mocks.checkHealth).toHaveBeenCalledTimes(2)
+  })
+
+  it("counts captured inbound sidecars as unique pending recovery during runtime sync", async () => {
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+
+    const captured = makeCatchUpMessage({
+      messageGuid: "captured-runtime-pending-guid",
+      textForAgent: "captured runtime pending",
+    })
+    const processed = makeCatchUpMessage({
+      messageGuid: "captured-runtime-processed-guid",
+      textForAgent: "captured runtime processed",
+    })
+    const { getBlueBubblesInboundLogPath } = await import("../../../senses/bluebubbles/inbound-log")
+    const logPath = getBlueBubblesInboundLogPath("testagent", "chat:any;-;ari@mendelow.me")
+    fs.mkdirSync(path.dirname(logPath), { recursive: true })
+    fs.writeFileSync(
+      logPath,
+      [
+        JSON.stringify({
+          recordedAt: new Date(captured.timestamp).toISOString(),
+          messageGuid: captured.messageGuid,
+          chatGuid: captured.chat.chatGuid,
+          chatIdentifier: captured.chat.chatIdentifier,
+          sessionKey: captured.chat.sessionKey,
+          textForAgent: captured.textForAgent,
+          source: "webhook",
+        }),
+        JSON.stringify({
+          recordedAt: new Date(captured.timestamp + 1).toISOString(),
+          messageGuid: captured.messageGuid,
+          chatGuid: captured.chat.chatGuid,
+          chatIdentifier: captured.chat.chatIdentifier,
+          sessionKey: captured.chat.sessionKey,
+          textForAgent: "duplicate should not count twice",
+          source: "webhook",
+        }),
+        JSON.stringify({
+          recordedAt: new Date(processed.timestamp).toISOString(),
+          messageGuid: processed.messageGuid,
+          chatGuid: processed.chat.chatGuid,
+          chatIdentifier: processed.chat.chatIdentifier,
+          sessionKey: processed.chat.sessionKey,
+          textForAgent: processed.textForAgent,
+          source: "webhook",
+        }),
+      ].join("\n") + "\n",
+      "utf-8",
+    )
+    const { recordProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
+    recordProcessedBlueBubblesMessage("testagent", processed, "webhook", "turn-complete")
+
+    const closableServer = createClosableServer()
+    mocks.createServer.mockReturnValue(closableServer.server as any)
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    bluebubbles.startBlueBubblesApp()
+    await flushAsyncWork()
+    closableServer.close()
+
+    const runtimePath = path.join(tempAgentRoot, "state", "senses", "bluebubbles", "runtime.json")
+    await waitFor(() => fs.existsSync(runtimePath))
+    expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
+      expect.objectContaining({
+        upstreamStatus: "error",
+        detail: "pending recovery: 1",
+        pendingRecoveryCount: 1,
+      }),
+    )
+    expect(mocks.repairEvent).not.toHaveBeenCalled()
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+  })
+
+  it("keeps runtime healthy when catch-up discovery fails without pending recovery", async () => {
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+    mocks.listRecentMessages.mockRejectedValueOnce("catch-up listing failed")
+
+    const closableServer = createClosableServer()
+    mocks.createServer.mockReturnValue(closableServer.server as any)
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    bluebubbles.startBlueBubblesApp()
+    await flushAsyncWork()
+    closableServer.close()
+
+    const runtimePath = path.join(tempAgentRoot, "state", "senses", "bluebubbles", "runtime.json")
+    await waitFor(() => fs.existsSync(runtimePath))
+    expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
+      expect.objectContaining({
+        upstreamStatus: "ok",
+        detail: "1 message(s) unrecoverable this cycle; upstream ok",
+        pendingRecoveryCount: 0,
+      }),
+    )
   })
 
   it("writes runtime error state when the BlueBubbles upstream health probe fails before backlog recovery", async () => {

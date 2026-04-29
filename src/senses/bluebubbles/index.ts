@@ -1344,44 +1344,22 @@ function resolveBlueBubblesCatchUpSince(previousState: BlueBubblesRuntimeState, 
   return nowMs - BLUEBUBBLES_FIRST_CATCHUP_LOOKBACK_MS
 }
 
-function formatRecoveredCount(count: number): string {
-  return `caught up ${count} missed message(s)`
-}
-
-interface BlueBubblesRuntimeSyncOptions {
-  /**
-   * Runtime health sync runs inside the HTTP webhook worker. Production keeps
-   * this false so stale recovery cannot monopolize the live iMessage listener.
-   * Direct recovery helpers still process turns when called explicitly.
-   */
-  processRecoveryTurns?: boolean
-}
-
-async function syncBlueBubblesRuntime(
-  deps: Partial<RuntimeDeps> = {},
-  options: BlueBubblesRuntimeSyncOptions = {},
-): Promise<void> {
+async function syncBlueBubblesRuntime(deps: Partial<RuntimeDeps> = {}): Promise<void> {
   const resolvedDeps = { ...defaultDeps, ...deps }
   const agentName = resolvedDeps.getAgentName()
   const client = resolvedDeps.createClient()
   const checkedAt = new Date().toISOString()
   const previousState = readBlueBubblesRuntimeState(agentName)
-  const processRecoveryTurns = options.processRecoveryTurns === true
 
   try {
     await client.checkHealth()
-    const captured = processRecoveryTurns
-      ? await recoverCapturedBlueBubblesInboundMessages(resolvedDeps)
-      : { recovered: 0, skipped: countPendingCapturedInboundMessages(agentName), failed: 0 }
-    const recovery = processRecoveryTurns
-      ? await recoverMissedBlueBubblesMessages(resolvedDeps)
-      : { recovered: 0, skipped: 0, pending: countPendingRecoveryCandidates(agentName), failed: 0 }
+    const capturedPending = countPendingCapturedInboundMessages(agentName)
+    const recoveryPending = countPendingRecoveryCandidates(agentName)
     const catchUp = await catchUpMissedBlueBubblesMessages(resolvedDeps, previousState, {
-      processTurns: processRecoveryTurns,
+      processTurns: false,
     })
-    const failed = captured.failed + recovery.failed + catchUp.failed
-    const recovered = captured.recovered + recovery.recovered + catchUp.recovered
-    const queued = (processRecoveryTurns ? 0 : captured.skipped + recovery.pending) + (catchUp.queued ?? 0)
+    const failed = catchUp.failed
+    const queued = capturedPending + recoveryPending + (catchUp.queued ?? 0)
     // upstreamStatus reflects whether BlueBubbles itself is healthy and we
     // have unprocessed work (pendingRecoveryCount). Per-cycle recovery
     // failures are noted in `detail` for transparency but do NOT flip the
@@ -1394,13 +1372,11 @@ async function syncBlueBubblesRuntime(
         ? `pending recovery: ${queued}`
         : failed > 0
           ? `${failed} message(s) unrecoverable this cycle; upstream ok`
-          : catchUp.recovered > 0
-            ? formatRecoveredCount(catchUp.recovered)
-            : "upstream reachable",
+          : "upstream reachable",
       lastCheckedAt: checkedAt,
       pendingRecoveryCount: queued,
-      lastRecoveredAt: recovered > 0 ? checkedAt : previousState.lastRecoveredAt,
-      lastRecoveredMessageGuid: catchUp.lastRecoveredMessageGuid ?? previousState.lastRecoveredMessageGuid,
+      lastRecoveredAt: previousState.lastRecoveredAt,
+      lastRecoveredMessageGuid: previousState.lastRecoveredMessageGuid,
     })
   } catch (error) {
     writeBlueBubblesRuntimeState(agentName, {
