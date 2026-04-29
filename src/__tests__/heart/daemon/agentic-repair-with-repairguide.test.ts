@@ -84,6 +84,297 @@ describe("RepairGuide gate wiring (cli-exec.ts call site)", () => {
   })
 })
 
+describe("RepairGuide content prepending", () => {
+  it("prepends RepairGuide bundle content to the diagnostic system prompt when present", async () => {
+    // Use the actual on-disk RepairGuide.ouro/ as the fixture (it ships in
+    // the repo). Verify the streamTurn mock receives a system message that
+    // contains a marker from SOUL.md.
+    const path = await import("path")
+    const fs = await import("fs")
+    const repoRoot = path.resolve(__dirname, "../../../..")
+    expect(fs.existsSync(path.join(repoRoot, "RepairGuide.ouro"))).toBe(true)
+
+    const captured: { systemContent?: string } = {}
+    const mockStreamTurn = vi.fn(async (req: { messages: Array<{ role: string; content: string }> }) => {
+      const sys = req.messages.find((m) => m.role === "system")
+      captured.systemContent = sys?.content
+      return {
+        content: "```json\n" + JSON.stringify({
+          actions: [
+            { kind: "vault-unlock", agent: "slugger", reason: "expired" },
+          ],
+        }) + "\n```",
+        toolCalls: [],
+        outputItems: [],
+      }
+    })
+
+    const degraded: DegradedAgent[] = [
+      { agent: "slugger", errorReason: "weird-error", fixHint: "" },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: true })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: repoRoot,
+    })
+
+    const result = await runAgenticRepair(degraded, deps)
+    expect(result.usedAgentic).toBe(true)
+    expect(captured.systemContent).toContain("RepairGuide SOUL")
+    expect(captured.systemContent).toContain("RepairGuide IDENTITY")
+    expect(captured.systemContent).toContain("diagnose-bootstrap-drift.md")
+
+    // RepairGuide proposals were extracted and surfaced to stdout
+    const stdoutCalls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.flat()
+    const stdout = stdoutCalls.join("\n")
+    expect(stdout).toContain("RepairGuide proposals")
+    expect(stdout).toContain("vault-unlock")
+  })
+
+  it("falls back to today's diagnosis blob when RepairGuide bundle is missing", async () => {
+    // Point the loader at an empty temp dir (no RepairGuide.ouro). The
+    // diagnostic call still runs with the original system prompt and the
+    // raw output is printed under "AI Diagnosis", not "RepairGuide proposals".
+    const path = await import("path")
+    const fs = await import("fs")
+    const os = await import("os")
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repair-guide-missing-"))
+
+    const mockStreamTurn = vi.fn(async () => ({
+      content: "plain-text diagnosis",
+      toolCalls: [],
+      outputItems: [],
+    }))
+
+    const degraded: DegradedAgent[] = [
+      { agent: "slugger", errorReason: "weird", fixHint: "" },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: true })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: tmpRoot,
+    })
+
+    const result = await runAgenticRepair(degraded, deps)
+    expect(result.usedAgentic).toBe(true)
+
+    const stdoutCalls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.flat()
+    const stdout = stdoutCalls.join("\n")
+    expect(stdout).toContain("AI Diagnosis")
+    expect(stdout).toContain("plain-text diagnosis")
+    expect(stdout).not.toContain("RepairGuide proposals")
+
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  it("when RepairGuide present and LLM emits unparseable output, prints fallback blob (not proposals)", async () => {
+    const path = await import("path")
+    const repoRoot = path.resolve(__dirname, "../../../..")
+
+    const mockStreamTurn = vi.fn(async () => ({
+      content: "raw prose without JSON block",
+      toolCalls: [],
+      outputItems: [],
+    }))
+
+    const degraded: DegradedAgent[] = [
+      { agent: "slugger", errorReason: "weird", fixHint: "" },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: true })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: repoRoot,
+    })
+
+    await runAgenticRepair(degraded, deps)
+    const stdoutCalls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.flat()
+    const stdout = stdoutCalls.join("\n")
+    expect(stdout).toContain("AI Diagnosis")
+    expect(stdout).toContain("raw prose without JSON block")
+    expect(stdout).not.toContain("RepairGuide proposals")
+  })
+
+  it("when RepairGuide proposal includes warnings, surfaces them under proposals", async () => {
+    const path = await import("path")
+    const repoRoot = path.resolve(__dirname, "../../../..")
+
+    const mockStreamTurn = vi.fn(async () => ({
+      content: "```json\n" + JSON.stringify({
+        actions: [
+          { kind: "vault-unlock", agent: "a", reason: "r" },
+          { kind: "totally-bogus", agent: "b" },
+        ],
+      }) + "\n```",
+      toolCalls: [],
+      outputItems: [],
+    }))
+
+    const degraded: DegradedAgent[] = [
+      { agent: "slugger", errorReason: "weird", fixHint: "" },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: true })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: repoRoot,
+    })
+
+    await runAgenticRepair(degraded, deps)
+    const stdoutCalls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.flat()
+    const stdout = stdoutCalls.join("\n")
+    expect(stdout).toContain("RepairGuide proposals")
+    expect(stdout).toContain("vault-unlock")
+    expect(stdout).toContain("warning")
+    expect(stdout).toContain("totally-bogus")
+  })
+
+  it("when RepairGuide bundle exists but psyche+skills are empty, falls back to base prompt", async () => {
+    // Create a RepairGuide.ouro with empty psyche/skills directories. The
+    // loader returns an object with empty psyche{} and skills{} (not null);
+    // buildSystemPromptWithRepairGuide should detect zero sections and
+    // return the base prompt unchanged.
+    const path = await import("path")
+    const fs = await import("fs")
+    const os = await import("os")
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repair-guide-empty-"))
+    fs.mkdirSync(path.join(tmpRoot, "RepairGuide.ouro", "psyche"), { recursive: true })
+    fs.mkdirSync(path.join(tmpRoot, "RepairGuide.ouro", "skills"), { recursive: true })
+
+    const captured: { systemContent?: string } = {}
+    const mockStreamTurn = vi.fn(async (req: { messages: Array<{ role: string; content: string }> }) => {
+      const sys = req.messages.find((m) => m.role === "system")
+      captured.systemContent = sys?.content
+      return { content: "diag", toolCalls: [], outputItems: [] }
+    })
+
+    const degraded: DegradedAgent[] = [
+      { agent: "slugger", errorReason: "weird", fixHint: "" },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: true })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: tmpRoot,
+    })
+
+    await runAgenticRepair(degraded, deps)
+    // Empty bundle → base prompt with NO RepairGuide markers
+    expect(captured.systemContent).toBeDefined()
+    expect(captured.systemContent).not.toContain("RepairGuide SOUL")
+    expect(captured.systemContent).not.toContain("RepairGuide IDENTITY")
+    expect(captured.systemContent).not.toContain("RepairGuide skill")
+
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  it("when RepairGuide has skills but no SOUL or IDENTITY, prompt still includes the skills", async () => {
+    // Edge case: psyche dir absent / both files missing but skills/ has
+    // content. The two psyche `if` branches are hit on the falsy side.
+    const path = await import("path")
+    const fs = await import("fs")
+    const os = await import("os")
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repair-guide-skills-only-"))
+    fs.mkdirSync(path.join(tmpRoot, "RepairGuide.ouro", "skills"), { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpRoot, "RepairGuide.ouro", "skills", "only-skill.md"),
+      "skill body content",
+    )
+
+    const captured: { systemContent?: string } = {}
+    const mockStreamTurn = vi.fn(async (req: { messages: Array<{ role: string; content: string }> }) => {
+      const sys = req.messages.find((m) => m.role === "system")
+      captured.systemContent = sys?.content
+      return { content: "diag", toolCalls: [], outputItems: [] }
+    })
+
+    const degraded: DegradedAgent[] = [
+      { agent: "slugger", errorReason: "weird", fixHint: "" },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: true })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: tmpRoot,
+    })
+
+    await runAgenticRepair(degraded, deps)
+    expect(captured.systemContent).toContain("only-skill.md")
+    expect(captured.systemContent).toContain("skill body content")
+    expect(captured.systemContent).not.toContain("RepairGuide SOUL")
+    expect(captured.systemContent).not.toContain("RepairGuide IDENTITY")
+
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  it("forceDiagnosis bypass: typed-only set with no local repair fires diagnostic", async () => {
+    const path = await import("path")
+    const repoRoot = path.resolve(__dirname, "../../../..")
+
+    const mockStreamTurn = vi.fn(async () => ({
+      content: "```json\n" + JSON.stringify({ actions: [] }) + "\n```",
+      toolCalls: [],
+      outputItems: [],
+    }))
+
+    // Three typed entries (issue.kind is known typed) — without
+    // forceDiagnosis, runAgenticRepair would early-return because
+    // hasKnownTypedRepair is true.
+    const typed: DegradedAgent[] = [
+      {
+        agent: "slugger",
+        errorReason: "vault locked",
+        fixHint: "",
+        issue: {
+          kind: "vault-locked",
+          severity: "blocked",
+          actor: "human-required",
+          summary: "",
+          actions: [],
+        },
+      },
+      {
+        agent: "slugger",
+        errorReason: "creds missing",
+        fixHint: "",
+        issue: {
+          kind: "provider-credentials-missing",
+          severity: "blocked",
+          actor: "human-required",
+          summary: "",
+          actions: [],
+        },
+      },
+      {
+        agent: "slugger",
+        errorReason: "live check failed",
+        fixHint: "",
+        issue: {
+          kind: "provider-live-check-failed",
+          severity: "blocked",
+          actor: "human-required",
+          summary: "",
+          actions: [],
+        },
+      },
+    ]
+    const deps = makeDeps({
+      promptInput: vi.fn(async () => "y"),
+      runInteractiveRepair: vi.fn(async () => ({ repairsAttempted: false })),
+      createProviderRuntime: vi.fn(() => ({ streamTurn: mockStreamTurn })),
+      repoRootOverride: repoRoot,
+      forceDiagnosis: true,
+    })
+
+    const result = await runAgenticRepair(typed, deps)
+    // The diagnostic LLM call fired (usedAgentic === true), bypassing the
+    // typed-only early-return.
+    expect(result.usedAgentic).toBe(true)
+  })
+})
+
 describe("RepairGuide gate wiring (function-level)", () => {
   it("shouldFireRepairGuide false → caller skips runAgenticRepair entirely", async () => {
     // When the gate decides NOT to fire, the caller must not even build the
