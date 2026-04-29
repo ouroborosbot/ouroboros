@@ -167,8 +167,8 @@ describe("kind:library exclusion", () => {
       const { listAllBundleAgents } = await import("../../../heart/daemon/agent-discovery")
 
       expect(listAllBundleAgents()).toEqual([
-        { name: "RepairGuide", enabled: false, kind: "library" },
         { name: "real", enabled: true },
+        { name: "RepairGuide", enabled: false, kind: "library" },
       ])
     })
 
