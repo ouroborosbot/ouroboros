@@ -827,6 +827,7 @@ export class BitwardenCredentialStore implements CredentialStore {
       const item = parseBwItem(stdout, "bw get item")
       return item.name === domain ? item : null
     } catch (error) {
+      /* v8 ignore next -- defensive: execBw rejects with Error instances @preserve */
       const err = error instanceof Error ? error : new Error(String(error))
       if (isBwItemNotFoundError(err)) return null
       throw err

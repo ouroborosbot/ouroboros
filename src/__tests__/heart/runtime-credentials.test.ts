@@ -139,6 +139,64 @@ describe("runtime credentials vault config", () => {
     expect(mockCredentialStore.store.getRawSecret).not.toHaveBeenCalled()
   })
 
+  it("rejects malformed runtime credential bootstrap messages without touching cache", () => {
+    emitTestEvent("runtime credentials reject malformed daemon bootstrap")
+
+    for (const message of [
+      null,
+      [],
+      { type: "other", agentName: "slugger" },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "" },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", runtimeConfig: [] },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", machineRuntimeConfig: "bad" },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", machineId: "" },
+    ]) {
+      expect(applyRuntimeCredentialBootstrapMessage(message)).toBe(false)
+    }
+
+    expect(readRuntimeCredentialConfig("slugger")).toEqual({
+      ok: false,
+      reason: "missing",
+      itemPath: "vault:slugger:runtime/config",
+      error: "no runtime credentials stored at vault:slugger:runtime/config",
+    })
+  })
+
+  it("uses this-machine when daemon IPC omits a machine id", () => {
+    emitTestEvent("runtime credentials daemon bootstrap default machine")
+
+    expect(applyRuntimeCredentialBootstrapMessage({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
+    })).toBe(true)
+
+    expect(readMachineRuntimeCredentialConfig("slugger")).toMatchObject({
+      ok: true,
+      itemPath: "vault:slugger:runtime/machines/<this-machine>/config",
+      config: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
+    })
+  })
+
+  it("accepts daemon IPC bootstrap messages that only include shared runtime config", () => {
+    emitTestEvent("runtime credentials daemon bootstrap runtime only")
+
+    expect(applyRuntimeCredentialBootstrapMessage({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      runtimeConfig: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
+    })).toBe(true)
+
+    expect(readRuntimeCredentialConfig("slugger")).toMatchObject({
+      ok: true,
+      config: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
+    })
+    expect(readMachineRuntimeCredentialConfig("slugger")).toMatchObject({
+      ok: false,
+      reason: "missing",
+    })
+  })
+
   it("waits briefly for daemon IPC runtime credential bootstrap", async () => {
     emitTestEvent("runtime credentials wait for daemon bootstrap")
 
@@ -155,6 +213,33 @@ describe("runtime credentials vault config", () => {
       ok: true,
       config: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
     })
+  })
+
+  it("ignores unrelated daemon IPC messages and resolves false on timeout", async () => {
+    emitTestEvent("runtime credentials daemon bootstrap timeout")
+    vi.useFakeTimers()
+
+    try {
+      const waiting = waitForRuntimeCredentialBootstrap("slugger")
+      process.emit("message", { type: "other", agentName: "slugger" })
+      process.emit("message", {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "ouroboros",
+        runtimeConfig: { mailroom: { mailboxAddress: "ouroboros@ouro.bot" } },
+      })
+
+      await vi.advanceTimersByTimeAsync(1_500)
+
+      await expect(waiting).resolves.toBe(false)
+      expect(readRuntimeCredentialConfig("slugger")).toEqual({
+        ok: false,
+        reason: "missing",
+        itemPath: "vault:slugger:runtime/config",
+        error: "no runtime credentials stored at vault:slugger:runtime/config",
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("upserts runtime/config into the agent vault and refreshes it back into cache", async () => {

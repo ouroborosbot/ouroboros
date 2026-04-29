@@ -305,6 +305,7 @@ export class DaemonProcessManager {
           )
           return
         }
+        /* v8 ignore next -- defensive duplicate stale-start guard before spawn preparation @preserve */
         if (!this.isStartAttemptCurrent(state, attemptId)) return
         // Config check passed — clear any prior error so the pulse stops
         // reporting the broken state. This is the recovery path: the user
@@ -330,6 +331,7 @@ export class DaemonProcessManager {
         return
       }
 
+      /* v8 ignore next -- defensive duplicate stale-start guard immediately before spawn @preserve */
       if (!this.isStartAttemptCurrent(state, attemptId)) return
       if (state.stopRequested) {
         state.snapshot.status = "stopped"
@@ -469,6 +471,7 @@ export class DaemonProcessManager {
     const state = this.requireAgent(agent)
     if (state.startInFlight && !state.process) {
       const startedAt = state.startAttemptedAtMs
+      /* v8 ignore next -- defensive: startInFlight always records a start timestamp @preserve */
       const elapsedMs = startedAt === null ? 0 : this.currentTimeMs() - startedAt
       if (elapsedMs < this.startupStaleAfterMs) {
         emitNervesEvent({

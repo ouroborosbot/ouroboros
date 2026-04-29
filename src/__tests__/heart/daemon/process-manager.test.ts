@@ -197,6 +197,70 @@ describe("daemon process manager", () => {
     })
   })
 
+  it("continues startup when runtime credential bootstrap IPC send throws", async () => {
+    const child = new MockChild()
+    child.send.mockImplementation(() => {
+      throw "ipc closed"
+    })
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents: [{
+        name: "slugger:bluebubbles",
+        agentArg: "slugger",
+        entry: "senses/bluebubbles/entry.js",
+        channel: "bluebubbles",
+        autoStart: true,
+        getRuntimeCredentialBootstrap: () => ({
+          agentName: "slugger",
+          machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
+        }),
+      }],
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await expect(manager.startAgent("slugger:bluebubbles")).resolves.not.toThrow()
+
+    expect(child.send).toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger:bluebubbles")?.status).toBe("running")
+  })
+
+  it("records Error details when runtime credential bootstrap IPC send throws an Error", async () => {
+    const child = new MockChild()
+    child.send.mockImplementation(() => {
+      throw new Error("ipc closed")
+    })
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents: [{
+        name: "slugger:bluebubbles",
+        agentArg: "slugger",
+        entry: "senses/bluebubbles/entry.js",
+        channel: "bluebubbles",
+        autoStart: true,
+        getRuntimeCredentialBootstrap: () => ({
+          agentName: "slugger",
+          machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
+        }),
+      }],
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await expect(manager.startAgent("slugger:bluebubbles")).resolves.not.toThrow()
+
+    expect(child.send).toHaveBeenCalled()
+    expect(manager.getAgentSnapshot("slugger:bluebubbles")?.status).toBe("running")
+  })
+
   it("notifies onSnapshotChange when configCheck fails (sets errorReason and fixHint)", async () => {
     const onSnapshotChange = vi.fn()
     const configCheck = vi.fn().mockReturnValue({
@@ -352,6 +416,46 @@ describe("daemon process manager", () => {
     expect(configCheck).toHaveBeenCalledTimes(1)
     expect(spawn).not.toHaveBeenCalled()
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("stopped")
+  })
+
+  it("terminates a child spawned by a startup attempt that became stale", async () => {
+    const staleChild = new MockChild()
+    staleChild.kill.mockImplementation(() => {
+      throw new Error("sigterm denied")
+    })
+    const freshChild = new MockChild()
+    let manager!: DaemonProcessManager
+    let restartPromise: Promise<void> | null = null
+    let spawnCount = 0
+    spawn.mockImplementation(() => {
+      spawnCount += 1
+      if (spawnCount === 1) {
+        restartPromise = manager.restartAgent("slugger")
+        return staleChild
+      }
+      return freshChild
+    })
+    now
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(3_000)
+
+    manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck: vi.fn(() => ({ ok: true })),
+      startupStaleAfterMs: 1_000,
+      statusWriter: () => {},
+    })
+
+    await manager.startAgent("slugger")
+    await restartPromise
+
+    expect(staleChild.kill).toHaveBeenCalledWith("SIGTERM")
+    expect(spawn).toHaveBeenCalledTimes(2)
+    expect(manager.getAgentSnapshot("slugger")?.pid).toBe(freshChild.pid)
   })
 
   it("does not spawn when stopAgent is requested after config validation but before spawn", async () => {

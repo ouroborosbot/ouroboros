@@ -788,6 +788,7 @@ export class OuroDaemon {
   }
 
   private triggerAutoStartSenses(): void {
+    /* v8 ignore next -- defensive: callers already check senseManager before delegating here @preserve */
     if (!this.senseManager) return
     if (this.senseManager.triggerAutoStartSenses) {
       this.senseManager.triggerAutoStartSenses()

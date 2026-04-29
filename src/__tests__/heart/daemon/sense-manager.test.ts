@@ -785,9 +785,80 @@ describe("daemon sense manager", () => {
         ],
       }),
     )
+    const bluebubblesAgent = (processManagerCtor.mock.calls[0]?.[0] as {
+      agents: Array<{ name: string; getRuntimeCredentialBootstrap?: () => unknown }>
+    }).agents.find((agent) => agent.name === "slugger:bluebubbles")
+    expect(bluebubblesAgent?.getRuntimeCredentialBootstrap?.()).toEqual({
+      agentName: "slugger",
+      runtimeConfig: {
+        teams: {
+          clientId: "cid",
+          clientSecret: "secret",
+          tenantId: "tenant",
+        },
+        mailroom: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: {
+            mail_slugger_primary: "secret",
+          },
+        },
+      },
+      machineRuntimeConfig: {
+        bluebubbles: {
+          serverUrl: "http://localhost:1234",
+          password: "pw",
+        },
+      },
+      machineId: expect.stringMatching(/^machine_/),
+    })
     expect(manager.listSenseRows().find((row) => row.agent === "ouroboros" && row.sense === "teams")).toEqual(
       expect.objectContaining({ status: "disabled" }),
     )
+  })
+
+  it("returns no runtime credential bootstrap when no cached config is available", async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-home-"))
+    const bundlesRoot = path.join(homeRoot, "AgentBundles")
+    writeAgentJson(bundlesRoot, "slugger", {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      senses: {
+        cli: { enabled: true },
+        mail: { enabled: true },
+      },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    const processManagerCtor = vi.fn()
+
+    vi.doMock("os", async () => {
+      const actual = await vi.importActual<typeof import("os")>("os")
+      return {
+        ...actual,
+        homedir: () => homeRoot,
+      }
+    })
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: class MockProcessManager {
+        constructor(options: unknown) {
+          processManagerCtor(options)
+        }
+        startAutoStartAgents = vi.fn(async () => undefined)
+        stopAll = vi.fn(async () => undefined)
+        listAgentSnapshots = vi.fn(() => [])
+      },
+    }))
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    new DaemonSenseManager({
+      agents: ["slugger"],
+    })
+
+    const mailAgent = (processManagerCtor.mock.calls[0]?.[0] as {
+      agents: Array<{ name: string; getRuntimeCredentialBootstrap?: () => unknown }>
+    }).agents.find((agent) => agent.name === "slugger:mail")
+    expect(mailAgent?.getRuntimeCredentialBootstrap?.()).toBeNull()
   })
 
   it("uses cached runtime config for default sense checks, refreshes in the background, and returns sense-specific repair hints", async () => {
@@ -957,6 +1028,264 @@ describe("daemon sense manager", () => {
     })
     await vi.waitFor(() => {
       expect(refreshMachineRuntimeCredentialConfig).toHaveBeenCalledWith("slugger", expect.any(String), { preserveCachedOnFailure: true })
+    })
+  })
+
+  it("retries skipped sense startup when background runtime refresh restores config", async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-home-"))
+    const bundlesRoot = path.join(homeRoot, "AgentBundles")
+    writeAgentJson(bundlesRoot, "slugger", {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      senses: {
+        cli: { enabled: true },
+        mail: { enabled: true },
+      },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    const processManagerCtor = vi.fn()
+    const startAgent = vi.fn(async () => undefined)
+    const refreshedConfig = {
+      ok: true as const,
+      itemPath: "vault:slugger:runtime/config",
+      config: {
+        mailroom: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: {
+            mail_slugger_primary: "secret",
+          },
+        },
+      },
+      revision: "runtime_test",
+      updatedAt: new Date(0).toISOString(),
+    }
+    let resolveRefresh!: (value: typeof refreshedConfig) => void
+    const refreshRuntimeCredentialConfig = vi.fn(() => new Promise<typeof refreshedConfig>((resolve) => {
+      resolveRefresh = resolve
+    }))
+
+    vi.doMock("os", async () => {
+      const actual = await vi.importActual<typeof import("os")>("os")
+      return {
+        ...actual,
+        homedir: () => homeRoot,
+      }
+    })
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: class MockProcessManager {
+        constructor(options: unknown) {
+          processManagerCtor(options)
+        }
+        startAgent = startAgent
+        startAutoStartAgents = vi.fn(async () => undefined)
+        stopAll = vi.fn(async () => undefined)
+        listAgentSnapshots = vi.fn(() => [])
+      },
+    }))
+    vi.doMock("../../../heart/runtime-credentials", () => ({
+      readRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/config`,
+        error: "missing",
+      }),
+      readMachineRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
+        error: "missing",
+      }),
+      refreshRuntimeCredentialConfig,
+      refreshMachineRuntimeCredentialConfig: vi.fn(),
+    }))
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    new DaemonSenseManager({
+      agents: ["slugger"],
+    })
+
+    const options = processManagerCtor.mock.calls[0]?.[0] as {
+      configCheck: (name: string) => Promise<{ ok: boolean; error?: string; fix?: string; skip?: boolean }>
+    }
+
+    await expect(options.configCheck("slugger:mail")).resolves.toMatchObject({ ok: false, skip: true })
+    await expect(options.configCheck("slugger:mail")).resolves.toMatchObject({ ok: false, skip: true })
+    expect(refreshRuntimeCredentialConfig).toHaveBeenCalledTimes(1)
+
+    resolveRefresh(refreshedConfig)
+
+    await vi.waitFor(() => {
+      expect(startAgent).toHaveBeenCalledWith("slugger:mail")
+    })
+  })
+
+  it("contains background runtime refresh failures for skipped sense startup", async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-home-"))
+    const bundlesRoot = path.join(homeRoot, "AgentBundles")
+    writeAgentJson(bundlesRoot, "slugger", {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      senses: {
+        cli: { enabled: true },
+        mail: { enabled: true },
+      },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    const processManagerCtor = vi.fn()
+    const emitNervesEvent = vi.fn()
+    const refreshRuntimeCredentialConfig = vi.fn(async () => {
+      throw new Error("vault offline")
+    })
+
+    vi.doMock("os", async () => {
+      const actual = await vi.importActual<typeof import("os")>("os")
+      return {
+        ...actual,
+        homedir: () => homeRoot,
+      }
+    })
+    vi.doMock("../../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: class MockProcessManager {
+        constructor(options: unknown) {
+          processManagerCtor(options)
+        }
+        startAgent = vi.fn(async () => undefined)
+        startAutoStartAgents = vi.fn(async () => undefined)
+        stopAll = vi.fn(async () => undefined)
+        listAgentSnapshots = vi.fn(() => [])
+      },
+    }))
+    vi.doMock("../../../heart/runtime-credentials", () => ({
+      readRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/config`,
+        error: "missing",
+      }),
+      readMachineRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
+        error: "missing",
+      }),
+      refreshRuntimeCredentialConfig,
+      refreshMachineRuntimeCredentialConfig: vi.fn(),
+    }))
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    new DaemonSenseManager({
+      agents: ["slugger"],
+    })
+
+    const options = processManagerCtor.mock.calls[0]?.[0] as {
+      configCheck: (name: string) => Promise<{ ok: boolean; error?: string; fix?: string; skip?: boolean }>
+    }
+
+    await expect(options.configCheck("slugger:mail")).resolves.toMatchObject({ ok: false, skip: true })
+
+    await vi.waitFor(() => {
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        event: "channel.daemon_sense_autostart_error",
+        message: "sense config refresh failed",
+      }))
+    })
+  })
+
+  it("contains sense start failures after a background runtime refresh restores config", async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-home-"))
+    const bundlesRoot = path.join(homeRoot, "AgentBundles")
+    writeAgentJson(bundlesRoot, "slugger", {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      senses: {
+        cli: { enabled: true },
+        mail: { enabled: true },
+      },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    const processManagerCtor = vi.fn()
+    const emitNervesEvent = vi.fn()
+    const startAgent = vi.fn(async () => {
+      throw new Error("start failed")
+    })
+    const refreshRuntimeCredentialConfig = vi.fn(async () => ({
+      ok: true as const,
+      itemPath: "vault:slugger:runtime/config",
+      config: {
+        mailroom: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: {
+            mail_slugger_primary: "secret",
+          },
+        },
+      },
+      revision: "runtime_test",
+      updatedAt: new Date(0).toISOString(),
+    }))
+
+    vi.doMock("os", async () => {
+      const actual = await vi.importActual<typeof import("os")>("os")
+      return {
+        ...actual,
+        homedir: () => homeRoot,
+      }
+    })
+    vi.doMock("../../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: class MockProcessManager {
+        constructor(options: unknown) {
+          processManagerCtor(options)
+        }
+        startAgent = startAgent
+        startAutoStartAgents = vi.fn(async () => undefined)
+        stopAll = vi.fn(async () => undefined)
+        listAgentSnapshots = vi.fn(() => [])
+      },
+    }))
+    vi.doMock("../../../heart/runtime-credentials", () => ({
+      readRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/config`,
+        error: "missing",
+      }),
+      readMachineRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
+        error: "missing",
+      }),
+      refreshRuntimeCredentialConfig,
+      refreshMachineRuntimeCredentialConfig: vi.fn(),
+    }))
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    new DaemonSenseManager({
+      agents: ["slugger"],
+    })
+
+    const options = processManagerCtor.mock.calls[0]?.[0] as {
+      configCheck: (name: string) => Promise<{ ok: boolean; error?: string; fix?: string; skip?: boolean }>
+    }
+
+    await expect(options.configCheck("slugger:mail")).resolves.toMatchObject({ ok: false, skip: true })
+
+    await vi.waitFor(() => {
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        event: "channel.daemon_sense_autostart_error",
+        message: "sense autostart failed",
+      }))
     })
   })
 

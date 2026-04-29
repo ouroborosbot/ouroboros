@@ -791,6 +791,57 @@ describe("BitwardenCredentialStore", () => {
       expect(calls.find((call) => call[0] === "get" && call[1] === "item")).toBeDefined()
       expect(calls.find((call) => call[0] === "list" && call[1] === "items")).toBeUndefined()
     })
+
+    it("treats a structured exact lookup with the wrong item name as missing", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "unlocked" }), "")
+          return
+        }
+        if (args[0] === "get") {
+          cb(null, JSON.stringify({
+            id: "item-1",
+            name: "providers/anthropic",
+            login: {
+              username: "providers/anthropic",
+              password: "secret",
+            },
+            revisionDate: "2026-04-20T05:01:30.000Z",
+          }), "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      const result = await store.get("providers/openai-codex")
+
+      expect(result).toBeNull()
+      expect(calls.find((call) => call[0] === "get" && call[1] === "item")).toBeDefined()
+      expect(calls.find((call) => call[0] === "list" && call[1] === "items")).toBeUndefined()
+    })
+
+    it("reuses the structured item cache for repeated legacy structured lookups", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "unlocked" }), "")
+          return
+        }
+        if (args[0] === "list" && args[1] === "items") {
+          cb(null, JSON.stringify([]), "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await expect(store.delete("providers/openai-codex")).resolves.toBe(false)
+      await expect(store.delete("providers/azure")).resolves.toBe(false)
+
+      expect(calls.filter((call) => call[0] === "list" && call[1] === "items")).toHaveLength(1)
+    })
   })
 
   describe("getRawSecret", () => {

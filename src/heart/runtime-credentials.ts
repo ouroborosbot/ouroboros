@@ -210,8 +210,10 @@ export function waitForRuntimeCredentialBootstrap(
     let timer: ReturnType<typeof setTimeout> | null = null
 
     const finish = (value: boolean): void => {
+      /* v8 ignore next -- defensive: listener cleanup and timer cleanup prevent double settlement @preserve */
       if (settled) return
       settled = true
+      /* v8 ignore next -- defensive: timer is assigned immediately after listener registration @preserve */
       if (timer) clearTimeout(timer)
       process.off?.("message", onMessage)
       resolve(value)

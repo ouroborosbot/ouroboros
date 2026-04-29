@@ -439,6 +439,7 @@ export async function upsertProviderCredential(input: ProviderCredentialUpsertIn
   })
   input.onProgress?.(`refreshing local provider snapshot from ${input.agentName}'s vault...`)
   const refreshResult = await refreshProviderCredentialPool(input.agentName, {
+    providers: [input.provider],
     onProgress: input.onProgress,
   })
   if (!refreshResult.ok) {

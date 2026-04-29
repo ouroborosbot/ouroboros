@@ -142,6 +142,104 @@ describe("session transcript", () => {
     }
   })
 
+  it("renders same-session send_message calls and ignores malformed tool arguments", async () => {
+    const { summarizeSessionTail } = await import("../../heart/session-transcript")
+
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      version: 1,
+      messages: [
+        { role: "user", content: "are you seeing this?" },
+        { role: "assistant", content: null, tool_calls: [{ id: "call_bad", type: "function", function: { name: "settle", arguments: "{" } }] },
+        { role: "assistant", content: null, tool_calls: [{ id: "call_array", type: "function", function: { name: "settle", arguments: "[]" } }] },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [{
+            id: "call_missing_target",
+            type: "function",
+            function: {
+              name: "send_message",
+              arguments: JSON.stringify({ content: "missing target metadata" }),
+            },
+          }],
+        },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [{
+            id: "call_1",
+            type: "function",
+            function: {
+              name: "send_message",
+              arguments: JSON.stringify({
+                friendId: "friend-1",
+                channel: "bluebubbles",
+                key: "chat",
+                content: "yes, I see the latest text now",
+              }),
+            },
+          }],
+        },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [{
+            id: "call_2",
+            type: "function",
+            function: {
+              name: "send_message",
+              arguments: JSON.stringify({
+                friendId: "friend-2",
+                channel: "bluebubbles",
+                key: "chat",
+                content: "wrong friend",
+              }),
+            },
+          }],
+        },
+      ],
+    }))
+
+    const result = await summarizeSessionTail({
+      sessionPath: "/mock/agent-root/state/sessions/friend-1/bluebubbles/chat.json",
+      friendId: "friend-1",
+      channel: "bluebubbles",
+      key: "chat",
+      messageCount: 10,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok") {
+      expect(stripTranscriptMetadata(result.transcript)).toBe("[user] are you seeing this?\n[assistant] yes, I see the latest text now")
+      expect(result.transcript).not.toContain("wrong friend")
+    }
+  })
+
+  it("uses the default transcript tail size when requested count is invalid", async () => {
+    const { summarizeSessionTail } = await import("../../heart/session-transcript")
+
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      version: 1,
+      messages: [
+        { role: "user", content: "default count please" },
+        { role: "assistant", content: "using default count" },
+      ],
+    }))
+
+    const result = await summarizeSessionTail({
+      sessionPath: "/mock/agent-root/state/sessions/friend-1/bluebubbles/chat.json",
+      friendId: "friend-1",
+      channel: "bluebubbles",
+      key: "chat",
+      messageCount: 0,
+    })
+
+    expect(result.kind).toBe("ok")
+    if (result.kind === "ok") {
+      expect(stripTranscriptMetadata(result.transcript)).toBe("[user] default count please\n[assistant] using default count")
+    }
+  })
+
   it("can fall back to archived events when the projected tail has no visible user text", async () => {
     const { summarizeSessionTail } = await import("../../heart/session-transcript")
     const staleHighSequence = sessionEvent(1000, "assistant", "old high-sequence answer", [], "2026-04-22T17:15:00.000Z")

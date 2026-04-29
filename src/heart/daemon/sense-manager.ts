@@ -438,6 +438,7 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
         ? await refreshMachineRuntimeCredentialConfig(parsed.agent, currentMachineId(), { preserveCachedOnFailure: true })
         : readMachineRuntimeCredentialConfig(parsed.agent)
       const context = this.contexts.get(parsed.agent)
+      /* v8 ignore next -- defensive: config refreshes are only scheduled for known agent contexts @preserve */
       if (!context) return
       context.facts = senseFactsFromRuntimeConfig(parsed.agent, context.senses, refreshed, machineRefreshed)
       if (!context.facts[parsed.sense].configured) return
@@ -448,6 +449,7 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
             component: "channels",
             event: "channel.daemon_sense_autostart_error",
             message: "sense autostart failed",
+            /* v8 ignore next -- defensive: process manager rejects with Error instances in normal use @preserve */
             meta: { error: error instanceof Error ? error.message : String(error) },
           })
         })
@@ -458,6 +460,7 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
         component: "channels",
         event: "channel.daemon_sense_autostart_error",
         message: "sense config refresh failed",
+        /* v8 ignore next -- defensive: runtime credential refresh rejects with Error instances in normal use @preserve */
         meta: { error: error instanceof Error ? error.message : String(error) },
       })
     } finally {
