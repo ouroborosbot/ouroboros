@@ -17,7 +17,7 @@ import {
   type InteractiveRepairResult,
 } from "./interactive-repair"
 import type { DiscoverWorkingProviderResult } from "./provider-discovery"
-import type { AgentProvider } from "../identity"
+import { getRepoRoot, type AgentProvider } from "../identity"
 import { createProviderRuntimeForConfig, type ProviderRuntimeConfig } from "../provider-ping"
 import type OpenAI from "openai"
 import { isKnownReadinessIssue, type RepairAction, type RepairActionKind } from "./readiness-repair"
@@ -57,6 +57,21 @@ export interface AgenticRepairDeps {
   isTTY?: boolean
   /** Current stdout width for tty rendering */
   stdoutColumns?: number
+  /**
+   * Layer 3: when true, bypass the typed-issues early-return so the diagnostic
+   * LLM call still fires. The cli-exec call site sets this when the activation
+   * contract fires solely on typed-stacking (`typedDegraded >= 3`,
+   * `untypedDegraded === 0`) — the deterministic typed repair already ran
+   * above and the operator now needs RepairGuide-driven advice on the
+   * compound situation.
+   */
+  forceDiagnosis?: boolean
+  /**
+   * Layer 3: optional override for the repo root the RepairGuide loader
+   * reads from. Production wiring leaves this undefined so the loader uses
+   * `getRepoRoot()`; tests inject a fixture path.
+   */
+  repoRootOverride?: string
 }
 
 export interface AgenticRepairResult {
@@ -136,6 +151,33 @@ export function createAgenticDiagnosisProviderRuntime(
   })
 }
 
+/**
+ * Layer 3: build the system prompt for the diagnostic call. Prepends
+ * RepairGuide bundle content (`psyche/SOUL.md`, `psyche/IDENTITY.md`, all
+ * skills) when the bundle is present and readable; falls back to today's
+ * pre-RepairGuide prompt when the loader returns null.
+ */
+function buildSystemPromptWithRepairGuide(
+  degraded: DegradedAgent[],
+  repairGuide: RepairGuideContent | null,
+): string {
+  const basePrompt = buildSystemPrompt(degraded)
+  if (repairGuide === null) return basePrompt
+
+  const sections: string[] = []
+  if (repairGuide.psyche.soul) {
+    sections.push("# RepairGuide SOUL\n\n" + repairGuide.psyche.soul)
+  }
+  if (repairGuide.psyche.identity) {
+    sections.push("# RepairGuide IDENTITY\n\n" + repairGuide.psyche.identity)
+  }
+  for (const [name, body] of Object.entries(repairGuide.skills)) {
+    sections.push(`# RepairGuide skill: ${name}\n\n${body}`)
+  }
+  if (sections.length === 0) return basePrompt
+  return [...sections, "---", basePrompt].join("\n\n")
+}
+
 async function tryAgenticDiagnosis(
   degraded: DegradedAgent[],
   provider: DiscoverWorkingProviderResult,
@@ -144,7 +186,12 @@ async function tryAgenticDiagnosis(
   const logsTail = deps.readDaemonLogsTail()
   const runtime = deps.createProviderRuntime(provider)
 
-  const systemPrompt = buildSystemPrompt(degraded)
+  // Layer 3: prepend RepairGuide bundle content when present. Loader
+  // returns null on missing bundle / I/O error — caller silently falls back
+  // to today's pre-RepairGuide prompt.
+  const repoRoot = deps.repoRootOverride ?? getRepoRoot()
+  const repairGuide = loadRepairGuideContent(repoRoot)
+  const systemPrompt = buildSystemPromptWithRepairGuide(degraded, repairGuide)
   const userMessage = buildUserMessage(degraded, logsTail)
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -171,11 +218,38 @@ async function tryAgenticDiagnosis(
   })
 
   if (result.content) {
-    deps.writeStdout("")
-    deps.writeStdout("--- AI Diagnosis ---")
-    deps.writeStdout(result.content)
-    deps.writeStdout("--- End Diagnosis ---")
-    deps.writeStdout("")
+    // Layer 3: when RepairGuide content was prepended, parse the LLM output
+    // through the typed-action catalog. If actions are extracted, surface
+    // them as structured proposals; otherwise fall back to today's plain
+    // text-blob diagnosis. `parseRepairProposals` handles the unparseable
+    // case by returning `fallbackBlob` set to the raw output.
+    if (repairGuide !== null) {
+      const parsed = parseRepairProposals(result.content)
+      if (parsed.actions.length > 0) {
+        deps.writeStdout("")
+        deps.writeStdout("--- RepairGuide proposals ---")
+        for (const action of parsed.actions) {
+          deps.writeStdout(`  • ${action.kind}: ${action.label}`)
+        }
+        for (const warning of parsed.warnings) {
+          deps.writeStdout(`  (warning) ${warning}`)
+        }
+        deps.writeStdout("--- End RepairGuide proposals ---")
+        deps.writeStdout("")
+      } else if (parsed.fallbackBlob !== undefined) {
+        deps.writeStdout("")
+        deps.writeStdout("--- AI Diagnosis ---")
+        deps.writeStdout(parsed.fallbackBlob)
+        deps.writeStdout("--- End Diagnosis ---")
+        deps.writeStdout("")
+      }
+    } else {
+      deps.writeStdout("")
+      deps.writeStdout("--- AI Diagnosis ---")
+      deps.writeStdout(result.content)
+      deps.writeStdout("--- End Diagnosis ---")
+      deps.writeStdout("")
+    }
   }
 
   return true
@@ -199,15 +273,16 @@ export async function runAgenticRepair(
 
   const hasLocalRepair = degraded.some(hasRunnableInteractiveRepair)
   const hasKnownTypedRepair = degraded.some((entry) => isKnownReadinessIssue(entry.issue))
+  const forceDiagnosis = deps.forceDiagnosis === true
   if (hasLocalRepair) {
     const interactiveResult = await runDeterministicRepair(degraded, deps)
     if (interactiveResult.repairsAttempted) {
       return { repairsAttempted: true, usedAgentic: false }
     }
-    if (hasKnownTypedRepair) {
+    if (hasKnownTypedRepair && !forceDiagnosis) {
       return { repairsAttempted: false, usedAgentic: false }
     }
-  } else if (hasKnownTypedRepair) {
+  } else if (hasKnownTypedRepair && !forceDiagnosis) {
     return { repairsAttempted: false, usedAgentic: false }
   }
 

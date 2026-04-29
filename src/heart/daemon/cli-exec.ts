@@ -137,7 +137,7 @@ import { runDoctorChecks } from "./doctor"
 import { formatDoctorOutput } from "./cli-render-doctor"
 import { hasRunnableInteractiveRepair, runInteractiveRepair } from "./interactive-repair"
 import type { DegradedAgent } from "./interactive-repair"
-import { createAgenticDiagnosisProviderRuntime, runAgenticRepair } from "./agentic-repair"
+import { createAgenticDiagnosisProviderRuntime, runAgenticRepair, shouldFireRepairGuide } from "./agentic-repair"
 import {
   genericReadinessIssue,
   isKnownReadinessIssue,
@@ -6851,8 +6851,25 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           }
         }
 
-        if (untypedDegraded.length > 0) {
-          const repairResult = await runAgenticRepair(untypedDegraded, {
+        // Layer 3: extended activation contract — fires when there are
+        // untyped degraded entries OR when typed entries stack to ≥3 (compound
+        // situations that warrant a RepairGuide-driven proposal pass). The
+        // `--no-repair` flag short-circuits the entire decision via
+        // `shouldFireRepairGuide`. The set passed into `runAgenticRepair` is
+        // the union of typed + untyped so the diagnostic prompt has the full
+        // picture. When the gate fires solely on typed-stacking,
+        // `runAgenticRepair` is told via `forceDiagnosis: true` to bypass the
+        // early-return that normally defers typed-only sets to the
+        // deterministic typed repair flow that already ran above.
+        const repairGuideShouldFire = shouldFireRepairGuide({
+          untypedDegraded,
+          typedDegraded,
+          noRepair: Boolean(command.noRepair),
+        })
+        if (repairGuideShouldFire) {
+          const repairInput = [...untypedDegraded, ...typedDegraded]
+          const forceDiagnosis = untypedDegraded.length === 0 && typedDegraded.length >= 3
+          const repairResult = await runAgenticRepair(repairInput, {
             /* v8 ignore start -- production provider discovery wiring @preserve */
             discoverWorkingProvider: async (agentName: string) => {
               const { discoverWorkingProvider: discover } = await import("./provider-discovery")
@@ -6894,6 +6911,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
             skipQueueSummary: true,
             isTTY: deps.isTTY ?? process.stdout.isTTY === true,
             stdoutColumns: deps.stdoutColumns ?? process.stdout.columns,
+            forceDiagnosis,
           })
           if (repairResult.repairsAttempted) {
             repairsAttempted = true
