@@ -236,6 +236,55 @@ describe("loadRepairGuideContent", () => {
     expect(result).toBeNull()
   })
 
+  it("returns content with empty psyche when psyche directory does not exist", async () => {
+    existsSyncMock.mockImplementation((target: string) => {
+      if (target.endsWith("RepairGuide.ouro")) return true
+      if (target.endsWith("psyche")) return false
+      if (target.endsWith("skills")) return true
+      return false
+    })
+    readdirSyncMock.mockImplementation((target: string) => {
+      if (target.endsWith("skills")) {
+        return [{ name: "skill.md", isFile: () => true, isDirectory: () => false }]
+      }
+      return []
+    })
+    readFileSyncMock.mockImplementation((target: string) => {
+      if (target.endsWith("skill.md")) return "skill body"
+      throw new Error(`unexpected read: ${target}`)
+    })
+
+    const { loadRepairGuideContent } = await import("../../../heart/daemon/agentic-repair")
+
+    const result = loadRepairGuideContent("/repo")
+    expect(result!.psyche).toEqual({})
+    expect(result!.skills).toEqual({ "skill.md": "skill body" })
+  })
+
+  it("ignores psyche .md files that are neither SOUL nor IDENTITY", async () => {
+    existsSyncMock.mockReturnValue(true)
+    readdirSyncMock.mockImplementation((target: string) => {
+      if (target.endsWith("psyche")) {
+        return [
+          { name: "SOUL.md", isFile: () => true, isDirectory: () => false },
+          { name: "EXTRA.md", isFile: () => true, isDirectory: () => false },
+        ]
+      }
+      return []
+    })
+    readFileSyncMock.mockImplementation((target: string) => {
+      if (target.endsWith("SOUL.md")) return "soul"
+      if (target.endsWith("EXTRA.md")) return "extra"
+      throw new Error(`unexpected read: ${target}`)
+    })
+
+    const { loadRepairGuideContent } = await import("../../../heart/daemon/agentic-repair")
+
+    const result = loadRepairGuideContent("/repo")
+    expect(result!.psyche.soul).toBe("soul")
+    expect(result!.psyche.identity).toBeUndefined()
+  })
+
   it("returns null when readFileSync throws on a psyche file (corrupt content)", async () => {
     existsSyncMock.mockReturnValue(true)
     readdirSyncMock.mockImplementation((target: string) => {
