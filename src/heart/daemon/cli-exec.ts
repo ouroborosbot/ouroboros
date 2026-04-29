@@ -6718,6 +6718,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     //
     // Errors in the probe path itself are caught and logged — they must not
     // break the boot, since the probe is best-effort visibility, not a gate.
+    // Layer 3: hoist sync-probe findings to outer scope so the
+    // RepairGuide diagnostic call later in this function can include
+    // them in its prompt. Default to [] when the probe was skipped or
+    // threw — the runAgenticRepair callsite then sees "no sync
+    // findings to report" rather than missing data.
+    let bootSyncFindings: BootSyncProbeFinding[] = []
     progress.startPhase("sync probe")
     try {
       const syncProbeImpl = deps.runBootSyncProbeImpl ?? runBootSyncProbe
@@ -6725,6 +6731,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       const syncProbeResult = await syncProbeImpl(syncRows, {
         bundlesRoot: deps.bundlesRoot ?? bundlesRoot,
       })
+      bootSyncFindings = syncProbeResult.findings
       progress.completePhase("sync probe", summarizeSyncProbeFindings(syncProbeResult.findings))
       if (syncProbeResult.findings.length > 0) {
         writeSyncProbeSummary(deps, syncProbeResult.findings)
@@ -6869,6 +6876,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         if (repairGuideShouldFire) {
           const repairInput = [...untypedDegraded, ...typedDegraded]
           const forceDiagnosis = untypedDegraded.length === 0 && typedDegraded.length >= 3
+          // Layer 3: collect drift findings here so the RepairGuide
+          // prompt receives them as a structured JSON block. Drift is
+          // already collected for the no-repair path above; we collect
+          // again here because the repair path is a separate branch.
+          const repairDriftFindings = await collectAgentDriftAdvisories(deps)
           const repairResult = await runAgenticRepair(repairInput, {
             /* v8 ignore start -- production provider discovery wiring @preserve */
             discoverWorkingProvider: async (agentName: string) => {
@@ -6912,6 +6924,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
             isTTY: deps.isTTY ?? process.stdout.isTTY === true,
             stdoutColumns: deps.stdoutColumns ?? process.stdout.columns,
             forceDiagnosis,
+            driftFindings: repairDriftFindings,
+            syncFindings: bootSyncFindings,
           })
           if (repairResult.repairsAttempted) {
             repairsAttempted = true

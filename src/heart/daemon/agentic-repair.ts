@@ -21,6 +21,8 @@ import { getRepoRoot, type AgentProvider } from "../identity"
 import { createProviderRuntimeForConfig, type ProviderRuntimeConfig } from "../provider-ping"
 import type OpenAI from "openai"
 import { isKnownReadinessIssue, type RepairAction, type RepairActionKind } from "./readiness-repair"
+import type { DriftFinding } from "./drift-detection"
+import type { BootSyncProbeFinding } from "./boot-sync-probe"
 
 /** Minimal subset of ProviderRuntime needed for a single diagnostic call. */
 export interface AgenticProviderRuntime {
@@ -72,6 +74,24 @@ export interface AgenticRepairDeps {
    * `getRepoRoot()`; tests inject a fixture path.
    */
   repoRootOverride?: string
+  /**
+   * Layer 3: structured drift findings collected during boot
+   * (Layer 4's `detectProviderBindingDrift`). Threaded into the
+   * RepairGuide diagnostic prompt as a JSON block so the
+   * `diagnose-bootstrap-drift` skill has the actual lane/intent/observed
+   * data to reason over. Empty array (or omitted) means no drift to
+   * report.
+   */
+  driftFindings?: DriftFinding[]
+  /**
+   * Layer 3: structured sync-probe findings collected during boot
+   * (Layer 2's `runBootSyncProbe`). Threaded into the RepairGuide
+   * diagnostic prompt as a JSON block so the `diagnose-broken-remote`
+   * and `diagnose-sync-blocked` skills have the actual classification +
+   * conflict-files data to reason over. Empty array (or omitted) means
+   * no sync findings to report.
+   */
+  syncFindings?: BootSyncProbeFinding[]
 }
 
 export interface AgenticRepairResult {
@@ -97,21 +117,55 @@ function buildSystemPrompt(degraded: DegradedAgent[]): string {
   ].join("\n")
 }
 
-function buildUserMessage(degraded: DegradedAgent[], logsTail: string): string {
+function buildUserMessage(
+  degraded: DegradedAgent[],
+  logsTail: string,
+  driftFindings: DriftFinding[] = [],
+  syncFindings: BootSyncProbeFinding[] = [],
+): string {
   const agentDetails = degraded
     .map((d) => `Agent: ${d.agent}\n  Error: ${d.errorReason}\n  Fix hint: ${d.fixHint}`)
     .join("\n\n")
 
-  return [
+  const sections: string[] = [
     "Here are the degraded agents and recent daemon logs:",
     "",
     agentDetails,
     "",
     "Recent daemon logs:",
     logsTail,
-    "",
-    "What is the most likely cause and how should I fix it?",
-  ].join("\n")
+  ]
+
+  // Layer 3: thread Layer 4's structured drift findings into the prompt as
+  // a JSON block. The `diagnose-bootstrap-drift` skill (loaded into the
+  // system prompt by `buildSystemPromptWithRepairGuide`) instructs the LLM
+  // how to read this shape and what `ouro use` repair to propose.
+  if (driftFindings.length > 0) {
+    sections.push(
+      "",
+      "driftFindings (DriftFinding[]):",
+      "```json",
+      JSON.stringify(driftFindings, null, 2),
+      "```",
+    )
+  }
+
+  // Layer 3: thread Layer 2's structured sync-probe findings into the
+  // prompt as a JSON block. `diagnose-broken-remote` (auth/404/network/
+  // timeout-hard) and `diagnose-sync-blocked` (dirty/non-fast-forward/
+  // merge-conflict/timeout-soft) consume this shape.
+  if (syncFindings.length > 0) {
+    sections.push(
+      "",
+      "bootSyncFindings (BootSyncProbeFinding[]):",
+      "```json",
+      JSON.stringify(syncFindings, null, 2),
+      "```",
+    )
+  }
+
+  sections.push("", "What is the most likely cause and how should I fix it?")
+  return sections.join("\n")
 }
 
 function makeInteractiveRepairDeps(deps: AgenticRepairDeps): InteractiveRepairDeps {
@@ -192,7 +246,12 @@ async function tryAgenticDiagnosis(
   const repoRoot = deps.repoRootOverride ?? getRepoRoot()
   const repairGuide = loadRepairGuideContent(repoRoot)
   const systemPrompt = buildSystemPromptWithRepairGuide(degraded, repairGuide)
-  const userMessage = buildUserMessage(degraded, logsTail)
+  const userMessage = buildUserMessage(
+    degraded,
+    logsTail,
+    deps.driftFindings,
+    deps.syncFindings,
+  )
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
