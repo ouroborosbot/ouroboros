@@ -137,7 +137,7 @@ Hard timeouts (locked O1):
 **What**: 100% coverage on changed lines.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 4a: Wire sync probe into `ouro up` — Tests
+### ✅ Unit 4a: Wire sync probe into `ouro up` — Tests
 **What**: Write failing tests for the new `runBootSyncProbe(bundles: BundleSyncRow[]): Promise<BootSyncProbeResult>` orchestrator in `src/__tests__/heart/daemon/boot-sync-probe.test.ts` (new file). The orchestrator runs `runWithTimeouts` over `preTurnPull` for each sync-enabled bundle and aggregates results. Test cases:
 - All bundles healthy — all probes succeed, no findings.
 - One bundle 404 remote — finding emitted with `classification = "not-found-404"`, daemon-rollup-relevant.
@@ -148,7 +148,7 @@ Hard timeouts (locked O1):
 - Bundle with `gitInitialized: false` — not probed; advisory only if sync was supposed to be on.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 4b: Wire sync probe into `ouro up` — Implementation
+### ✅ Unit 4b: Wire sync probe into `ouro up` — Implementation
 **What**:
 - Implement `runBootSyncProbe` in `src/heart/daemon/boot-sync-probe.ts` (new file).
 - Wire `runBootSyncProbe` into `ouro up`'s per-agent loop in `cli-exec.ts` BEFORE the live-check loop at `cli-exec.ts:287`.
@@ -156,22 +156,22 @@ Hard timeouts (locked O1):
 - Honor `--no-repair` flag: probe still runs, results still surface, just don't trigger layer 3 (which is a separate PR anyway).
 **Acceptance**: Tests from 4a PASS. Existing `ouro up` tests still pass.
 
-### ⬜ Unit 4c: Wire sync probe into `ouro up` — Coverage & refactor
+### ✅ Unit 4c: Wire sync probe into `ouro up` — Coverage & refactor
 **What**: 100% coverage. Lint + typecheck.
 **Acceptance**: Coverage 100%. All tests green.
 
-### ⬜ Unit 5a: Surface findings in renders — Tests
+### ✅ Unit 5a: Surface findings in renders — Tests
 **What**: Extend `inner-status.ts` and `startup-tui.ts` rendering to display sync-probe findings. Write failing tests in `src/__tests__/heart/daemon/sync-probe-rendering.test.ts` covering:
 - Each taxonomy variant has a distinct, scannable label and color.
 - Repair hints surface where they're known (e.g., "dirty tree → run `git stash` or `git status` to clean", "not-found-404 → check the remote URL in `agent.json`").
 - `--no-repair` summary path includes the findings.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 5b: Surface findings in renders — Implementation
+### ✅ Unit 5b: Surface findings in renders — Implementation
 **What**: Implement the rendering changes.
 **Acceptance**: Tests from 5a PASS.
 
-### ⬜ Unit 5c: Surface findings in renders — Coverage & refactor
+### ✅ Unit 5c: Surface findings in renders — Coverage & refactor
 **What**: 100% coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
@@ -222,3 +222,4 @@ Hard timeouts (locked O1):
 - 2026-04-28 Unit 1a-c complete: `classifySyncFailure` taxonomy implemented in `src/heart/sync-classification.ts`. 27 tests. 100% line/branch/function/statement coverage on the new file. `PendingSyncRecord.classification` widened additively to `SyncClassification` union; existing 26 sync.ts tests still green.
 - 2026-04-28 Unit 2a-c complete: `runWithTimeouts<T>` soft/hard timeout wrapper in `src/heart/timeouts.ts`. 13 tests. 100% line/branch/function/statement coverage. Honours `OURO_BOOT_TIMEOUT_GIT_SOFT/HARD` and `OURO_BOOT_TIMEOUT_LIVECHECK` env overrides via `envKey` opt-in. Cleans up timers on resolve/reject so no dangling refs block process exit.
 - 2026-04-28 Unit 3a-c complete: `preTurnPullAsync` async/signal-aware sibling added to `src/heart/sync.ts`. 11 tests. Uses `child_process.execFile` (not `execFileSync`) with `{ signal }` so an injected `AbortSignal` cancels the child mid-fetch. Sync `preTurnPull` preserved unchanged for the per-turn pipeline at `senses/pipeline.ts:522`. Coverage 100% across the whole file.
+- 2026-04-28 Unit 4a-c + 5a-c complete: `runBootSyncProbe` orchestrator in `src/heart/daemon/boot-sync-probe.ts`. 15 tests. Wired into `daemon.up` in `cli-exec.ts` as a new boot phase BEFORE provider checks. `writeSyncProbeSummary` + `summarizeSyncProbeFindings` rendering helpers exposed for direct test (10 tests in `sync-probe-rendering.test.ts`). Layer 5 scope correction (analogous to layer 1's): rendering happens in the boot progress / stdout summary, not in `inner-status.ts`/`startup-tui.ts` which render different concepts (per-agent inner dialog and daemon stability poll). Tests inject `runBootSyncProbeImpl` to no-op stub for the affected suite. Full coverage gate now passes (line 99.94% → 100%; nerves source-coverage 707/915 with my 4 new events all observed; sync-classification.ts and timeouts.ts added to dispatch-exempt list as pure helpers).
