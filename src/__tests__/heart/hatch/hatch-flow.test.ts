@@ -407,4 +407,35 @@ describe("hatch flow", () => {
       process.chdir(originalCwd)
     }
   })
+
+  it("falls through to getSpecialistIdentitySourceDir() when specialistIdentitySourceDir is not in deps", async () => {
+    // Covers the RHS branch of the `?? getSpecialistIdentitySourceDir()`
+    // operator at hatch-flow.ts:183. Without this test, the production
+    // code path (deps override absent) is unreachable from the test
+    // suite — branch coverage stays at 99.99% even though both sides
+    // of the `??` are syntactically reachable.
+    const homeDir = os.homedir()
+    const explicitTargetDir = makeTempDir("hatch-default-target")
+    cleanup.push(explicitTargetDir)
+
+    const agentName = `SourceFallbackBot-${Date.now()}`
+    const bundleRoot = path.join(homeDir, "AgentBundles", `${agentName}.ouro`)
+    cleanup.push(bundleRoot)
+
+    const result = await runHatchFlow({
+      agentName,
+      humanName: "Ari",
+      provider: "anthropic",
+      credentials: {
+        setupToken: `sk-ant-oat01-${"c".repeat(80)}`,
+      },
+    }, { specialistIdentityTargetDir: explicitTargetDir })
+
+    expect(result.bundleRoot).toBe(bundleRoot)
+    // Source resolves to the in-repo SerpentGuide.ouro path via the
+    // production resolver. Identities directory will have been populated
+    // from whatever ships in-repo today.
+    expect(fs.readdirSync(explicitTargetDir).length).toBeGreaterThan(0)
+    expect(result.credentialPath).toBe(`vault:${agentName}:providers/anthropic`)
+  })
 })
