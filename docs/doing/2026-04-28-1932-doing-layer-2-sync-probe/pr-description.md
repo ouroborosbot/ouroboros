@@ -12,21 +12,25 @@ This is the first PR in the four-layer sequence that **mutates working trees** (
 
 ## Sync failure taxonomy (`SyncClassification`)
 
-Locked vocabulary used by `classifySyncFailure(error, context)`:
+Locked vocabulary used by `classifySyncFailure(error, context)`. The `advisory` flag is a **hint for layer 3 RepairGuide** (which routes diagnostic skills based on it), NOT a layer-1-rollup downgrade signal — the probe surfaces findings only via the boot stdout summary. See "Rollup interaction" section below.
 
 | classification | trigger | advisory? |
 | --- | --- | --- |
-| `auth-failed` | 401 / 403 / "Authentication failed" / "Permission denied" | no (blocks) |
-| `not-found-404` | 404 / "Repository not found" | no (blocks) |
-| `network-down` | `ENOTFOUND` / `ECONNREFUSED` / "Could not resolve host" | no (blocks) |
-| `dirty-working-tree` | "would be overwritten by merge" / "stash them" | yes (downgrade) |
-| `non-fast-forward` | "non-fast-forward" / "fetch first" / "rejected" | yes (downgrade) |
-| `merge-conflict` | "CONFLICT" stderr (with file list via `git status`) | yes (downgrade) |
-| `timeout-soft` | soft timeout fired but op completed within hard window | yes (downgrade) |
-| `timeout-hard` | hard timeout aborted the op via `AbortSignal` | no (blocks) |
-| `unknown` | fallthrough | yes (downgrade) |
+| `auth-failed` | 401 / 403 / "Authentication failed" / "Permission denied" | no (blocking) |
+| `not-found-404` | 404 / "Repository not found" | no (blocking) |
+| `network-down` | `ENOTFOUND` / `ECONNREFUSED` / "Could not resolve host" | no (blocking) |
+| `dirty-working-tree` | "would be overwritten by merge" / "stash them" | yes |
+| `non-fast-forward` | "non-fast-forward" / "fetch first" / "rejected" | yes |
+| `merge-conflict` | "CONFLICT" stderr (with file list via `git status`) | yes |
+| `timeout-soft` | soft timeout fired but op completed within hard window | yes |
+| `timeout-hard` | hard timeout aborted the op via `AbortSignal` | no (blocking) |
+| `unknown` | fallthrough | yes |
 
 The pattern priority (most actionable wins) is documented in `sync-classification.ts`. Existing legacy variants (`push_rejected`, `pull_rebase_conflict`) remain in the `PendingSyncRecord.classification` union — additive widening, no breaking change.
+
+## Rollup interaction (intentionally none)
+
+This PR is a **boot-time preflight surface only.** Findings flow into the boot stdout summary written by `cli-exec.ts` after the probe phase; they are NOT persisted to daemon health and do NOT downgrade `computeDaemonRollup`'s output. Layer 3 RepairGuide is the planned consumer (it reads the in-memory `BootSyncProbeFinding[]` at boot time and dispatches the right diagnostic skill, e.g. `diagnose-broken-remote.md` for `not-found-404`, `diagnose-sync-blocked.md` for `dirty-working-tree`). Wiring sync findings into the running daemon's rollup is a future concern that would mirror layer 4's `DaemonHealthState.drift` pattern.
 
 ## End-to-end AbortSignal
 
@@ -34,7 +38,6 @@ The pattern priority (most actionable wins) is documented in `sync-classificatio
 
 - `OURO_BOOT_TIMEOUT_GIT_SOFT` (default 8000ms)
 - `OURO_BOOT_TIMEOUT_GIT_HARD` (default 15000ms)
-- `OURO_BOOT_TIMEOUT_LIVECHECK` (default 10000ms; not yet wired to live-check, included for future use)
 
 ## New files
 

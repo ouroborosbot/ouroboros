@@ -9,11 +9,9 @@
  * reject with an AbortError, and the wrapper returns
  * `{ classification: "timeout-hard" }` rather than re-throwing.
  *
- * Three optional env overrides:
+Two optional env overrides (currently only `GIT` is consumed):
  *   - `OURO_BOOT_TIMEOUT_GIT_SOFT` / `OURO_BOOT_TIMEOUT_GIT_HARD` — boot
  *     git operations (fetch / pull). Used when `envKey === "GIT"`.
- *   - `OURO_BOOT_TIMEOUT_LIVECHECK` — provider live-check. Used when
- *     `envKey === "LIVECHECK"`.
  *
  * Env values are parsed as integer milliseconds. Non-numeric or non-positive
  * values are ignored (the explicit `softMs` / `hardMs` defaults from the
@@ -24,7 +22,7 @@
  * many of these and a leaking timer would block process exit.
  */
 
-export type TimeoutEnvKey = "GIT" | "LIVECHECK"
+export type TimeoutEnvKey = "GIT"
 
 export interface RunWithTimeoutsOptions {
   /** Soft warning threshold in ms — emit a warning, do NOT abort. */
@@ -35,9 +33,8 @@ export interface RunWithTimeoutsOptions {
   label: string
   /**
    * When set, consult the corresponding env vars
-   * (`OURO_BOOT_TIMEOUT_<KEY>_SOFT/HARD` for `"GIT"`,
-   * `OURO_BOOT_TIMEOUT_LIVECHECK` for `"LIVECHECK"`) to override
-   * `softMs` / `hardMs`.
+   * (`OURO_BOOT_TIMEOUT_GIT_SOFT` / `OURO_BOOT_TIMEOUT_GIT_HARD` for `"GIT"`)
+   * to override `softMs` / `hardMs`.
    */
   envKey?: TimeoutEnvKey
 }
@@ -75,14 +72,6 @@ function resolveTimeouts(options: RunWithTimeoutsOptions): { softMs: number; har
     if (envSoft !== null) softMs = envSoft
     const envHard = readEnvMs("OURO_BOOT_TIMEOUT_GIT_HARD")
     if (envHard !== null) hardMs = envHard
-  } else if (options.envKey === "LIVECHECK") {
-    const envHard = readEnvMs("OURO_BOOT_TIMEOUT_LIVECHECK")
-    if (envHard !== null) {
-      hardMs = envHard
-      // Soft for live-check defaults to half the hard window when env-overridden,
-      // floor 1ms — keeps the "warn before cut" behaviour without a separate knob.
-      softMs = Math.max(1, Math.floor(envHard / 2))
-    }
   }
 
   return { softMs, hardMs }

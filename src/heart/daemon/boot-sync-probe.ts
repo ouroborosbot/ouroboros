@@ -3,8 +3,15 @@
  *
  * For each sync-enabled bundle, runs `preTurnPullAsync` wrapped in
  * `runWithTimeouts`, classifies failures via `classifySyncFailure`, and
- * returns aggregated findings. Findings flow into the daemon rollup
- * (`computeDaemonRollup`) and into the boot TUI rendering.
+ * returns aggregated findings. Findings surface in the boot stdout
+ * summary written by `cli-exec.ts` after the probe phase.
+ *
+ * Layer 2 is intentionally a **boot-time preflight surface only** — it
+ * does NOT feed into the running daemon's rollup state. `computeDaemonRollup`
+ * is unaware of these findings; nothing is persisted to daemon health for
+ * the running daemon to consume. Layer 3 RepairGuide is the planned consumer
+ * (it reads the in-memory `BootSyncProbeFinding[]` at boot time and
+ * dispatches the right diagnostic skill).
  *
  * The probe NEVER:
  *   - Writes to `state/` (verified by Unit 7's grep gate).
@@ -12,7 +19,8 @@
  *   - Hangs — `AbortSignal` from `runWithTimeouts` cuts hung remotes
  *     within `hardMs`.
  *
- * Advisory vs blocking classifications:
+ * Advisory vs blocking classifications (consumed by layer 3, not by the
+ * layer 1 rollup — see comment above):
  *
  *   | classification         | advisory? | rationale                                   |
  *   | ---------------------- | --------- | ------------------------------------------- |
@@ -26,8 +34,9 @@
  *   | timeout-soft           | yes       | warning surfaced, op completed              |
  *   | unknown                | yes       | unrecognised; surface for diagnosis         |
  *
- * "advisory: yes" => downgrade rollup `healthy` -> `partial`.
- * "advisory: no"  => agent counts as not-serving in the rollup.
+ * `advisory: true` is a hint for layer 3 ("warn-and-continue, agent likely
+ * still works") vs `advisory: false` ("blocking, agent can't sync until
+ * fixed"). Layer 3 will route the right diagnostic skill on this signal.
  */
 
 import * as path from "path"
@@ -57,9 +66,10 @@ export interface BootSyncProbeFinding {
   conflictFiles: string[]
   warnings: string[]
   /**
-   * `true` => downgrade healthy -> partial. `false` => the agent should be
-   * counted as not-serving in the rollup. See module-level table for the
-   * mapping.
+   * Hint for layer 3 RepairGuide: `true` => warn-and-continue (agent likely
+   * still works), `false` => blocking (agent can't sync until fixed). Layer 2
+   * does NOT use this to affect the layer-1 rollup; findings are surfaced
+   * only in the boot stdout summary. See module-level table for mapping.
    */
   advisory: boolean
 }

@@ -16,14 +16,12 @@ describe("runWithTimeouts", () => {
     vi.useFakeTimers()
     delete process.env["OURO_BOOT_TIMEOUT_GIT_SOFT"]
     delete process.env["OURO_BOOT_TIMEOUT_GIT_HARD"]
-    delete process.env["OURO_BOOT_TIMEOUT_LIVECHECK"]
   })
 
   afterEach(() => {
     vi.useRealTimers()
     delete process.env["OURO_BOOT_TIMEOUT_GIT_SOFT"]
     delete process.env["OURO_BOOT_TIMEOUT_GIT_HARD"]
-    delete process.env["OURO_BOOT_TIMEOUT_LIVECHECK"]
   })
 
   it("returns result when op completes before soft timeout — no classification, no warnings", async () => {
@@ -155,26 +153,6 @@ describe("runWithTimeouts", () => {
     expect(outcome.classification).toBe("timeout-hard")
   })
 
-  it("honours OURO_BOOT_TIMEOUT_LIVECHECK env override", async () => {
-    process.env["OURO_BOOT_TIMEOUT_LIVECHECK"] = "10"
-    const { runWithTimeouts } = await import("../../heart/timeouts")
-
-    const promise = runWithTimeouts(
-      (signal) => new Promise<string>((_resolve, reject) => {
-        signal.addEventListener("abort", () => {
-          const err = new Error("aborted")
-          ;(err as { name?: string }).name = "AbortError"
-          reject(err)
-        })
-      }),
-      { softMs: 5000, hardMs: 10000, label: "provider-live-check", envKey: "LIVECHECK" },
-    )
-
-    await vi.advanceTimersByTimeAsync(50)
-    const outcome = await promise
-    expect(outcome.classification).toBe("timeout-hard")
-  })
-
   it("preserves a non-abort error thrown by the op (rethrows wrapped, classification undefined)", async () => {
     const { runWithTimeouts } = await import("../../heart/timeouts")
     // Attach the rejection handler before any async tick so vitest doesn't
@@ -233,21 +211,6 @@ describe("runWithTimeouts", () => {
     const promise = runWithTimeouts(
       async () => "ok",
       { softMs: 100, hardMs: 1000, label: "git-pull", envKey: "GIT" },
-    )
-    await vi.advanceTimersByTimeAsync(50)
-    const outcome = await promise
-    expect(outcome.result).toBe("ok")
-    expect(outcome.classification).toBeUndefined()
-    expect(outcome.warnings).toEqual([])
-  })
-
-  it("envKey=LIVECHECK with no env override falls back to passed-in defaults", async () => {
-    // No OURO_BOOT_TIMEOUT_LIVECHECK env — the LIVECHECK branch is taken
-    // but the inner `if (envHard !== null)` falls through.
-    const { runWithTimeouts } = await import("../../heart/timeouts")
-    const promise = runWithTimeouts(
-      async () => "ok",
-      { softMs: 100, hardMs: 1000, label: "live-check", envKey: "LIVECHECK" },
     )
     await vi.advanceTimersByTimeAsync(50)
     const outcome = await promise

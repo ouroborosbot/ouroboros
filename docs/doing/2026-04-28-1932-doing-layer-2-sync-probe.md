@@ -22,8 +22,7 @@ This is the first PR in the sequence that **mutates working trees**. It absolute
 
 Hard timeouts (locked O1):
 - `git fetch` / `git pull`: 8s soft (warn) / 15s hard (cut). `AbortSignal` threaded end-to-end.
-- Provider live-check: 10s.
-- Env override knobs (overrides only, env is not the design centre): `OURO_BOOT_TIMEOUT_GIT_SOFT`, `OURO_BOOT_TIMEOUT_GIT_HARD`, `OURO_BOOT_TIMEOUT_LIVECHECK`.
+- Env override knobs (overrides only, env is not the design centre): `OURO_BOOT_TIMEOUT_GIT_SOFT`, `OURO_BOOT_TIMEOUT_GIT_HARD`. Live-check timeout knob is deliberately NOT shipped in this PR — it would be a public surface with no callsite. Adding it lands when a live-check call site is ready to consume it.
 
 ## Completion Criteria
 
@@ -39,11 +38,11 @@ Hard timeouts (locked O1):
   - `timeout-soft` (warn but did not abort)
   - `timeout-hard` (aborted via `AbortSignal`)
   - `unknown` (catch-all)
-- [x] Hard timeouts wired through `AbortSignal`. Soft timeout (8s) emits a warning advisory, hard timeout (15s) aborts the operation. Live-check timeout 10s. _(LIVECHECK env-knob plumbed but the live-check call site itself is unchanged in this PR — the wrapper is ready for layer-3 to wire in.)_
-- [x] Env overrides honored for the three timeout knobs.
+- [x] Hard timeouts wired through `AbortSignal`. Soft timeout (8s) emits a warning advisory, hard timeout (15s) aborts the operation. _(Live-check timeout knob deliberately not shipped — would be a lying public surface with no consuming callsite. Adding it lands with the consumer.)_
+- [x] Env overrides honored for the two GIT timeout knobs.
 - [x] No write to `state/` from any new code. Verified by grep at the end of the work _(and by Unit 7's meta-test)_.
 - [x] No write to the bundle root from any new code OUTSIDE of what `preTurnPull` already does (which is git-managed working tree, not `state/`).
-- [x] Daemon rollup (from layer 1) reflects sync findings: a sync failure on one agent that prevents its live-check from passing flows through to the rollup; a sync warning (e.g., dirty tree) is advisory and downgrades `healthy` to `partial`. _(Indirect path: probe runs before live-check, so post-pull `agent.json` is what live-check reads. Direct cross-process integration is layer-3 RepairGuide territory.)_
+- [x] Daemon rollup interaction is INDIRECT only: the probe runs before live-check, so post-pull `agent.json` is what the live-check reads. A sync failure that prevents the live-check from passing therefore reaches the rollup through the existing live-check → agent-snapshot → rollup path. Sync probe findings themselves are NOT fed into the rollup directly — they surface only via the boot stdout summary. Direct daemon-rollup wiring (mirroring layer 4's `DaemonHealthState.drift` pattern) is a future concern; layer 3 RepairGuide is the planned consumer of `BootSyncProbeFinding[]`.
 - [x] `ouro up` boot does NOT hang on a slow / unresponsive remote thanks to `AbortSignal` + hard timeout. Verified via a fixture with a simulated slow remote _(`boot-sync-probe-slow-remote.test.ts`)_.
 - [x] 100% test coverage on all new code.
 - [x] All tests pass.
@@ -152,7 +151,7 @@ Hard timeouts (locked O1):
 **What**:
 - Implement `runBootSyncProbe` in `src/heart/daemon/boot-sync-probe.ts` (new file).
 - Wire `runBootSyncProbe` into `ouro up`'s per-agent loop in `cli-exec.ts` BEFORE the live-check loop at `cli-exec.ts:287`.
-- Pass probe results into the daemon rollup so layer 1's `computeDaemonRollup` sees them. Findings that are advisory (dirty tree, soft timeout, drift-style) downgrade `healthy` to `partial` only. Findings that block the agent (auth-failed, not-found-404, hard timeout) flow through to the agent-unhealthy column already used by the rollup.
+- Surface probe findings in the boot stdout summary. Probe findings are NOT directly fed into `computeDaemonRollup` in this PR — that wiring would need to mirror layer 4's `DaemonHealthState.drift` field and is deferred. Indirect rollup interaction still exists: the probe runs before live-check, so an agent whose sync failure causes its live-check to fail flows through to the rollup through the existing agent-snapshot path.
 - Honor `--no-repair` flag: probe still runs, results still surface, just don't trigger layer 3 (which is a separate PR anyway).
 **Acceptance**: Tests from 4a PASS. Existing `ouro up` tests still pass.
 
