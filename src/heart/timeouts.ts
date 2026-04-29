@@ -129,6 +129,14 @@ export async function runWithTimeouts<T>(
   try {
     const result = await fn(controller.signal)
     cleanup()
+    // If the abort fired and the op resolved gracefully (e.g., the inner
+    // function caught the AbortError and returned a structured result), we
+    // still classify the outcome as timeout-hard — the op was aborted from
+    // the caller's perspective even if no exception propagated. The caller
+    // can ignore the classification and use `result` if both are present.
+    if (controller.signal.aborted) {
+      return { classification: "timeout-hard", warnings }
+    }
     return { result, warnings }
   } catch (err) {
     cleanup()
