@@ -3592,7 +3592,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
       expect.objectContaining({
         upstreamStatus: "ok",
-        detail: "upstream reachable; 1 recovery item(s) queued",
+        detail: "upstream reachable but iMessage is not caught up; 1 recovery item(s) queued",
         pendingRecoveryCount: 1,
       }),
     )
@@ -3948,6 +3948,72 @@ describe("BlueBubbles sense runtime", () => {
     expect(mocks.runAgent).toHaveBeenCalledTimes(1)
     const { hasProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
     expect(hasProcessedBlueBubblesMessage("testagent", "chat:any;-;ari@mendelow.me", "captured-recovery-guid")).toBe(true)
+  })
+
+  it("runs queued captured recovery shortly after startup without running inside runtime sync", async () => {
+    vi.useFakeTimers()
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+
+    const { recordBlueBubblesInbound } = await import("../../../senses/bluebubbles/inbound-log")
+    recordBlueBubblesInbound("testagent", {
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "delayed-captured-recovery-guid",
+      timestamp: Date.parse("2026-04-24T23:20:14.289Z"),
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: {
+        chatGuid: "any;-;ari@mendelow.me",
+        chatIdentifier: "ari@mendelow.me",
+        isGroup: false,
+        sessionKey: "chat:any;-;ari@mendelow.me",
+        sendTarget: { kind: "chat_guid", value: "any;-;ari@mendelow.me" },
+        participantHandles: [],
+      },
+      text: "delayed captured recovery",
+      textForAgent: "delayed captured recovery",
+      attachments: [],
+      hasPayloadData: false,
+      requiresRepair: false,
+    }, "webhook")
+
+    const closableServer = createClosableServer()
+    mocks.createServer.mockReturnValue(closableServer.server as any)
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    bluebubbles.startBlueBubblesApp()
+    await flushAsyncWork()
+    expect(mocks.repairEvent).not.toHaveBeenCalled()
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(mocks.repairEvent).not.toHaveBeenCalled()
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushAsyncWork()
+
+    expect(mocks.repairEvent).toHaveBeenCalledTimes(1)
+    expect(mocks.runAgent).toHaveBeenCalledTimes(1)
+    const { hasProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
+    expect(hasProcessedBlueBubblesMessage("testagent", "chat:any;-;ari@mendelow.me", "delayed-captured-recovery-guid")).toBe(true)
+
+    const runtimePath = path.join(tempAgentRoot, "state", "senses", "bluebubbles", "runtime.json")
+    expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
+      expect.objectContaining({
+        upstreamStatus: "ok",
+        detail: "upstream reachable",
+        pendingRecoveryCount: 0,
+      }),
+    )
+    closableServer.close()
   })
 
   it("recovers guidless captured sidecars without crashing the in-flight dedupe guards", async () => {
@@ -4552,6 +4618,85 @@ describe("BlueBubbles sense runtime", () => {
     )
   })
 
+  it("aborts captured inbound recovery turns that exceed the recovery timeout", async () => {
+    vi.useFakeTimers()
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+
+    const { recordBlueBubblesInbound } = await import("../../../senses/bluebubbles/inbound-log")
+    recordBlueBubblesInbound("testagent", {
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "captured-timeout-guid",
+      timestamp: Date.parse("2026-04-24T23:22:29.289Z"),
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: {
+        chatGuid: "any;-;ari@mendelow.me",
+        chatIdentifier: "ari@mendelow.me",
+        isGroup: false,
+        sessionKey: "chat:any;-;ari@mendelow.me",
+        sendTarget: { kind: "chat_guid", value: "any;-;ari@mendelow.me" },
+        participantHandles: [],
+      },
+      text: "captured timeout",
+      textForAgent: "captured timeout",
+      attachments: [],
+      hasPayloadData: false,
+      requiresRepair: false,
+    }, "webhook")
+    mocks.handleInboundTurn.mockImplementationOnce(() => new Promise(() => undefined))
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const recovery = bluebubbles.recoverCapturedBlueBubblesInboundMessages()
+    for (let attempt = 0; attempt < 10 && mocks.handleInboundTurn.mock.calls.length === 0; attempt++) {
+      await vi.advanceTimersByTimeAsync(0)
+      await flushAsyncWork()
+    }
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(59_999)
+    await flushAsyncWork()
+    expect(mocks.emitNervesEvent).not.toHaveBeenCalledWith(expect.objectContaining({
+      event: "senses.bluebubbles_turn_timeout",
+    }))
+
+    await vi.advanceTimersByTimeAsync(1)
+    const result = await recovery
+
+    expect(result).toEqual({ recovered: 0, skipped: 0, failed: 1 })
+    expect(mocks.handleInboundTurn.mock.calls[0]?.[0]?.signal.aborted).toBe(true)
+    const { getBlueBubblesProcessedLogPath, hasProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
+    expect(hasProcessedBlueBubblesMessage("testagent", "chat:any;-;ari@mendelow.me", "captured-timeout-guid")).toBe(true)
+    const processedLog = fs.readFileSync(getBlueBubblesProcessedLogPath("testagent", "chat:any;-;ari@mendelow.me"), "utf-8")
+    expect(processedLog).toContain("\"outcome\":\"recovery-timeout\"")
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "senses.bluebubbles_turn_timeout",
+        meta: expect.objectContaining({
+          messageGuid: "captured-timeout-guid",
+          source: "webhook",
+          timeoutMs: 60_000,
+        }),
+      }),
+    )
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "senses.bluebubbles_capture_recovery_error",
+        meta: expect.objectContaining({
+          messageGuid: "captured-timeout-guid",
+          reason: "bluebubbles recovery turn timed out after 60000ms",
+        }),
+      }),
+    )
+  })
+
   it("stringifies Error objects during captured inbound recovery failures", async () => {
     const tempAgentRoot = makeTempDir()
     const { getAgentRoot } = await import("../../../heart/identity")
@@ -4730,7 +4875,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(hasProcessedBlueBubblesMessage("testagent", "chat:any;-;ari@mendelow.me", "session-already-has-message")).toBe(true)
   })
 
-  it("keeps runtime state healthy when reachable BlueBubbles still has pending recovery backlog", async () => {
+  it("records pending recovery backlog even when the BlueBubbles upstream is reachable", async () => {
     const tempAgentRoot = makeTempDir()
     const { getAgentRoot } = await import("../../../heart/identity")
     vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
@@ -4775,7 +4920,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
       expect.objectContaining({
         upstreamStatus: "ok",
-        detail: "upstream reachable; 1 recovery item(s) queued",
+        detail: "upstream reachable but iMessage is not caught up; 1 recovery item(s) queued",
         pendingRecoveryCount: 1,
       }),
     )
@@ -4884,7 +5029,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
       expect.objectContaining({
         upstreamStatus: "ok",
-        detail: "upstream reachable; 1 recovery item(s) queued",
+        detail: "upstream reachable but iMessage is not caught up; 1 recovery item(s) queued",
         pendingRecoveryCount: 1,
       }),
     )
@@ -4937,7 +5082,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
       expect.objectContaining({
         upstreamStatus: "ok",
-        detail: "upstream reachable; 1 recovery item(s) queued",
+        detail: "upstream reachable but iMessage is not caught up; 1 recovery item(s) queued",
         pendingRecoveryCount: 1,
       }),
     )
@@ -4971,7 +5116,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(JSON.parse(fs.readFileSync(runtimePath, "utf-8"))).toEqual(
       expect.objectContaining({
         upstreamStatus: "ok",
-        detail: "upstream reachable; 1 recovery item(s) queued",
+        detail: "upstream reachable but iMessage is not caught up; 1 recovery item(s) queued",
         pendingRecoveryCount: 1,
       }),
     )
