@@ -13,6 +13,12 @@ This is PR 2 of 4 in the harness-hardening sequence (1 → 4 → 2 → 3). Build
 - **`src/heart/daemon/daemon-rollup.ts`** — `ComputeDaemonRollupInput` gains an optional `driftDetected: boolean`. When true, `healthy` → `partial` (same downgrade rule as `bootstrapDegraded`). `degraded` and `safe-mode` rollups are unaffected — drift never escalates past `partial`.
 - **`src/heart/daemon/daemon-entry.ts`** — `buildDaemonHealthState` probes each enabled agent for drift before computing the rollup. A single agent's read failure does not block the rest of the scan (best-effort).
 - **`src/heart/daemon/inner-status.ts`** — `BuildInnerStatusInput` gains an optional `driftFindings: DriftFinding[]`. When non-empty, a "drift advisory" section renders per-finding lines with intent vs observed bindings and the copy-pasteable `ouro use` repair command. Pre-Layer-4 callers (callers that don't pass the field) see unchanged output.
+- **`src/heart/daemon/daemon-health.ts`** — `DaemonHealthState` gains a required `drift: DriftFinding[]` field. `readHealth` tolerates legacy cached health files missing the field (defaults to `[]`). Required by post-review fix below to give `ouro status` a daemon-level explanation when rollup is `partial` due to drift.
+- **`src/heart/daemon/cli-render.ts:renderRollupStatusLine`** — `partial` branch now distinguishes three sub-cases by inspecting agent statuses + `health.drift`:
+  - agents-unhealthy-only → `"N agent(s) unhealthy"` (existing copy, refined to count)
+  - drift-only → `"drift on N agent(s)"` (NEW — the load-bearing fix)
+  - both → `"N agent(s) unhealthy; drift on M agent(s)"` (NEW)
+  - neither (legacy file with `partial` status but no visible cause) → `"stale cache, run `ouro up` to refresh"` fallback (NEW)
 - **`src/heart/daemon/cli-exec.ts`** —
   - New `collectAgentDriftAdvisories(deps)` and `writeDriftAdvisorySummary(deps, advisories)` helpers.
   - Wired into the `--no-repair` boot path (both preflight provider-degraded and post-startup paths) so drift advisories ride along with provider-repair summaries — the operator sees them without running `ouro inner status` per agent.
