@@ -302,6 +302,46 @@ export async function runAgenticRepair(
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Layer 3: RepairGuide activation contract
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Threshold for compound typed-degraded findings to activate RepairGuide.
+ * Set to 3 (not 2) so that common pairs — vault-locked + provider-auth-needed,
+ * for example — do NOT trigger the new path on every boot. Encoded once here;
+ * never duplicate at call sites.
+ */
+const REPAIR_GUIDE_TYPED_THRESHOLD = 3
+
+export interface ShouldFireRepairGuideInput {
+  /** Degraded findings whose `issue` is NOT in the typed `RepairAction` catalog. */
+  untypedDegraded: DegradedAgent[]
+  /** Degraded findings whose `issue` IS in the typed `RepairAction` catalog. */
+  typedDegraded: DegradedAgent[]
+  /** Operator's `--no-repair` flag — short-circuits the entire decision. */
+  noRepair: boolean
+}
+
+/**
+ * Single decision function for whether to fire the RepairGuide-driven
+ * diagnostic flow.
+ *
+ * Contract (LOCKED, planning O4):
+ * - `noRepair: true` → false unconditionally (escape hatch).
+ * - `untypedDegraded.length > 0` → true (preserves today's gate at
+ *   `cli-exec.ts:6706`).
+ * - `typedDegraded.length >= REPAIR_GUIDE_TYPED_THRESHOLD` → true (compound
+ *   stack of typed issues; the new behavior this PR introduces).
+ * - Otherwise → false.
+ */
+export function shouldFireRepairGuide(input: ShouldFireRepairGuideInput): boolean {
+  if (input.noRepair) return false
+  if (input.untypedDegraded.length > 0) return true
+  if (input.typedDegraded.length >= REPAIR_GUIDE_TYPED_THRESHOLD) return true
+  return false
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Layer 3: RepairGuide bundle loader
 // ──────────────────────────────────────────────────────────────────────
 
