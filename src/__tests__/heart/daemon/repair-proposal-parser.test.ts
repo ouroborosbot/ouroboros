@@ -185,6 +185,110 @@ describe("parseRepairProposals", () => {
     expect(result.warnings).toHaveLength(1)
   })
 
+  it("parses bare JSON object without a fenced block", () => {
+    const llm = `prelude prose ${JSON.stringify({
+      actions: [
+        { kind: "provider-retry", agent: "a", reason: "transient" },
+      ],
+    })} trailing prose`
+
+    const result = parseRepairProposals(llm)
+    expect(result.actions).toHaveLength(1)
+    expect(result.actions[0].kind).toBe("provider-retry")
+  })
+
+  it("returns no actions when JSON parses to a non-object (e.g., array)", () => {
+    const llm = "```json\n[1, 2, 3]\n```"
+
+    const result = parseRepairProposals(llm)
+    expect(result.actions).toEqual([])
+    expect(result.fallbackBlob).toBeUndefined()
+  })
+
+  it("backfills agent label when entry omits agent field", () => {
+    const llm = [
+      "```json",
+      JSON.stringify({
+        actions: [{ kind: "vault-unlock", reason: "expired" }],
+      }),
+      "```",
+    ].join("\n")
+
+    const result = parseRepairProposals(llm)
+    expect(result.actions).toHaveLength(1)
+    expect(result.actions[0].label).toContain("(unknown agent)")
+  })
+
+  it("backfills provider on provider-auth when entry omits provider field", () => {
+    const llm = [
+      "```json",
+      JSON.stringify({
+        actions: [{ kind: "provider-auth", agent: "a", reason: "auth" }],
+      }),
+      "```",
+    ].join("\n")
+
+    const result = parseRepairProposals(llm)
+    expect(result.actions).toHaveLength(1)
+    const action = result.actions[0]
+    expect(action.kind).toBe("provider-auth")
+    if (action.kind === "provider-auth") {
+      expect(action.provider).toBe("anthropic")
+    }
+  })
+
+  it("passes through valid lane on provider-use action", () => {
+    const llm = [
+      "```json",
+      JSON.stringify({
+        actions: [
+          { kind: "provider-use", agent: "a", reason: "drift", lane: "inner" },
+          { kind: "provider-use", agent: "b", reason: "drift", lane: "outward" },
+        ],
+      }),
+      "```",
+    ].join("\n")
+
+    const result = parseRepairProposals(llm)
+    expect(result.actions).toHaveLength(2)
+    const inner = result.actions[0]
+    const outward = result.actions[1]
+    if (inner.kind === "provider-use") expect(inner.lane).toBe("inner")
+    if (outward.kind === "provider-use") expect(outward.lane).toBe("outward")
+  })
+
+  it("ignores invalid lane on provider-use action", () => {
+    const llm = [
+      "```json",
+      JSON.stringify({
+        actions: [
+          { kind: "provider-use", agent: "a", reason: "drift", lane: "totally-bogus" },
+        ],
+      }),
+      "```",
+    ].join("\n")
+
+    const result = parseRepairProposals(llm)
+    const action = result.actions[0]
+    expect(action.kind).toBe("provider-use")
+    if (action.kind === "provider-use") {
+      expect(action.lane).toBeUndefined()
+    }
+  })
+
+  it("backfills reason when entry omits reason field", () => {
+    const llm = [
+      "```json",
+      JSON.stringify({
+        actions: [{ kind: "vault-unlock", agent: "a" }],
+      }),
+      "```",
+    ].join("\n")
+
+    const result = parseRepairProposals(llm)
+    expect(result.actions[0].command).toContain("(no reason given)")
+  })
+
   it("populates a default label/command on each parsed action", () => {
     // The typed RepairAction shape requires label/command/actor — the parser
     // backfills sensible defaults so the action plugs into the existing
