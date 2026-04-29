@@ -92,11 +92,15 @@ function packageRootFromBinPath(binPath, packageName = "@ouro.bot/cli", deps = d
     // Plain npm shims are not always symlinks; path-derived candidates cover them.
   }
 
+  let matchedPackageRoot = null
   for (const candidate of candidates) {
     const packageRoot = findPackageRoot(candidate, packageName, deps)
-    if (packageRoot) return packageRoot
+    if (matchedPackageRoot === null && packageRoot !== null) {
+      matchedPackageRoot = packageRoot
+    }
   }
 
+  if (matchedPackageRoot !== null) return matchedPackageRoot
   throw new Error(`could not derive ${packageName} package root from ${binPath}`)
 }
 
@@ -108,20 +112,27 @@ function findPackageRoot(startPath, packageName, deps) {
     current = deps.dirname(current)
   }
 
-  while (true) {
-    const packageJsonPath = deps.join(current, "package.json")
-    if (deps.existsSync(packageJsonPath)) {
-      try {
-        const packageJson = JSON.parse(deps.readFileSync(packageJsonPath, "utf-8"))
-        if (packageJson.name === packageName) return current
-      } catch {
-        return null
-      }
+  let matchedPackageRoot = null
+  while (current !== deps.dirname(current)) {
+    const packageRoot = readMatchingPackageRoot(current, packageName, deps)
+    if (matchedPackageRoot === null && packageRoot !== null) {
+      matchedPackageRoot = packageRoot
     }
+    current = deps.dirname(current)
+  }
 
-    const parent = deps.dirname(current)
-    if (parent === current) return null
-    current = parent
+  return matchedPackageRoot ?? readMatchingPackageRoot(current, packageName, deps)
+}
+
+function readMatchingPackageRoot(current, packageName, deps) {
+  const packageJsonPath = deps.join(current, "package.json")
+  if (!deps.existsSync(packageJsonPath)) return null
+
+  try {
+    const packageJson = JSON.parse(deps.readFileSync(packageJsonPath, "utf-8"))
+    return packageJson.name === packageName ? current : null
+  } catch {
+    return null
   }
 }
 

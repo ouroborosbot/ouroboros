@@ -6,6 +6,7 @@ import * as path from "path"
 const {
   REQUIRED_PACKAGE_ASSET_PATHS,
   DISALLOWED_PACKAGE_ASSET_PATH_PREFIXES,
+  listPackageFiles,
   packageRootFromBinPath,
   validatePackageAssets,
 } = require(path.resolve(__dirname, "../../../scripts/package-assets.cjs"))
@@ -66,6 +67,28 @@ describe("package asset validation", () => {
     })
   })
 
+  it("lists package files recursively and ignores non-file entries", () => {
+    const root = makeRoot()
+    writeFile(root, "b/file.txt")
+    writeFile(root, "a/file.txt")
+    fs.symlinkSync(path.join(root, "a", "file.txt"), path.join(root, "linked-file.txt"))
+
+    expect(listPackageFiles(root)).toEqual([
+      "a/file.txt",
+      "b/file.txt",
+    ])
+  })
+
+  it("treats a missing package root as missing all required package assets", () => {
+    const root = path.join(makeRoot(), "missing-root")
+
+    const result = validatePackageAssets(root)
+
+    expect(result.ok).toBe(false)
+    expect(result.missing).toEqual([...REQUIRED_PACKAGE_ASSET_PATHS].sort())
+    expect(result.disallowed).toEqual([])
+  })
+
   it("fails with clear missing-path messages when required assets are absent", () => {
     const root = makeRoot()
     writeFile(root, "RepairGuide.ouro/agent.json")
@@ -119,5 +142,71 @@ describe("package asset validation", () => {
     fs.writeFileSync(bin, "#!/usr/bin/env node\n")
 
     expect(packageRootFromBinPath(bin, "@ouro.bot/cli")).toBe(packageRoot)
+  })
+
+  it("derives the package root from realpath when the bin path is outside node_modules", () => {
+    const root = makeRoot()
+    const packageRoot = path.join(root, "actual-package")
+    const entry = path.join(packageRoot, "dist", "heart", "daemon", "ouro-entry.js")
+    const bin = path.join(root, "bin", "ouro")
+    fs.mkdirSync(path.dirname(entry), { recursive: true })
+    fs.mkdirSync(path.dirname(bin), { recursive: true })
+    writeFile(packageRoot, "package.json", JSON.stringify({ name: "@ouro.bot/cli" }))
+    fs.writeFileSync(entry, "#!/usr/bin/env node\n")
+    fs.symlinkSync(entry, bin)
+
+    expect(packageRootFromBinPath(bin, "@ouro.bot/cli")).toBe(fs.realpathSync(packageRoot))
+  })
+
+  it("throws clearly when a package root cannot be derived from the bin path", () => {
+    const root = makeRoot()
+    const bin = path.join(root, "node_modules", ".bin", "ouro")
+    fs.mkdirSync(path.dirname(bin), { recursive: true })
+    fs.writeFileSync(bin, "#!/usr/bin/env node\n")
+
+    expect(() => packageRootFromBinPath(bin, "@ouro.bot/cli")).toThrow(
+      `could not derive @ouro.bot/cli package root from ${bin}`,
+    )
+  })
+
+  it("keeps searching when a nearby package.json belongs to a different package", () => {
+    const root = makeRoot()
+    const packageRoot = path.join(root, "node_modules", "@ouro.bot", "cli")
+    const bin = path.join(root, "node_modules", ".bin", "ouro")
+    fs.mkdirSync(path.dirname(bin), { recursive: true })
+    writeFile(packageRoot, "package.json", JSON.stringify({ name: "not-ouro" }))
+    fs.writeFileSync(bin, "#!/usr/bin/env node\n")
+
+    expect(() => packageRootFromBinPath(bin, "@ouro.bot/cli")).toThrow(
+      `could not derive @ouro.bot/cli package root from ${bin}`,
+    )
+  })
+
+  it("rejects malformed package.json files while deriving package roots", () => {
+    const root = makeRoot()
+    const packageRoot = path.join(root, "node_modules", "@ouro.bot", "cli")
+    const bin = path.join(root, "node_modules", ".bin", "ouro")
+    fs.mkdirSync(path.dirname(bin), { recursive: true })
+    writeFile(packageRoot, "package.json", "{")
+    fs.writeFileSync(bin, "#!/usr/bin/env node\n")
+
+    expect(() => packageRootFromBinPath(bin, "@ouro.bot/cli")).toThrow(
+      `could not derive @ouro.bot/cli package root from ${bin}`,
+    )
+  })
+
+  it("throws clearly when the bin path and fallback package path do not exist", () => {
+    const root = makeRoot()
+    const bin = path.join(root, "missing", ".bin", "ouro")
+
+    expect(() => packageRootFromBinPath(bin, "@ouro.bot/cli")).toThrow(
+      `could not derive @ouro.bot/cli package root from ${bin}`,
+    )
+  })
+
+  it("stops package root derivation at the filesystem root", () => {
+    expect(() => packageRootFromBinPath(path.parse(process.cwd()).root, "@ouro.bot/cli")).toThrow(
+      "could not derive @ouro.bot/cli package root",
+    )
   })
 })
