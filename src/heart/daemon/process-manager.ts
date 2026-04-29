@@ -3,12 +3,14 @@ import * as path from "path"
 import { getRepoRoot } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 import type { RuntimeCredentialBootstrapMessage, RuntimeCredentialConfig } from "../runtime-credentials"
+import type { ProviderCredentialRecord } from "../provider-credentials"
 
 export interface RuntimeCredentialBootstrap {
   agentName: string
   runtimeConfig?: RuntimeCredentialConfig
   machineRuntimeConfig?: RuntimeCredentialConfig
   machineId?: string
+  providerCredentialRecords?: ProviderCredentialRecord[]
 }
 
 export interface DaemonManagedAgent {
@@ -377,10 +379,11 @@ export class DaemonProcessManager {
         const message: RuntimeCredentialBootstrapMessage = {
           type: "ouro.runtimeCredentialBootstrap",
           agentName: bootstrap.agentName,
-          runtimeConfig: bootstrap.runtimeConfig,
-          machineRuntimeConfig: bootstrap.machineRuntimeConfig,
-          machineId: bootstrap.machineId,
         }
+        if (bootstrap.runtimeConfig) message.runtimeConfig = bootstrap.runtimeConfig
+        if (bootstrap.machineRuntimeConfig) message.machineRuntimeConfig = bootstrap.machineRuntimeConfig
+        if (bootstrap.machineId) message.machineId = bootstrap.machineId
+        if (bootstrap.providerCredentialRecords) message.providerCredentialRecords = bootstrap.providerCredentialRecords
         try {
           child.send?.(message)
           emitNervesEvent({
@@ -391,6 +394,7 @@ export class DaemonProcessManager {
               agent,
               runtimeConfig: !!bootstrap.runtimeConfig,
               machineRuntimeConfig: !!bootstrap.machineRuntimeConfig,
+              providerCredentialRecords: bootstrap.providerCredentialRecords?.length ?? 0,
             },
           })
         } catch (error) {

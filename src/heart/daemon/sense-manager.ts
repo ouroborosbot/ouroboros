@@ -11,6 +11,7 @@ import {
   type RuntimeCredentialConfigReadResult,
   type RuntimeCredentialConfig,
 } from "../runtime-credentials"
+import { readProviderCredentialPool, type ProviderCredentialRecord } from "../provider-credentials"
 import { getSenseInventory, type SenseRuntimeInfo, type SenseStatus } from "../sense-truth"
 import { loadOrCreateMachineIdentity } from "../machine-identity"
 import { DaemonProcessManager } from "./process-manager"
@@ -265,17 +266,23 @@ function runtimeCredentialBootstrapFor(agent: string, sense: Exclude<SenseName, 
   runtimeConfig?: RuntimeCredentialConfig
   machineRuntimeConfig?: RuntimeCredentialConfig
   machineId?: string
+  providerCredentialRecords?: ProviderCredentialRecord[]
 } | null {
   const runtime = readRuntimeCredentialConfig(agent)
   const machineId = sense === "bluebubbles" ? currentMachineId() : undefined
   const machine = sense === "bluebubbles" ? readMachineRuntimeCredentialConfig(agent) : null
+  const providerPool = readProviderCredentialPool(agent)
+  const providerCredentialRecords = providerPool.ok
+    ? Object.values(providerPool.pool.providers).filter((record): record is ProviderCredentialRecord => !!record)
+    : []
   const bootstrap = {
     agentName: agent,
     runtimeConfig: runtime.ok ? runtime.config : undefined,
     machineRuntimeConfig: machine?.ok ? machine.config : undefined,
     machineId,
+    providerCredentialRecords: providerCredentialRecords.length > 0 ? providerCredentialRecords : undefined,
   }
-  if (!bootstrap.runtimeConfig && !bootstrap.machineRuntimeConfig) return null
+  if (!bootstrap.runtimeConfig && !bootstrap.machineRuntimeConfig && !bootstrap.providerCredentialRecords) return null
   return bootstrap
 }
 

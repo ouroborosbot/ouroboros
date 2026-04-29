@@ -58,6 +58,11 @@ import {
   upsertRuntimeCredentialConfig,
   waitForRuntimeCredentialBootstrap,
 } from "../../heart/runtime-credentials"
+import {
+  createProviderCredentialRecord,
+  readProviderCredentialPool,
+  resetProviderCredentialCache,
+} from "../../heart/provider-credentials"
 
 function emitTestEvent(testName: string): void {
   mockEmitNervesEvent({
@@ -83,6 +88,7 @@ describe("runtime credentials vault config", () => {
     mockCredentialStore.clearRawFailure()
     vi.clearAllMocks()
     resetRuntimeCredentialConfigCache()
+    resetProviderCredentialCache()
   })
 
   it("returns a redaction-safe missing result before runtime/config is loaded", () => {
@@ -139,6 +145,38 @@ describe("runtime credentials vault config", () => {
     expect(mockCredentialStore.store.getRawSecret).not.toHaveBeenCalled()
   })
 
+  it("applies daemon IPC provider credential bootstrap into process memory", () => {
+    emitTestEvent("runtime credentials daemon provider bootstrap")
+
+    const providerRecord = createProviderCredentialRecord({
+      provider: "openai-codex",
+      credentials: { oauthAccessToken: "codex-token" },
+      config: {},
+      provenance: { source: "auth-flow" },
+      now: new Date("2026-04-14T12:00:00.000Z"),
+    })
+
+    const applied = applyRuntimeCredentialBootstrapMessage({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      providerCredentialRecords: [providerRecord],
+    })
+
+    expect(applied).toBe(true)
+    expect(readProviderCredentialPool("slugger")).toMatchObject({
+      ok: true,
+      pool: {
+        providers: {
+          "openai-codex": expect.objectContaining({
+            provider: "openai-codex",
+            credentials: { oauthAccessToken: "codex-token" },
+          }),
+        },
+      },
+    })
+    expect(mockCredentialStore.store.getRawSecret).not.toHaveBeenCalled()
+  })
+
   it("rejects malformed runtime credential bootstrap messages without touching cache", () => {
     emitTestEvent("runtime credentials reject malformed daemon bootstrap")
 
@@ -150,6 +188,8 @@ describe("runtime credentials vault config", () => {
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", runtimeConfig: [] },
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", machineRuntimeConfig: "bad" },
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", machineId: "" },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", providerCredentialRecords: "bad" },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", providerCredentialRecords: [{ provider: "openai-codex" }] },
     ]) {
       expect(applyRuntimeCredentialBootstrapMessage(message)).toBe(false)
     }

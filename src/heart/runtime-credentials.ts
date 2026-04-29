@@ -2,6 +2,7 @@ import * as crypto from "node:crypto"
 import { emitNervesEvent } from "../nerves/runtime"
 import { getCredentialStore } from "../repertoire/credential-access"
 import { getAgentName } from "./identity"
+import { cacheProviderCredentialRecords, type ProviderCredentialRecord } from "./provider-credentials"
 
 export type RuntimeCredentialConfig = Record<string, unknown>
 
@@ -21,6 +22,7 @@ export interface RuntimeCredentialBootstrapMessage {
   runtimeConfig?: RuntimeCredentialConfig
   machineRuntimeConfig?: RuntimeCredentialConfig
   machineId?: string
+  providerCredentialRecords?: ProviderCredentialRecord[]
 }
 
 interface RuntimeCredentialVaultPayload {
@@ -38,6 +40,29 @@ let cachedMachineRuntimeConfigs = new Map<string, RuntimeCredentialConfigReadRes
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function isCredentialValue(value: unknown): value is string | number {
+  return typeof value === "string" || typeof value === "number"
+}
+
+function isCredentialRecord(value: unknown): value is Record<string, string | number> {
+  if (!isRecord(value)) return false
+  return Object.values(value).every(isCredentialValue)
+}
+
+function isProviderCredentialRecord(value: unknown): value is ProviderCredentialRecord {
+  if (!isRecord(value)) return false
+  if (typeof value.provider !== "string") return false
+  if (typeof value.revision !== "string" || value.revision.trim().length === 0) return false
+  if (typeof value.updatedAt !== "string" || value.updatedAt.trim().length === 0) return false
+  if (!isCredentialRecord(value.credentials)) return false
+  if (!isCredentialRecord(value.config)) return false
+  const provenance = value.provenance
+  if (!isRecord(provenance)) return false
+  if (provenance.source !== "auth-flow" && provenance.source !== "manual") return false
+  if (typeof provenance.updatedAt !== "string" || provenance.updatedAt.trim().length === 0) return false
+  return true
 }
 
 function stableJson(value: unknown): string {
@@ -174,6 +199,13 @@ function isRuntimeCredentialBootstrapMessage(value: unknown): value is RuntimeCr
   if (record.runtimeConfig !== undefined && !isRecord(record.runtimeConfig)) return false
   if (record.machineRuntimeConfig !== undefined && !isRecord(record.machineRuntimeConfig)) return false
   if (record.machineId !== undefined && (typeof record.machineId !== "string" || record.machineId.trim().length === 0)) return false
+  if (
+    record.providerCredentialRecords !== undefined
+    && (
+      !Array.isArray(record.providerCredentialRecords)
+      || !record.providerCredentialRecords.every(isProviderCredentialRecord)
+    )
+  ) return false
   return true
 }
 
@@ -187,6 +219,9 @@ export function applyRuntimeCredentialBootstrapMessage(message: unknown): boolea
   if (message.machineRuntimeConfig) {
     cacheMachineRuntimeCredentialConfig(agentName, message.machineRuntimeConfig, now, message.machineId ?? "<this-machine>")
   }
+  if (message.providerCredentialRecords && message.providerCredentialRecords.length > 0) {
+    cacheProviderCredentialRecords(agentName, message.providerCredentialRecords, now)
+  }
   emitNervesEvent({
     component: "config/identity",
     event: "config.runtime_credentials_bootstrapped",
@@ -195,6 +230,7 @@ export function applyRuntimeCredentialBootstrapMessage(message: unknown): boolea
       agentName,
       runtimeConfig: !!message.runtimeConfig,
       machineRuntimeConfig: !!message.machineRuntimeConfig,
+      providerCredentialRecords: message.providerCredentialRecords?.length ?? 0,
     },
   })
   return true

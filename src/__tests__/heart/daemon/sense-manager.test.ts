@@ -19,6 +19,19 @@ async function cacheMachineRuntimeConfig(agent: string, payload: Record<string, 
   cacheMachineRuntimeCredentialConfig(agent, payload, new Date(0), "machine_test")
 }
 
+async function cacheProviderCredentials(agent: string): Promise<void> {
+  const { cacheProviderCredentialRecords, createProviderCredentialRecord } = await import("../../../heart/provider-credentials")
+  cacheProviderCredentialRecords(agent, [
+    createProviderCredentialRecord({
+      provider: "openai-codex",
+      credentials: { oauthAccessToken: "codex-token" },
+      config: {},
+      provenance: { source: "auth-flow" },
+      now: new Date(0),
+    }),
+  ], new Date(0))
+}
+
 describe("daemon sense manager", () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -749,6 +762,7 @@ describe("daemon sense manager", () => {
         password: "pw",
       },
     })
+    await cacheProviderCredentials("slugger")
 
     const processManagerCtor = vi.fn()
 
@@ -810,6 +824,14 @@ describe("daemon sense manager", () => {
         },
       },
       machineId: expect.stringMatching(/^machine_/),
+      providerCredentialRecords: [
+        expect.objectContaining({
+          provider: "openai-codex",
+          credentials: { oauthAccessToken: "codex-token" },
+          config: {},
+          provenance: expect.objectContaining({ source: "auth-flow" }),
+        }),
+      ],
     })
     expect(manager.listSenseRows().find((row) => row.agent === "ouroboros" && row.sense === "teams")).toEqual(
       expect.objectContaining({ status: "disabled" }),

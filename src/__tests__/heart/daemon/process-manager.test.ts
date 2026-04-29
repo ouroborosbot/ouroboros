@@ -178,6 +178,14 @@ describe("daemon process manager", () => {
           runtimeConfig: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
           machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
           machineId: "machine_test",
+          providerCredentialRecords: [{
+            provider: "openai-codex",
+            revision: "vault_test",
+            updatedAt: "2026-04-14T12:00:00.000Z",
+            credentials: { oauthAccessToken: "codex-token" },
+            config: {},
+            provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+          }],
         }),
       }],
       spawn,
@@ -194,6 +202,14 @@ describe("daemon process manager", () => {
       runtimeConfig: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
       machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
       machineId: "machine_test",
+      providerCredentialRecords: [{
+        provider: "openai-codex",
+        revision: "vault_test",
+        updatedAt: "2026-04-14T12:00:00.000Z",
+        credentials: { oauthAccessToken: "codex-token" },
+        config: {},
+        provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+      }],
     })
   })
 
