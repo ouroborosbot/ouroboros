@@ -84,6 +84,22 @@ const DISPATCH_EXEMPT_PATTERNS = [
   // HTTP health probe: pure HTTP utility factory. The HealthMonitor caller
   // owns observability via daemon.health_result events.
   "daemon/http-health-probe",
+  // Rollup decision function: pure decision tree mapping per-agent
+  // snapshots + bootstrap-degraded entries + safe-mode flag to a
+  // RollupStatus. No side effects. The caller (daemon-entry.ts
+  // buildDaemonHealthState → DaemonHealthWriter) owns observability via
+  // daemon.health_written when the rolled-up state is persisted.
+  "daemon/daemon-rollup",
+  // Drift comparator + thin I/O loader: `detectProviderBindingDrift`
+  // is a pure intent-vs-observed comparator with no side effects;
+  // `loadDriftInputsForAgent` is a small fs-read wrapper that returns
+  // `null` on missing/invalid state rather than emitting. The caller
+  // (daemon-entry.ts buildDaemonHealthState's per-agent drift probe)
+  // owns observability — drift findings ride along through
+  // `daemon.health_written` as part of the rolled-up state, and
+  // `agent-config-check.ts` carries `driftFindings` through its
+  // existing instrumentation. Same pattern as `daemon-rollup`.
+  "daemon/drift-detection",
   // Attachment helper modules: generic file-path/extension utilities and the
   // source registry are pure support seams. The orchestrator/adapters that
   // call them own the observability.
@@ -130,6 +146,15 @@ const DISPATCH_EXEMPT_PATTERNS = [
   // Diagnostics-only utility; output is human-readable summary.
   "heart/session-stats-cli-main",
   "heart/session-stats",
+  // Layer 2 sync classifier: pure pattern-matcher mapping (error, context)
+  // to a SyncClassification. The orchestrator (boot-sync-probe.ts) owns
+  // observability via daemon.boot_sync_probe_start/end events; the
+  // post-turn push path (sync.ts) emits its own classification events.
+  "heart/sync-classification",
+  // Layer 2 timeout wrapper: pure soft/hard timeout abstraction over
+  // AbortController + setTimeout. Callers (boot-sync-probe.ts and any
+  // future consumer) own observability; the wrapper itself is mechanical.
+  "heart/timeouts",
 ]
 
 function isDispatchExempt(filePath: string): boolean {
