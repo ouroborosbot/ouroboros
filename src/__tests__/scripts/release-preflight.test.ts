@@ -1,4 +1,6 @@
 import * as path from "path"
+import * as fs from "fs"
+import * as os from "os"
 
 import { describe, expect, it } from "vitest"
 
@@ -9,6 +11,9 @@ const {
   versionBumpRequired,
   wrapperPackageChanged,
 } = require(path.resolve(__dirname, "../../../scripts/release-preflight.cjs"))
+const {
+  REQUIRED_PACKAGE_ASSET_PATHS,
+} = require(path.resolve(__dirname, "../../../scripts/package-assets.cjs"))
 
 type ExecResponse = {
   changedFiles?: string[]
@@ -82,6 +87,16 @@ function makeReadFileSyncImpl(response: ReadResponse = {}) {
   }
 }
 
+function makePackageRootWithRequiredAssets(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-release-preflight-assets-"))
+  for (const relativePath of REQUIRED_PACKAGE_ASSET_PATHS) {
+    const filePath = path.join(root, relativePath)
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
+    fs.writeFileSync(filePath, "ok")
+  }
+  return root
+}
+
 describe("release-preflight", () => {
   it("flags releasable source and packaged skill changes but ignores src test churn", () => {
     expect(versionBumpRequired(["src/heart/daemon/daemon-cli.ts"])).toBe(true)
@@ -110,6 +125,7 @@ describe("release-preflight", () => {
   })
 
   it("passes when only docs changed and the changelog entry exists", () => {
+    const packageRoot = makePackageRootWithRequiredAssets()
     const result = runReleasePreflight(
       {},
       {
@@ -117,13 +133,34 @@ describe("release-preflight", () => {
           changedFiles: ["docs/auth-and-providers.md"],
         }),
         readFileSyncImpl: makeReadFileSyncImpl(),
+        packageRoot,
       },
     )
+    fs.rmSync(packageRoot, { recursive: true, force: true })
 
     expect(result.ok).toBe(true)
     expect(result.messages).toContain("No releasable src/ or packaged skills changes detected — version bump not required")
     expect(result.messages).toContain("changelog gate: pass (0.1.0-alpha.407)")
     expect(result.messages).toContain("wrapper package unchanged")
+    expect(result.messages).toContain("package assets verified")
+  })
+
+  it("fails when release preflight package assets are missing", () => {
+    const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-release-preflight-assets-"))
+    const result = runReleasePreflight(
+      {},
+      {
+        execSyncImpl: makeExecSyncImpl({
+          changedFiles: ["docs/auth-and-providers.md"],
+        }),
+        readFileSyncImpl: makeReadFileSyncImpl(),
+        packageRoot,
+      },
+    )
+    fs.rmSync(packageRoot, { recursive: true, force: true })
+
+    expect(result.ok).toBe(false)
+    expect(result.errors.join("\n")).toContain("missing required package assets")
   })
 
   it("fails when releasable changes reuse an already-published cli version", () => {
