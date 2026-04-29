@@ -31,6 +31,7 @@ import { OUTLOOK_DEFAULT_PORT } from "../outlook/outlook-types"
 import { readOutlookAgentState, readOutlookMachineState } from "../outlook/outlook-read"
 import { buildOutlookAgentView, buildOutlookMachineView } from "../outlook/outlook-view"
 import { buildAgentProviderVisibility, providerVisibilityStatusRows, type ProviderStatusRow } from "../provider-visibility"
+import { DEFAULT_DAEMON_SOCKET_PATH } from "./socket-client"
 
 const PIDFILE_PATH = path.join(os.homedir(), ".ouro-cli", "daemon.pids")
 
@@ -169,7 +170,21 @@ function runPsCheck(pids: number[]): string | null {
  * manual cleanup). The scope is narrow on purpose — see parseOrphanPidsFromPs.
  */
 /* v8 ignore start -- process lifecycle: uses kill/ps, tested via deployment @preserve */
-export function killOrphanProcesses(): void {
+function isProductionDaemonSocketPath(socketPath: string): boolean {
+  return socketPath === DEFAULT_DAEMON_SOCKET_PATH
+}
+
+export function killOrphanProcesses(socketPath = DEFAULT_DAEMON_SOCKET_PATH): void {
+  if (!isProductionDaemonSocketPath(socketPath)) {
+    emitNervesEvent({
+      level: "warn",
+      component: "daemon",
+      event: "daemon.orphan_cleanup_nonproduction_blocked",
+      message: "blocked orphan cleanup for non-production daemon socket",
+      meta: { socketPath, pidfilePath: PIDFILE_PATH },
+    })
+    return
+  }
   if (isVitestProcess()) {
     emitNervesEvent({
       level: "warn",
@@ -234,7 +249,17 @@ export function killOrphanProcesses(): void {
  * Write all managed PIDs (daemon + children) to the pidfile.
  * Called after all agents and senses are spawned.
  */
-export function writePidfile(extraPids: number[] = []): void {
+export function writePidfile(extraPids: number[] = [], socketPath = DEFAULT_DAEMON_SOCKET_PATH): void {
+  if (!isProductionDaemonSocketPath(socketPath)) {
+    emitNervesEvent({
+      level: "warn",
+      component: "daemon",
+      event: "daemon.write_pidfile_nonproduction_blocked",
+      message: "blocked production pidfile write for non-production daemon socket",
+      meta: { socketPath, pidfilePath: PIDFILE_PATH, attemptedPids: extraPids.length },
+    })
+    return
+  }
   if (isVitestProcess()) {
     emitNervesEvent({
       level: "warn",
@@ -738,7 +763,7 @@ export class OuroDaemon {
     // (daemon manages multiple agents; agent identity must be set before loading MCP config)
 
     /* v8 ignore start -- orphan cleanup + pidfile: calls process management functions @preserve */
-    killOrphanProcesses()
+    killOrphanProcesses(this.socketPath)
     /* v8 ignore stop */
     await this.openCommandSocket()
     this.triggerAutoStartAgents()
@@ -748,7 +773,7 @@ export class OuroDaemon {
     /* v8 ignore start -- pidfile write: collects PIDs from process managers @preserve */
     const agentPids = this.processManager.listAgentSnapshots().map((s) => s.pid).filter((p): p is number => p !== null)
     const sensePids = this.senseManager?.listManagedPids?.() ?? []
-    writePidfile([...agentPids, ...sensePids])
+    writePidfile([...agentPids, ...sensePids], this.socketPath)
     /* v8 ignore stop */
 
     this.scheduler.start?.()
