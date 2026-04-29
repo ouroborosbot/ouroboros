@@ -256,6 +256,29 @@ describe("createToolActivityCallbacks", () => {
       expect(onFailure).toHaveBeenCalledWith("✗ running npm test — exit code 1")
     })
 
+    it("two concurrent same-named hidden tool starts (e.g. settle x2) decrement the counter on each end without emitting", async () => {
+      // Defensive: covers the counter-decrement branch (hiddenCount > 1) so a
+      // concurrent same-name hidden tool path stays suppressed across both ends.
+      const createToolActivityCallbacks = await loadModule()
+      const onResult = vi.fn()
+      const onFailure = vi.fn()
+
+      const { onToolStart, onToolEnd } = createToolActivityCallbacks({
+        onDescription: vi.fn(),
+        onResult,
+        onFailure,
+        isDebug: () => true,
+      })
+
+      onToolStart("settle", { answer: "first" })
+      onToolStart("settle", { answer: "second" }) // bumps counter to 2
+      onToolEnd("settle", "answer=first", false)  // takes the > 1 branch (counter -> 1)
+      onToolEnd("settle", "answer=second", true)  // takes the === 1 branch (deletes)
+
+      expect(onResult).not.toHaveBeenCalled()
+      expect(onFailure).not.toHaveBeenCalled()
+    })
+
     it("hidden tool start without a matching end does not break the next visible tool's END emission", async () => {
       // Defensive: if an engine path ever calls onToolStart for a hidden tool but
       // never calls onToolEnd for it, a subsequent visible tool's END must still
