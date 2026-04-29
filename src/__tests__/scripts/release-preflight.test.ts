@@ -101,6 +101,11 @@ describe("release-preflight", () => {
   it("flags releasable source and packaged skill changes but ignores src test churn", () => {
     expect(versionBumpRequired(["src/heart/daemon/daemon-cli.ts"])).toBe(true)
     expect(versionBumpRequired(["skills/work-planner/SKILL.md"])).toBe(true)
+    expect(versionBumpRequired(["package.json"])).toBe(true)
+    expect(versionBumpRequired(["scripts/package-assets.cjs"])).toBe(true)
+    expect(versionBumpRequired(["scripts/package-e2e.cjs"])).toBe(true)
+    expect(versionBumpRequired(["scripts/release-preflight.cjs"])).toBe(true)
+    expect(versionBumpRequired(["scripts/release-smoke.cjs"])).toBe(true)
     expect(versionBumpRequired(["src/__tests__/scripts/changelog-gate.test.ts"])).toBe(false)
   })
 
@@ -174,6 +179,25 @@ describe("release-preflight", () => {
         readFileSyncImpl: makeReadFileSyncImpl(),
       },
     )
+
+    expect(result.ok).toBe(false)
+    expect(result.errors[0]).toContain("@ouro.bot/cli@0.1.0-alpha.407 is already published on npm.")
+  })
+
+  it("fails when package-truth changes reuse an already-published cli version", () => {
+    const packageRoot = makePackageRootWithRequiredAssets()
+    const result = runReleasePreflight(
+      {},
+      {
+        execSyncImpl: makeExecSyncImpl({
+          changedFiles: ["scripts/package-assets.cjs"],
+          publishedCliVersion: "0.1.0-alpha.407",
+        }),
+        readFileSyncImpl: makeReadFileSyncImpl(),
+        packageRoot,
+      },
+    )
+    fs.rmSync(packageRoot, { recursive: true, force: true })
 
     expect(result.ok).toBe(false)
     expect(result.errors[0]).toContain("@ouro.bot/cli@0.1.0-alpha.407 is already published on npm.")
