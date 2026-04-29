@@ -5,7 +5,7 @@ import * as path from "path"
 
 const {
   copyOutlookUiDist,
-} = require(path.resolve(__dirname, "../../../scripts/copy-outlook-ui.cjs"))
+} = require(path.resolve(__dirname, "../../../scripts/copy-outlook-ui-lib.cjs"))
 
 const roots: string[] = []
 
