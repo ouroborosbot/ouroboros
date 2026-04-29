@@ -150,8 +150,8 @@ describe("runtime credentials vault config", () => {
 
     const providerRecord = createProviderCredentialRecord({
       provider: "openai-codex",
-      credentials: { oauthAccessToken: "codex-token" },
-      config: {},
+      credentials: { oauthAccessToken: "codex-token", expiresAt: 123 },
+      config: { retryBudget: 1 },
       provenance: { source: "auth-flow" },
       now: new Date("2026-04-14T12:00:00.000Z"),
     })
@@ -169,7 +169,8 @@ describe("runtime credentials vault config", () => {
         providers: {
           "openai-codex": expect.objectContaining({
             provider: "openai-codex",
-            credentials: { oauthAccessToken: "codex-token" },
+            credentials: { oauthAccessToken: "codex-token", expiresAt: 123 },
+            config: { retryBudget: 1 },
           }),
         },
       },
@@ -189,7 +190,105 @@ describe("runtime credentials vault config", () => {
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", machineRuntimeConfig: "bad" },
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", machineId: "" },
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", providerCredentialRecords: "bad" },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", providerCredentialRecords: [null] },
+      { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", providerCredentialRecords: [{ provider: 42 }] },
       { type: "ouro.runtimeCredentialBootstrap", agentName: "slugger", providerCredentialRecords: [{ provider: "openai-codex" }] },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "",
+          credentials: {},
+          config: {},
+          provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: "bad",
+          config: {},
+          provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: { oauthAccessToken: false },
+          config: {},
+          provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: {},
+          config: "bad",
+          provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: {},
+          config: { retryBudget: false },
+          provenance: { source: "auth-flow", updatedAt: "2026-04-14T12:00:00.000Z" },
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: {},
+          config: {},
+          provenance: "bad",
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: {},
+          config: {},
+          provenance: { source: "other", updatedAt: "2026-04-14T12:00:00.000Z" },
+        }],
+      },
+      {
+        type: "ouro.runtimeCredentialBootstrap",
+        agentName: "slugger",
+        providerCredentialRecords: [{
+          provider: "openai-codex",
+          revision: "vault_test",
+          updatedAt: "2026-04-14T12:00:00.000Z",
+          credentials: {},
+          config: {},
+          provenance: { source: "auth-flow", updatedAt: "" },
+        }],
+      },
     ]) {
       expect(applyRuntimeCredentialBootstrapMessage(message)).toBe(false)
     }

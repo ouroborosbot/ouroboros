@@ -245,6 +245,80 @@ describe("daemon process manager", () => {
     expect(manager.getAgentSnapshot("slugger:bluebubbles")?.status).toBe("running")
   })
 
+  it("sends runtime credential bootstrap without provider records", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents: [{
+        name: "slugger:bluebubbles",
+        agentArg: "slugger",
+        entry: "senses/bluebubbles/entry.js",
+        channel: "bluebubbles",
+        autoStart: true,
+        getRuntimeCredentialBootstrap: () => ({
+          agentName: "slugger",
+          machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
+        }),
+      }],
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger:bluebubbles")
+
+    expect(child.send).toHaveBeenCalledWith({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
+    })
+    expect(manager.getAgentSnapshot("slugger:bluebubbles")?.status).toBe("running")
+  })
+
+  it("sends provider credential bootstrap without unrelated runtime fields", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const providerCredentialRecords = [{
+      provider: "openai-codex" as const,
+      revision: "vault_test",
+      updatedAt: "2026-04-14T12:00:00.000Z",
+      credentials: { oauthAccessToken: "codex-token" },
+      config: {},
+      provenance: { source: "auth-flow" as const, updatedAt: "2026-04-14T12:00:00.000Z" },
+    }]
+
+    const manager = new DaemonProcessManager({
+      agents: [{
+        name: "slugger:mail",
+        agentArg: "slugger",
+        entry: "senses/mail-entry.js",
+        channel: "mail",
+        autoStart: true,
+        getRuntimeCredentialBootstrap: () => ({
+          agentName: "slugger",
+          providerCredentialRecords,
+        }),
+      }],
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger:mail")
+
+    expect(child.send).toHaveBeenCalledWith({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      providerCredentialRecords,
+    })
+  })
+
   it("records Error details when runtime credential bootstrap IPC send throws an Error", async () => {
     const child = new MockChild()
     child.send.mockImplementation(() => {
