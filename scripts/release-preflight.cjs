@@ -34,7 +34,10 @@ function parseArgs(argv) {
 
 function versionBumpRequired(changedFiles) {
   return changedFiles.some(
-    (file) => file.startsWith("skills/") || (file.startsWith("src/") && !file.startsWith("src/__tests__/")),
+    (file) => file === "package.json" ||
+      file.startsWith("skills/") ||
+      file.startsWith("scripts/") ||
+      (file.startsWith("src/") && !file.startsWith("src/__tests__/")),
   )
 }
 
