@@ -20,7 +20,7 @@ import type { DiscoverWorkingProviderResult } from "./provider-discovery"
 import type { AgentProvider } from "../identity"
 import { createProviderRuntimeForConfig, type ProviderRuntimeConfig } from "../provider-ping"
 import type OpenAI from "openai"
-import { isKnownReadinessIssue } from "./readiness-repair"
+import { isKnownReadinessIssue, type RepairAction, type RepairActionKind } from "./readiness-repair"
 
 /** Minimal subset of ProviderRuntime needed for a single diagnostic call. */
 export interface AgenticProviderRuntime {
@@ -414,4 +414,156 @@ export function loadRepairGuideContent(repoRoot: string): RepairGuideContent | n
     // falls back to today's pre-RepairGuide diagnostic prompt.
     return null
   }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Layer 3: RepairGuide LLM output parser → typed `RepairAction[]`
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * The set of `RepairActionKind` literals the typed catalog recognizes.
+ * Encoded once here; the parser uses this for membership checks. Any other
+ * kind in the LLM output is dropped with a warning.
+ */
+const KNOWN_REPAIR_ACTION_KINDS: ReadonlySet<RepairActionKind> = new Set<RepairActionKind>([
+  "vault-create",
+  "vault-unlock",
+  "vault-replace",
+  "vault-recover",
+  "provider-auth",
+  "provider-retry",
+  "provider-use",
+])
+
+export interface ParsedRepairProposals {
+  actions: RepairAction[]
+  warnings: string[]
+  /** Set when the entire LLM output cannot be parsed into structured actions —
+   * caller surfaces this as today's pre-RepairGuide text-blob. */
+  fallbackBlob?: string
+}
+
+function extractFirstJsonBlock(text: string): string | null {
+  // Look for a triple-backtick fence labeled `json` and grab its body.
+  const fenceMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n```/)
+  if (fenceMatch) return fenceMatch[1]
+  // Fallback: the LLM may have emitted a bare JSON object (no fence).
+  const objectMatch = text.match(/\{[\s\S]*\}/)
+  if (objectMatch) return objectMatch[0]
+  return null
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Parse a single LLM-emitted action object into a typed `RepairAction`. Returns
+ * `null` when the entry is shaped wrong — the caller logs a warning and drops
+ * it. The parser backfills `label`, `command`, and `actor` so the result plugs
+ * into the existing interactive-repair surface without further massaging.
+ */
+function buildRepairAction(entry: Record<string, unknown>): RepairAction | null {
+  const kind = entry.kind
+  if (typeof kind !== "string") return null
+  if (!KNOWN_REPAIR_ACTION_KINDS.has(kind as RepairActionKind)) return null
+
+  const reason = typeof entry.reason === "string" ? entry.reason : "(no reason given)"
+  const agent = typeof entry.agent === "string" ? entry.agent : "(unknown agent)"
+  const label = `RepairGuide: ${kind} for ${agent}`
+  const command = `# ${kind} (${agent}): ${reason}`
+
+  switch (kind as RepairActionKind) {
+    case "provider-auth": {
+      const provider = typeof entry.provider === "string" ? entry.provider : "anthropic"
+      return {
+        kind: "provider-auth",
+        label,
+        command,
+        actor: "human-required",
+        provider: provider as AgentProvider,
+      }
+    }
+    case "provider-use": {
+      // `provider-use` may carry an optional `lane` — pass it through when
+      // present and validly typed (`outward` or `inner`).
+      const lane = entry.lane === "outward" || entry.lane === "inner" ? entry.lane : undefined
+      const action: RepairAction = {
+        kind: "provider-use",
+        label,
+        command,
+        actor: "human-choice",
+        ...(lane ? { lane } : {}),
+      }
+      return action
+    }
+    case "vault-create":
+    case "vault-unlock":
+    case "vault-replace":
+    case "vault-recover":
+    case "provider-retry": {
+      return {
+        kind: kind as "vault-create" | "vault-unlock" | "vault-replace" | "vault-recover" | "provider-retry",
+        label,
+        command,
+        actor: "human-required",
+      }
+    }
+    /* v8 ignore next 4 -- exhaustiveness guard: unreachable since membership
+     * was checked above; left in place to satisfy `never` on future
+     * RepairActionKind extensions. @preserve */
+    default: {
+      return null
+    }
+  }
+}
+
+/**
+ * Parse RepairGuide LLM output. The persona content (`SOUL.md`) instructs the
+ * model to emit exactly one ```json fenced block containing
+ * `{ actions: RepairAction[], notes?: string[] }`. The parser extracts that
+ * block, walks `actions[]`, drops entries with unknown kinds (with warnings),
+ * and falls back to the raw output when no JSON can be extracted at all
+ * (preserving today's text-blob behavior).
+ */
+export function parseRepairProposals(llmOutput: string): ParsedRepairProposals {
+  const block = extractFirstJsonBlock(llmOutput)
+  if (block === null) {
+    return { actions: [], warnings: [], fallbackBlob: llmOutput }
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(block)
+  } catch {
+    return { actions: [], warnings: [], fallbackBlob: llmOutput }
+  }
+
+  if (!isPlainObject(parsed)) {
+    return { actions: [], warnings: [] }
+  }
+
+  const rawActions = parsed.actions
+  if (!Array.isArray(rawActions)) {
+    return { actions: [], warnings: [] }
+  }
+
+  const actions: RepairAction[] = []
+  const warnings: string[] = []
+
+  for (const entry of rawActions) {
+    if (!isPlainObject(entry)) {
+      warnings.push(`dropped non-object entry from actions[]: ${JSON.stringify(entry)}`)
+      continue
+    }
+    const built = buildRepairAction(entry)
+    if (built === null) {
+      const kindLabel = typeof entry.kind === "string" ? entry.kind : "(no kind)"
+      warnings.push(`dropped action with unknown or missing kind: ${kindLabel}`)
+      continue
+    }
+    actions.push(built)
+  }
+
+  return { actions, warnings }
 }
