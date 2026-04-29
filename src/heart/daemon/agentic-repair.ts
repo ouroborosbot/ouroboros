@@ -6,6 +6,8 @@
  * This is a lightweight integration: one diagnostic LLM call, not a chat loop.
  */
 
+import * as fs from "fs"
+import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
 import {
   hasRunnableInteractiveRepair,
@@ -297,4 +299,79 @@ export async function runAgenticRepair(
   })
 
   return { repairsAttempted: interactiveResult.repairsAttempted, usedAgentic }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Layer 3: RepairGuide bundle loader
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Structured content loaded from `RepairGuide.ouro/`. Returned to callers that
+ * want to prepend it to the diagnostic LLM call's system prompt. Both `psyche`
+ * fields and the `skills` map may be partially populated — graceful degradation
+ * is the rule (any missing piece is OK; a broken bundle returns `null`).
+ */
+export interface RepairGuideContent {
+  psyche: { soul?: string; identity?: string }
+  /** Filename → file content. Sorted alphabetically by filename. */
+  skills: Record<string, string>
+}
+
+/**
+ * Read `RepairGuide.ouro/{psyche,skills}/*.md` from the given repo root and
+ * return a structured shape suitable for prepending to a diagnostic LLM call.
+ *
+ * Behavior:
+ * - Returns `null` if `RepairGuide.ouro/` does not exist at all (graceful: caller
+ *   should fall back to today's pre-RepairGuide pipeline).
+ * - Returns `null` on any I/O error (`readdirSync`/`readFileSync` throws).
+ * - Returns a populated `RepairGuideContent` when the bundle exists, even if
+ *   psyche or skills are partially populated.
+ * - Skips files that are not `.md`, are not regular files, or have empty
+ *   contents.
+ * - `skills` map is iterated in alphabetical order so callers can rely on
+ *   deterministic prompt assembly.
+ *
+ * The loader is intentionally inline in `agentic-repair.ts` per the planning
+ * O5 lock — splitting into its own module is allowed only if the validator
+ * grows large.
+ */
+export function loadRepairGuideContent(repoRoot: string): RepairGuideContent | null {
+  const bundleRoot = path.join(repoRoot, "RepairGuide.ouro")
+  if (!fs.existsSync(bundleRoot)) return null
+
+  try {
+    const psyche: RepairGuideContent["psyche"] = {}
+    const skills: RepairGuideContent["skills"] = {}
+
+    const psycheDir = path.join(bundleRoot, "psyche")
+    if (fs.existsSync(psycheDir)) {
+      const psycheEntries = fs.readdirSync(psycheDir, { withFileTypes: true })
+      for (const entry of psycheEntries) {
+        if (!entry.isFile() || !entry.name.endsWith(".md")) continue
+        const content = fs.readFileSync(path.join(psycheDir, entry.name), "utf-8")
+        if (entry.name === "SOUL.md") psyche.soul = content
+        else if (entry.name === "IDENTITY.md") psyche.identity = content
+      }
+    }
+
+    const skillsDir = path.join(bundleRoot, "skills")
+    if (fs.existsSync(skillsDir)) {
+      const skillEntries = fs.readdirSync(skillsDir, { withFileTypes: true })
+      const sorted = skillEntries
+        .filter((e) => e.isFile() && e.name.endsWith(".md"))
+        .sort((a, b) => a.name.localeCompare(b.name))
+      for (const entry of sorted) {
+        const content = fs.readFileSync(path.join(skillsDir, entry.name), "utf-8")
+        if (content.length === 0) continue
+        skills[entry.name] = content
+      }
+    }
+
+    return { psyche, skills }
+  } catch {
+    // Best-effort: any I/O error in the bundle leads to null and the caller
+    // falls back to today's pre-RepairGuide diagnostic prompt.
+    return null
+  }
 }
