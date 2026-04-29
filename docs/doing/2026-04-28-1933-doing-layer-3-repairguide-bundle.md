@@ -165,22 +165,22 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 **What**: 100% branch coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 2a: Tag SerpentGuide.ouro as library — Tests
+### ✅ Unit 2a: Tag SerpentGuide.ouro as library — Tests
 **What**: Write failing test in `src/__tests__/heart/daemon/serpentguide-library-kind.test.ts` (new file) asserting:
 - `SerpentGuide.ouro/agent.json` parses with `kind === "library"`.
 - `listEnabledBundleAgents` does not return SerpentGuide regardless of its `enabled` flag.
 - An override of SerpentGuide's `enabled` to true (in-test fixture) still does NOT promote it to discovery (because `kind === "library"` overrides `enabled`).
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 2b: Tag SerpentGuide.ouro as library — Implementation
+### ✅ Unit 2b: Tag SerpentGuide.ouro as library — Implementation
 **What**: Edit `SerpentGuide.ouro/agent.json` — add `"kind": "library"` field (alongside `"enabled": false`). Both fields stay; `kind: library` is the architectural reason, `enabled: false` is preserved for back-compat with anything that still reads it.
 **Acceptance**: Tests from 2a PASS. Existing SerpentGuide-related tests still pass.
 
-### ⬜ Unit 2c: Tag SerpentGuide.ouro as library — Coverage & refactor
+### ✅ Unit 2c: Tag SerpentGuide.ouro as library — Coverage & refactor
 **What**: Coverage on the changed agent.json parse path.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 3: Build RepairGuide.ouro bundle skeleton
+### ✅ Unit 3: Build RepairGuide.ouro bundle skeleton
 **What**: Create the bundle on disk:
 - `RepairGuide.ouro/agent.json` with `{"version": 2, "enabled": false, "kind": "library"}`.
 - `RepairGuide.ouro/psyche/SOUL.md` with orientation content (see "Content drafting notes" below).
@@ -192,7 +192,7 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 - `RepairGuide.ouro/skills/diagnose-stacked-typed-issues.md`
 **Acceptance**: All files exist on disk in repo. `git status` shows them as untracked. `agent.json` parses cleanly as JSON.
 
-### ⬜ Unit 4a: RepairGuide loader — Tests
+### ✅ Unit 4a: RepairGuide loader — Tests
 **What**: Write failing tests for the loader function (call it `loadRepairGuideContent(repoRoot: string): RepairGuideContent | null`) in `src/__tests__/heart/daemon/repair-guide-loader.test.ts` (new file).
 **Test cases**:
 - All files present → returns concatenated content with section markers.
@@ -203,7 +203,7 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 - Multiple psyche files (future-proofing) → concatenated in alphabetical order.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 4b: RepairGuide loader — Implementation
+### ✅ Unit 4b: RepairGuide loader — Implementation
 **What**: Implement `loadRepairGuideContent` in `src/heart/daemon/agentic-repair.ts` (per O5 lock — inlined unless validator grows). Use `getRepoRoot()` from `identity.ts` to find the bundle.
 **Output shape**:
 ```ts
@@ -214,11 +214,11 @@ interface RepairGuideContent {
 ```
 **Acceptance**: Tests from 4a PASS.
 
-### ⬜ Unit 4c: RepairGuide loader — Coverage & refactor
+### ✅ Unit 4c: RepairGuide loader — Coverage & refactor
 **What**: 100% coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 5a: Activation contract — Tests
+### ✅ Unit 5a: Activation contract — Tests
 **What**: Write failing tests for `shouldFireRepairGuide(input: { untypedDegraded: DegradedAgent[]; typedDegraded: DegradedAgent[]; noRepair: boolean }): boolean` in `src/__tests__/heart/daemon/repair-guide-activation.test.ts` (new file). Use the existing `DegradedAgent` type from `cli-exec.ts` for the input shape so the function plugs in cleanly at the existing call site.
 **Test cases**:
 - `noRepair: true` → false unconditionally.
@@ -231,15 +231,15 @@ interface RepairGuideContent {
 - `untypedDegraded.length === 0 && typedDegraded.length === 2 && noRepair: false` → false.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 5b: Activation contract — Implementation
+### ✅ Unit 5b: Activation contract — Implementation
 **What**: Implement `shouldFireRepairGuide` in `agentic-repair.ts`. Pure function.
 **Acceptance**: Tests from 5a PASS.
 
-### ⬜ Unit 5c: Activation contract — Coverage & refactor
+### ✅ Unit 5c: Activation contract — Coverage & refactor
 **What**: 100% coverage.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 6a: LLM output parser → typed `RepairAction` — Tests
+### ✅ Unit 6a: LLM output parser → typed `RepairAction` — Tests
 **What**: Write failing tests for `parseRepairProposals(llmOutput: string): { actions: RepairAction[]; warnings: string[]; fallbackBlob?: string }` in `src/__tests__/heart/daemon/repair-proposal-parser.test.ts` (new file).
 **Test cases**:
 - LLM output contains a structured `vault-unlock` action → parsed correctly.
@@ -249,15 +249,15 @@ interface RepairGuideContent {
 - Each existing action kind in `readiness-repair.ts` (`vault-create`, `vault-unlock`, `vault-replace`, `vault-recover`, `provider-auth`, `provider-retry`, `provider-use`) is parseable.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 6b: LLM output parser — Implementation
+### ✅ Unit 6b: LLM output parser — Implementation
 **What**: Implement `parseRepairProposals` in `agentic-repair.ts`. Decide structured-output format during implementation: a JSON block in the LLM output is the simplest. The persona content (SOUL.md / skills) instructs the LLM to emit JSON in a specific shape.
 **Acceptance**: Tests from 6a PASS.
 
-### ⬜ Unit 6c: LLM output parser — Coverage & refactor
+### ✅ Unit 6c: LLM output parser — Coverage & refactor
 **What**: 100% coverage. If the parser grows large enough that it dominates `agentic-repair.ts`, split into a sibling file (`repair-proposal-parser.ts`) — operator's O5 lock allows this judgment call.
 **Acceptance**: Coverage 100%. Tests green.
 
-### ⬜ Unit 7a: Wire RepairGuide into existing `agentic-repair.ts` flow — Tests
+### ✅ Unit 7a: Wire RepairGuide into existing `agentic-repair.ts` flow — Tests
 **What**: Write failing integration tests in `src/__tests__/heart/daemon/agentic-repair-with-repairguide.test.ts` covering:
 - `agentic-repair.ts` is invoked during `ouro up`. Loader runs. Activation contract evaluated. If fired, RepairGuide content prepended to system prompt. LLM output parsed. Typed actions surfaced.
 - `--no-repair` short-circuits the entire RepairGuide path. Diagnostics still surface.
@@ -265,7 +265,7 @@ interface RepairGuideContent {
 - LLM call fails → `discoverWorkingProvider` already handles this; verify the typed-action repair from `readiness-repair.ts` still fires regardless.
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 7b: Wire RepairGuide — Implementation
+### ✅ Unit 7b: Wire RepairGuide — Implementation
 **What**:
 - Modify the gate at `cli-exec.ts:6706` from `if (untypedDegraded.length > 0)` to `if (shouldFireRepairGuide({ untypedDegraded, typedDegraded, noRepair: command.noRepair === true }))`. This is the single-line gate change that activates the new contract.
 - Inside the existing one-shot LLM diagnostic call in `agentic-repair.ts`, load RepairGuide content via `loadRepairGuideContent` and prepend `psyche/SOUL.md` + `psyche/IDENTITY.md` + relevant skills (selected based on the finding mix — skills act as instructions for the LLM) to the system prompt.
@@ -273,7 +273,7 @@ interface RepairGuideContent {
 - Honor `--no-repair` — already encoded in the gate function via the `noRepair` arg.
 **Acceptance**: Tests from 7a PASS. Existing `agentic-repair` tests still pass. Existing `cli-exec.ts:6706` regression tests still pass.
 
-### ⬜ Unit 7c: Wire RepairGuide — Coverage & refactor
+### ✅ Unit 7c: Wire RepairGuide — Coverage & refactor
 **What**: 100% coverage on changed lines.
 **Acceptance**: Coverage 100%. Tests green.
 
