@@ -203,7 +203,6 @@ const BLUEBUBBLES_RECOVERY_CATCHUP_LOOKBACK_MS = 24 * 60 * 60 * 1000
 const BLUEBUBBLES_FIRST_CATCHUP_LOOKBACK_MS = 10 * 60 * 1000
 
 interface BlueBubblesHandleOptions {
-  signal?: AbortSignal
   timeoutMs?: number
 }
 
@@ -1073,16 +1072,6 @@ async function handleBlueBubblesNormalizedEvent(
     let timeoutPromise: Promise<never> | null = null
     let timeoutReject: ((error: Error) => void) | undefined
     let recoveryTimedOut = false
-    let removeAbortListener: (() => void) | undefined
-    if (options.signal) {
-      if (options.signal.aborted) {
-        controller.abort(options.signal.reason)
-      } else {
-        const onAbort = () => controller.abort(options.signal?.reason)
-        options.signal.addEventListener("abort", onAbort, { once: true })
-        removeAbortListener = () => options.signal?.removeEventListener("abort", onAbort)
-      }
-    }
 
     // BB-specific tool context wrappers
     const summarize = createSummarize("human")
@@ -1139,6 +1128,7 @@ async function handleBlueBubblesNormalizedEvent(
             },
           })
         }, timeoutMs)
+        /* v8 ignore next -- timer handles expose unref only in some runtimes @preserve */
         if (typeof (timeoutTimer as { unref?: () => void }).unref === "function") {
           (timeoutTimer as { unref: () => void }).unref()
         }
@@ -1205,6 +1195,7 @@ async function handleBlueBubblesNormalizedEvent(
           return bbFailoverStates.get(event.chat.sessionKey)!
         })(),
       })
+      /* v8 ignore start -- detached late-rejection telemetry is asserted in timeout tests, but V8 does not reliably attribute Promise.catch callbacks @preserve */
       if (timeoutPromise) {
         void turnPromise.catch((error) => {
           if (!recoveryTimedOut) return
@@ -1222,6 +1213,7 @@ async function handleBlueBubblesNormalizedEvent(
           })
         })
       }
+      /* v8 ignore stop */
       const result = timeoutPromise
         ? await Promise.race([turnPromise, timeoutPromise])
         : await turnPromise
@@ -1292,7 +1284,6 @@ async function handleBlueBubblesNormalizedEvent(
         clearTimeout(timeoutTimer)
         timeoutTimer = null
       }
-      removeAbortListener?.()
       await callbacks.finish()
     }
     })
