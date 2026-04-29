@@ -135,7 +135,7 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 0: Verify layers 1, 4, 2 have landed
+### ✅ Unit 0: Verify layers 1, 4, 2 have landed
 **What**:
 - Confirm `DaemonStatus` + `computeDaemonRollup` from layer 1 in `daemon-health.ts`.
 - Confirm `detectProviderBindingDrift` from layer 4 in `drift-detection.ts`.
@@ -143,7 +143,7 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 - If any is missing, halt — do NOT start this PR. Re-cut the branch from a base where all three have landed.
 **Acceptance**: All three symbols exist on the base. `git log` shows all three PRs merged.
 
-### ⬜ Unit 1a: `kind: library` exclusion in `agent-discovery.ts` — Tests
+### ✅ Unit 1a: `kind: library` exclusion in `agent-discovery.ts` — Tests
 **What**: Write failing tests in `src/__tests__/heart/daemon/agent-discovery-kind.test.ts` (new file) covering:
 - A bundle with `"kind": "library"` is excluded from `listEnabledBundleAgents` and `listBundleSyncRows`.
 - A bundle with no `kind` field continues to be discovered (back-compat).
@@ -152,7 +152,7 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 - The `listAllBundleAgents` behavior (whether it includes library bundles or not — decide here based on the tests you write; recommend: it returns ALL bundles with their `kind`, and the filter happens in `listEnabledBundleAgents` / `listBundleSyncRows`).
 **Acceptance**: Tests exist and FAIL (red).
 
-### ⬜ Unit 1b: `kind: library` exclusion — Implementation
+### ✅ Unit 1b: `kind: library` exclusion — Implementation
 **What**:
 - Extend the `agent.json` parse type in `agent-discovery.ts` with `kind?: string`.
 - Extend `BundleAgentRow` (or whatever the existing inventory row type is) with `kind?: string`.
@@ -161,7 +161,7 @@ Threshold of 3 (not 2) prevents common pairs (vault-locked + provider-auth-neede
 - Optionally export a typed predicate `isLibraryKind(kind: unknown): boolean`.
 **Acceptance**: Tests from 1a PASS. No regression in existing `agent-discovery` tests.
 
-### ⬜ Unit 1c: `kind: library` exclusion — Coverage & refactor
+### ✅ Unit 1c: `kind: library` exclusion — Coverage & refactor
 **What**: 100% branch coverage. Refactor.
 **Acceptance**: Coverage 100%. Tests green.
 
@@ -384,3 +384,5 @@ The exact prose can be drafted iteratively during implementation. The shape of t
 
 ## Progress Log
 - 2026-04-28 19:33 UTC Created as PR 4 of 4 in the sequential rollout (1 → 4 → 2 → 3). Depends on layers 1, 4, and 2 PRs all merged.
+- 2026-04-28 18:43 Unit 0 complete: confirmed `computeDaemonRollup` (`daemon-rollup.ts:79`), `detectProviderBindingDrift` (`drift-detection.ts:88`), and `runBootSyncProbe` (`boot-sync-probe.ts:103`) all exist on `origin/main` (HEAD `2f17921c`). Branch `harness/layer-3-repairguide-bundle` cut from origin/main.
+- 2026-04-28 18:43 Unit 1a-1c complete: `kind: library` exclusion implemented in `agent-discovery.ts`. New tests in `agent-discovery-kind.test.ts` (10 tests). `BundleAgentRow.kind?: string` added; `isLibraryKind(kind)` predicate exported; `listEnabledBundleAgents` filters libraries; `listBundleSyncRows` inherits the filter via its dependency. Coverage 100% on `agent-discovery.ts` (57/57 lines, 45/45 branches).
