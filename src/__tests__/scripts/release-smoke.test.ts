@@ -22,7 +22,6 @@ function makeDeps(outputs: Array<string | Error>) {
       calls.push({ command, args, cwd: options.cwd })
       const next = outputs.shift()
       if (next instanceof Error) throw next
-      if (next === "__BIN__\n") return `${binPath}\n`
       return next
     }),
     mkdtempSync: vi.fn(() => "/tmp/ouro-release-smoke-abcd"),
@@ -56,6 +55,7 @@ function makePublishedPackageDeps(outputs: Array<string | Error>, options: { wit
       calls.push({ command, args, cwd: options.cwd })
       const next = outputs.shift()
       if (next instanceof Error) throw next
+      if (next === "__BIN__\n") return `${binPath}\n`
       return next
     }),
     mkdtempSync: vi.fn(() => prefixDir),
