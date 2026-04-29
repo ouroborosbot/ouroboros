@@ -790,7 +790,7 @@ describe("daemon sense manager", () => {
     )
   })
 
-  it("rechecks runtime/config during default sense config checks and returns sense-specific repair hints", async () => {
+  it("uses cached runtime config for default sense checks, refreshes in the background, and returns sense-specific repair hints", async () => {
     const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-home-"))
     const bundlesRoot = path.join(homeRoot, "AgentBundles")
     writeAgentJson(bundlesRoot, "slugger", {
@@ -846,6 +846,28 @@ describe("daemon sense manager", () => {
       },
     }))
 
+    const refreshRuntimeCredentialConfig = vi.fn(async (agentName: string) => ({
+      ok: true,
+      itemPath: `vault:${agentName}:runtime/config`,
+      config: runtimeConfig,
+      revision: "runtime_test",
+      updatedAt: new Date(0).toISOString(),
+    }))
+    const refreshMachineRuntimeCredentialConfig = vi.fn(async (agentName: string) => machineRuntimeConfig
+      ? {
+          ok: true,
+          itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
+          config: machineRuntimeConfig,
+          revision: "runtime_machine_test",
+          updatedAt: new Date(0).toISOString(),
+        }
+      : {
+          ok: false,
+          reason: "missing",
+          itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
+          error: "missing",
+        })
+
     vi.doMock("../../../heart/runtime-credentials", () => ({
       readRuntimeCredentialConfig: (agentName: string) => ({
         ok: true,
@@ -854,13 +876,7 @@ describe("daemon sense manager", () => {
         revision: "runtime_test",
         updatedAt: new Date(0).toISOString(),
       }),
-      refreshRuntimeCredentialConfig: async (agentName: string) => ({
-        ok: true,
-        itemPath: `vault:${agentName}:runtime/config`,
-        config: runtimeConfig,
-        revision: "runtime_test",
-        updatedAt: new Date(0).toISOString(),
-      }),
+      refreshRuntimeCredentialConfig,
       readMachineRuntimeCredentialConfig: (agentName: string) => machineRuntimeConfig
         ? {
             ok: true,
@@ -875,20 +891,7 @@ describe("daemon sense manager", () => {
             itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
             error: "missing",
           },
-      refreshMachineRuntimeCredentialConfig: async (agentName: string) => machineRuntimeConfig
-        ? {
-            ok: true,
-            itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
-            config: machineRuntimeConfig,
-            revision: "runtime_machine_test",
-            updatedAt: new Date(0).toISOString(),
-          }
-        : {
-            ok: false,
-            reason: "missing",
-            itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
-            error: "missing",
-          },
+      refreshMachineRuntimeCredentialConfig,
     }))
 
     const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
@@ -897,7 +900,7 @@ describe("daemon sense manager", () => {
     })
 
     const options = processManagerCtor.mock.calls[0]?.[0] as {
-      configCheck: (name: string) => Promise<{ ok: boolean; error?: string; fix?: string }>
+      configCheck: (name: string) => Promise<{ ok: boolean; error?: string; fix?: string; skip?: boolean }>
     }
 
     await expect(options.configCheck("bad-format")).resolves.toEqual({ ok: true })
@@ -910,14 +913,19 @@ describe("daemon sense manager", () => {
     const missingTeams = await options.configCheck("slugger:teams")
     expect(missingTeams).toEqual({
       ok: false,
+      skip: true,
       error: "teams is enabled for slugger but runtime credentials are not ready: missing teams.clientId/teams.clientSecret/teams.tenantId",
       fix: "Run 'ouro vault config set --agent slugger --key teams.clientId', teams.clientSecret, and teams.tenantId; then run 'ouro up' again.",
     })
     const missingMail = await options.configCheck("slugger:mail")
     expect(missingMail).toEqual({
       ok: false,
+      skip: true,
       error: "mail is enabled for slugger but runtime credentials are not ready: missing mailroom.mailboxAddress/mailroom.privateKeys",
       fix: "Agent-runnable: provision Mailroom access with 'ouro connect mail --agent slugger', then restart with 'ouro up'.",
+    })
+    await vi.waitFor(() => {
+      expect(refreshRuntimeCredentialConfig).toHaveBeenCalledWith("slugger", { preserveCachedOnFailure: true })
     })
 
     runtimeConfig = {
@@ -943,9 +951,82 @@ describe("daemon sense manager", () => {
     const incompleteBlueBubbles = await options.configCheck("slugger:bluebubbles")
     expect(incompleteBlueBubbles).toEqual({
       ok: false,
+      skip: true,
       error: "bluebubbles is enabled for slugger but runtime credentials are not ready: missing bluebubbles.password",
       fix: "Run 'ouro connect bluebubbles --agent slugger' to attach BlueBubbles on this machine; then run 'ouro up' again.",
     })
+    await vi.waitFor(() => {
+      expect(refreshMachineRuntimeCredentialConfig).toHaveBeenCalledWith("slugger", expect.any(String), { preserveCachedOnFailure: true })
+    })
+  })
+
+  it("does not wait for a slow runtime config refresh before skipping a sense startup", async () => {
+    const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "sense-manager-home-"))
+    const bundlesRoot = path.join(homeRoot, "AgentBundles")
+    writeAgentJson(bundlesRoot, "slugger", {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      senses: {
+        cli: { enabled: true },
+        mail: { enabled: true },
+      },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    const processManagerCtor = vi.fn()
+    const refreshRuntimeCredentialConfig = vi.fn(() => new Promise(() => undefined))
+
+    vi.doMock("os", async () => {
+      const actual = await vi.importActual<typeof import("os")>("os")
+      return {
+        ...actual,
+        homedir: () => homeRoot,
+      }
+    })
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: class MockProcessManager {
+        constructor(options: unknown) {
+          processManagerCtor(options)
+        }
+        startAutoStartAgents = vi.fn(async () => undefined)
+        stopAll = vi.fn(async () => undefined)
+        listAgentSnapshots = vi.fn(() => [])
+      },
+    }))
+    vi.doMock("../../../heart/runtime-credentials", () => ({
+      readRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/config`,
+        error: "missing",
+      }),
+      readMachineRuntimeCredentialConfig: (agentName: string) => ({
+        ok: false,
+        reason: "missing",
+        itemPath: `vault:${agentName}:runtime/machines/machine_test/config`,
+        error: "missing",
+      }),
+      refreshRuntimeCredentialConfig,
+      refreshMachineRuntimeCredentialConfig: vi.fn(),
+    }))
+
+    const { DaemonSenseManager } = await import("../../../heart/daemon/sense-manager")
+    new DaemonSenseManager({
+      agents: ["slugger"],
+    })
+
+    const options = processManagerCtor.mock.calls[0]?.[0] as {
+      configCheck: (name: string) => Promise<{ ok: boolean; error?: string; fix?: string; skip?: boolean }>
+    }
+
+    await expect(options.configCheck("slugger:mail")).resolves.toEqual({
+      ok: false,
+      skip: true,
+      error: "mail is enabled for slugger but runtime credentials are not ready: missing vault runtime/config (slugger)",
+      fix: "Agent-runnable: provision Mailroom access with 'ouro connect mail --agent slugger', then restart with 'ouro up'.",
+    })
+    expect(refreshRuntimeCredentialConfig).toHaveBeenCalledWith("slugger", { preserveCachedOnFailure: true })
   })
 
   it("treats empty runtime/config objects as missing required config", async () => {

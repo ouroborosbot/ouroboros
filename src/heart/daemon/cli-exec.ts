@@ -5045,7 +5045,7 @@ async function readProviderCredentialRecord(
   _deps: OuroCliDeps,
   options: { onProgress?: (message: string) => void } = {},
 ): Promise<{ ok: true; record: ProviderCredentialRecord } | { ok: false; reason: "missing" | "invalid" | "unavailable"; poolPath: string; error: string }> {
-  const poolResult = await refreshProviderCredentialPool(agent, options)
+  const poolResult = await refreshProviderCredentialPool(agent, { ...options, providers: [provider] })
   if (poolResult.ok) {
     const existing = poolResult.pool.providers[provider]
     if (existing) return { ok: true, record: existing }
@@ -5294,19 +5294,27 @@ async function executeProviderStatus(
 ): Promise<string> {
   const agentRoot = providerCliAgentRoot(command, deps)
   const progress = createHumanCommandProgress(deps, "provider status")
+  const stateResult = readProviderState(agentRoot)
   try {
-    await runCommandProgressPhase(
-      progress,
-      "reading provider credentials",
-      () => refreshProviderCredentialPool(command.agent, {
-        onProgress: (message) => progress.updateDetail(message),
-      }),
-      (poolResult) => {
-        if (!poolResult.ok) return poolResult.reason
-        const summary = summarizeProviderCredentialPool(poolResult.pool)
-        return summary.providers.map((provider) => provider.provider).join(", ") || "none stored"
-      },
-    )
+    if (stateResult.ok) {
+      const selectedProviders = [...new Set([
+        stateResult.state.lanes.outward.provider,
+        stateResult.state.lanes.inner.provider,
+      ])]
+      await runCommandProgressPhase(
+        progress,
+        "reading selected provider credentials",
+        () => refreshProviderCredentialPool(command.agent, {
+          providers: selectedProviders,
+          onProgress: (message) => progress.updateDetail(message),
+        }),
+        (poolResult) => {
+          if (!poolResult.ok) return poolResult.reason
+          const summary = summarizeProviderCredentialPool(poolResult.pool)
+          return summary.providers.map((provider) => provider.provider).join(", ") || "none stored"
+        },
+      )
+    }
   } finally {
     progress.end()
   }

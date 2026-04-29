@@ -129,6 +129,68 @@ describe("daemon command plane branches", () => {
     await daemon.stop()
   })
 
+  it("waits to autostart senses until agent startup has settled", async () => {
+    vi.useFakeTimers()
+    const socketPath = tmpSocketPath("daemon-start-senses-after-agents")
+    const { daemon, processManager, senseManager } = make(socketPath)
+    let agentStatus = "starting"
+    processManager.listAgentSnapshots.mockImplementation(() => [{
+      name: "slugger",
+      channel: "inner-dialog",
+      status: agentStatus,
+      pid: null,
+      restartCount: 0,
+      startedAt: null,
+      lastCrashAt: null,
+      backoffMs: 1000,
+      errorReason: null,
+      fixHint: null,
+    }])
+
+    try {
+      await daemon.start()
+
+      expect(processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+      expect(senseManager.startAutoStartSenses).not.toHaveBeenCalled()
+
+      agentStatus = "running"
+      await vi.advanceTimersByTimeAsync(250)
+
+      expect(senseManager.startAutoStartSenses).toHaveBeenCalledTimes(1)
+    } finally {
+      await daemon.stop()
+      vi.useRealTimers()
+    }
+  })
+
+  it("cancels deferred sense autostart when the daemon stops first", async () => {
+    vi.useFakeTimers()
+    const socketPath = tmpSocketPath("daemon-start-senses-cancelled")
+    const { daemon, processManager, senseManager } = make(socketPath)
+    processManager.listAgentSnapshots.mockImplementation(() => [{
+      name: "slugger",
+      channel: "inner-dialog",
+      status: "starting",
+      pid: null,
+      restartCount: 0,
+      startedAt: null,
+      lastCrashAt: null,
+      backoffMs: 1000,
+      errorReason: null,
+      fixHint: null,
+    }])
+
+    try {
+      await daemon.start()
+      await daemon.stop()
+      await vi.advanceTimersByTimeAsync(250)
+
+      expect(senseManager.startAutoStartSenses).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("contains fallback autostart errors after opening the command socket", async () => {
     const firstSocketPath = tmpSocketPath("daemon-start-autostart-error-a")
     const first = make(firstSocketPath)

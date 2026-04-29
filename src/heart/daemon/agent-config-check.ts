@@ -505,7 +505,7 @@ export async function checkAgentConfigWithProviderHealth(
     {
       ...(deps.onProgress ? { onProgress: mapVaultRefreshProgress(agentName, deps.onProgress) } : {}),
       providers,
-      skipCache: true,
+      preserveCachedOnFailure: true,
     },
   )
 

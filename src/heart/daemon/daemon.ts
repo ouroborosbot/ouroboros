@@ -541,6 +541,7 @@ export class OuroDaemon {
   private server: net.Server | null = null
   private outlookServer: OutlookHttpServerHandle | null = null
   private socketIdentity: SocketIdentity | null = null
+  private senseAutostartTimer: ReturnType<typeof setTimeout> | null = null
   private readonly outlookServerFactory: () => Promise<OutlookHttpServerHandle>
 
   constructor(options: OuroDaemonOptions) {
@@ -741,7 +742,7 @@ export class OuroDaemon {
     /* v8 ignore stop */
     await this.openCommandSocket()
     this.triggerAutoStartAgents()
-    this.triggerAutoStartSenses()
+    this.triggerAutoStartSensesWhenAgentsSettled()
 
     // Write all managed PIDs to disk so the next daemon can clean up
     /* v8 ignore start -- pidfile write: collects PIDs from process managers @preserve */
@@ -801,6 +802,20 @@ export class OuroDaemon {
         meta: { error: error instanceof Error ? error.message : String(error) },
       })
     })
+  }
+
+  private triggerAutoStartSensesWhenAgentsSettled(): void {
+    if (!this.senseManager) return
+    const waitingOnAgents = this.processManager.listAgentSnapshots()
+      .some((snapshot) => snapshot.status === "starting")
+    if (!waitingOnAgents) {
+      this.triggerAutoStartSenses()
+      return
+    }
+    this.senseAutostartTimer = setTimeout(() => {
+      this.senseAutostartTimer = null
+      this.triggerAutoStartSensesWhenAgentsSettled()
+    }, 250)
   }
 
   private async openCommandSocket(): Promise<void> {
@@ -1044,6 +1059,10 @@ export class OuroDaemon {
     stopUpdateChecker()
     shutdownSharedMcpManager()
     this.scheduler.stop?.()
+    if (this.senseAutostartTimer) {
+      clearTimeout(this.senseAutostartTimer)
+      this.senseAutostartTimer = null
+    }
     await this.processManager.stopAll()
     await this.senseManager?.stopAll()
 

@@ -45,6 +45,7 @@ vi.mock("../../nerves/runtime", () => ({
 import {
   MACHINE_RUNTIME_CONFIG_ITEM_PREFIX,
   RUNTIME_CONFIG_ITEM_NAME,
+  applyRuntimeCredentialBootstrapMessage,
   cacheMachineRuntimeCredentialConfig,
   cacheRuntimeCredentialConfig,
   machineRuntimeConfigItemName,
@@ -55,6 +56,7 @@ import {
   resetRuntimeCredentialConfigCache,
   upsertMachineRuntimeCredentialConfig,
   upsertRuntimeCredentialConfig,
+  waitForRuntimeCredentialBootstrap,
 } from "../../heart/runtime-credentials"
 
 function emitTestEvent(testName: string): void {
@@ -111,6 +113,48 @@ describe("runtime credentials vault config", () => {
     expect(result.ok ? result.revision : "").toMatch(/^runtime_/)
     expect(readRuntimeCredentialConfig("slugger")).toEqual(result)
     expect(mockCredentialStore.store.getRawSecret).not.toHaveBeenCalled()
+  })
+
+  it("applies daemon IPC runtime credential bootstrap into process memory", () => {
+    emitTestEvent("runtime credentials daemon bootstrap")
+
+    const applied = applyRuntimeCredentialBootstrapMessage({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      runtimeConfig: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
+      machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
+      machineId: "machine_test",
+    })
+
+    expect(applied).toBe(true)
+    expect(readRuntimeCredentialConfig("slugger")).toMatchObject({
+      ok: true,
+      config: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
+    })
+    expect(readMachineRuntimeCredentialConfig("slugger")).toMatchObject({
+      ok: true,
+      itemPath: "vault:slugger:runtime/machines/machine_test/config",
+      config: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
+    })
+    expect(mockCredentialStore.store.getRawSecret).not.toHaveBeenCalled()
+  })
+
+  it("waits briefly for daemon IPC runtime credential bootstrap", async () => {
+    emitTestEvent("runtime credentials wait for daemon bootstrap")
+
+    const waiting = waitForRuntimeCredentialBootstrap("slugger", { timeoutMs: 100 })
+    process.emit("message", {
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
+      machineId: "machine_test",
+    })
+
+    await expect(waiting).resolves.toBe(true)
+    expect(readMachineRuntimeCredentialConfig("slugger")).toMatchObject({
+      ok: true,
+      config: { bluebubbles: { serverUrl: "http://localhost:1234", password: "bb-secret" } },
+    })
   })
 
   it("upserts runtime/config into the agent vault and refreshes it back into cache", async () => {

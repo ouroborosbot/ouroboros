@@ -15,6 +15,14 @@ export interface RefreshRuntimeCredentialConfigOptions {
   preserveCachedOnFailure?: boolean
 }
 
+export interface RuntimeCredentialBootstrapMessage {
+  type: "ouro.runtimeCredentialBootstrap"
+  agentName: string
+  runtimeConfig?: RuntimeCredentialConfig
+  machineRuntimeConfig?: RuntimeCredentialConfig
+  machineId?: string
+}
+
 interface RuntimeCredentialVaultPayload {
   schemaVersion: 1
   kind: "runtime-config"
@@ -156,6 +164,68 @@ export function cacheMachineRuntimeCredentialConfig(
     config: { ...config },
   }
   return cacheMachineResult(agentName, resultFromPayloadForItem(agentName, machineRuntimeConfigItemName(machineId), payload))
+}
+
+function isRuntimeCredentialBootstrapMessage(value: unknown): value is RuntimeCredentialBootstrapMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (record.type !== "ouro.runtimeCredentialBootstrap") return false
+  if (typeof record.agentName !== "string" || record.agentName.trim().length === 0) return false
+  if (record.runtimeConfig !== undefined && !isRecord(record.runtimeConfig)) return false
+  if (record.machineRuntimeConfig !== undefined && !isRecord(record.machineRuntimeConfig)) return false
+  if (record.machineId !== undefined && (typeof record.machineId !== "string" || record.machineId.trim().length === 0)) return false
+  return true
+}
+
+export function applyRuntimeCredentialBootstrapMessage(message: unknown): boolean {
+  if (!isRuntimeCredentialBootstrapMessage(message)) return false
+  const agentName = message.agentName.trim()
+  const now = new Date()
+  if (message.runtimeConfig) {
+    cacheRuntimeCredentialConfig(agentName, message.runtimeConfig, now)
+  }
+  if (message.machineRuntimeConfig) {
+    cacheMachineRuntimeCredentialConfig(agentName, message.machineRuntimeConfig, now, message.machineId ?? "<this-machine>")
+  }
+  emitNervesEvent({
+    component: "config/identity",
+    event: "config.runtime_credentials_bootstrapped",
+    message: "loaded runtime credentials from daemon bootstrap",
+    meta: {
+      agentName,
+      runtimeConfig: !!message.runtimeConfig,
+      machineRuntimeConfig: !!message.machineRuntimeConfig,
+    },
+  })
+  return true
+}
+
+export function waitForRuntimeCredentialBootstrap(
+  agentName: string,
+  options: { timeoutMs?: number } = {},
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? 1_500
+  return new Promise((resolve) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const finish = (value: boolean): void => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      process.off?.("message", onMessage)
+      resolve(value)
+    }
+
+    const onMessage = (message: unknown): void => {
+      if (!isRuntimeCredentialBootstrapMessage(message)) return
+      if (message.agentName.trim() !== agentName.trim()) return
+      finish(applyRuntimeCredentialBootstrapMessage(message))
+    }
+
+    process.on?.("message", onMessage)
+    timer = setTimeout(() => finish(false), timeoutMs)
+  })
 }
 
 async function refreshRuntimeCredentialConfigItem(

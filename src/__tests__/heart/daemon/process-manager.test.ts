@@ -161,6 +161,42 @@ describe("daemon process manager", () => {
     expect(lastCall?.[0].status).toBe("running")
   })
 
+  it("sends runtime credential bootstrap over IPC after spawning", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents: [{
+        name: "slugger:bluebubbles",
+        agentArg: "slugger",
+        entry: "senses/bluebubbles/entry.js",
+        channel: "bluebubbles",
+        autoStart: true,
+        getRuntimeCredentialBootstrap: () => ({
+          agentName: "slugger",
+          runtimeConfig: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
+          machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
+          machineId: "machine_test",
+        }),
+      }],
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger:bluebubbles")
+
+    expect(child.send).toHaveBeenCalledWith({
+      type: "ouro.runtimeCredentialBootstrap",
+      agentName: "slugger",
+      runtimeConfig: { mailroom: { mailboxAddress: "slugger@ouro.bot" } },
+      machineRuntimeConfig: { bluebubbles: { serverUrl: "http://localhost:1234", password: "pw" } },
+      machineId: "machine_test",
+    })
+  })
+
   it("notifies onSnapshotChange when configCheck fails (sets errorReason and fixHint)", async () => {
     const onSnapshotChange = vi.fn()
     const configCheck = vi.fn().mockReturnValue({
@@ -252,6 +288,44 @@ describe("daemon process manager", () => {
 
     expect(spawn).toHaveBeenCalledTimes(1)
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
+  })
+
+  it("recovers a stale pending startup without letting the old check spawn later", async () => {
+    const staleCheck = createDeferred<{ ok: boolean }>()
+    const freshChild = new MockChild()
+    const configCheck = vi.fn()
+      .mockReturnValueOnce(staleCheck.promise)
+      .mockReturnValueOnce({ ok: true })
+    spawn.mockReturnValue(freshChild)
+    now
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(2_500)
+      .mockReturnValueOnce(2_500)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      configCheck,
+      startupStaleAfterMs: 1_000,
+      statusWriter: () => {},
+    })
+
+    const originalStart = manager.startAgent("slugger")
+    await Promise.resolve()
+    await manager.restartAgent("slugger")
+
+    expect(configCheck).toHaveBeenCalledTimes(2)
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
+
+    staleCheck.resolve({ ok: true })
+    await originalStart
+
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(manager.getAgentSnapshot("slugger")?.pid).toBe(freshChild.pid)
   })
 
   it("does not spawn after stopAgent is called during a pending config check", async () => {
