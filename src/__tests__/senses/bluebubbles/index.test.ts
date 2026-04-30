@@ -1583,6 +1583,37 @@ describe("BlueBubbles sense runtime", () => {
     )
   })
 
+  it("times out stuck live webhook turns, tells the chat, and leaves the captured message recoverable", async () => {
+    vi.useFakeTimers()
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+    mocks.handleInboundTurn.mockImplementationOnce(() => new Promise(() => undefined))
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const handling = bluebubbles.handleBlueBubblesEvent(dmThreadPayload)
+      .then(() => null, (error: unknown) => error)
+    for (let attempt = 0; attempt < 10 && mocks.handleInboundTurn.mock.calls.length === 0; attempt++) {
+      await vi.advanceTimersByTimeAsync(0)
+      await flushAsyncWork()
+    }
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(120_000)
+    await expect(handling).resolves.toEqual(expect.objectContaining({
+      message: "bluebubbles recovery turn timed out after 120000ms",
+    }))
+
+    expect(mocks.sendText).toHaveBeenCalledWith(expect.objectContaining({
+      text: expect.stringContaining("live iMessage turn timed out"),
+    }))
+    const { hasProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
+    expect(hasProcessedBlueBubblesMessage("testagent", "chat:any;-;ari@mendelow.me", dmThreadPayload.data.guid)).toBe(false)
+
+    const recovery = await bluebubbles.recoverCapturedBlueBubblesInboundMessages()
+    expect(recovery).toEqual(expect.objectContaining({ recovered: 1, failed: 0 }))
+  })
+
   it("starts group chat typing only after the agent commits to replying", async () => {
     mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any) => {
       callbacks.onModelStart()
