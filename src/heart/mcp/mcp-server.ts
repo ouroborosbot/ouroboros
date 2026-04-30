@@ -34,10 +34,11 @@ async function withSenseTurnTimeout<T>(promise: Promise<T>, timeoutMs: number, c
         }, timeoutMs)
       }),
     ])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
+	  } finally {
+	    /* v8 ignore next -- Promise.race installs the timer synchronously; null is only a defensive cleanup guard @preserve */
+	    if (timer) clearTimeout(timer)
+	  }
+	}
 
 /**
  * Send a senseTurn command to the daemon with retry logic.

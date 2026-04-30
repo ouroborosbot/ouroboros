@@ -632,6 +632,7 @@ describe("mail tools", () => {
     expect(familySearch).toContain("Breakfast logistics")
     const messageId = /mail_[a-f0-9]+/.exec(String(familySearch))?.[0]
     expect(messageId).toBeTruthy()
+    clearMailBodyCache()
     await expect(tool("mail_body").handler({ message_id: messageId!, reason: "friend curiosity" }, friendContext()))
       .resolves.toContain("delegated human mail requires family trust")
   })
@@ -1564,7 +1565,63 @@ describe("mail tools", () => {
     expect(accessLog).toContain("mailbox")
   })
 
-  it("keeps mail_access_log readable when the file-backed audit log has a malformed tail line", async () => {
+	  it("renders empty local mailbox guidance for delegated search with coverage notes", async () => {
+	    setAgentName("slugger")
+	    const storePath = tempDir()
+    const { keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    new FileMailroomStore({ rootDir: storePath })
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: {
+        mailboxAddress: "slugger@ouro.bot",
+        storePath,
+        privateKeys: keys,
+      },
+    })
+
+    const search = await tool("mail_search").handler({
+      query: "anything",
+      scope: "delegated",
+      source: "hey",
+      reason: "empty delegated mailbox check",
+    }, trustedContext())
+
+    expect(search).toContain("No visible mail yet.")
+    expect(search).toContain("search coverage:")
+	    expect(search).toContain("live visible messages searched=0")
+	    expect(search).toContain("cache hits are not proof of absence")
+	  })
+
+	  it("refreshes an empty delegated mail index without inventing date bounds", async () => {
+	    setAgentName("slugger")
+	    process.env.HOME = tempDir()
+	    const storePath = tempDir()
+	    new FileMailroomStore({ rootDir: storePath })
+	    cacheRuntimeCredentialConfig("slugger", {
+	      mailroom: {
+	        mailboxAddress: "slugger@ouro.bot",
+	        storePath,
+	        privateKeys: { unused: "unused-empty-mailbox-key" },
+	      },
+	    })
+
+	    const refresh = await tool("mail_index_refresh").handler({
+	      scope: "delegated",
+	      source: "hey",
+	      reason: "empty delegated index proof",
+	    }, trustedContext())
+
+	    expect(refresh).toContain("mail search index refreshed.")
+	    expect(refresh).toContain("visible messages: 0")
+	    expect(refresh).toContain("fetched this run: 0")
+	    expect(refresh).not.toContain("oldest:")
+	    expect(refresh).not.toContain("newest:")
+	  })
+
+	  it("keeps mail_access_log readable when the file-backed audit log has a malformed tail line", async () => {
     setAgentName("slugger")
     const storePath = tempDir()
     const seeded = await seedNativeMail(storePath)

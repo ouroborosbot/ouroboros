@@ -356,11 +356,185 @@ describe("trip tools", () => {
       expect(withUndated).toContain("Hotel TBD")
     })
 
-    it("returns not-found for an unknown trip id", async () => {
+    it("renders route labels when only one endpoint is known", async () => {
+      mountAgent()
+      await tool("trip_ensure_ledger").handler({}, familyCtx)
+      const partialRoute = trip({
+        tripId: "trip_partialroute_aaaaaaaaaaaa",
+        legs: [{
+          legId: "leg_partial_route",
+          kind: "ground-transport",
+          status: "tentative",
+          operator: "Taxi",
+          origin: "Lugano Station",
+          departureAt: "2026-08-04T16:00:00.000Z",
+          evidence: [],
+          createdAt: "2026-04-01T08:00:00.000Z",
+          updatedAt: "2026-04-01T08:00:00.000Z",
+        }],
+      })
+      await tool("trip_upsert").handler({ record: JSON.stringify(partialRoute) }, familyCtx)
+
+	      const calendar = await tool("trip_calendar").handler({ tripId: partialRoute.tripId }, familyCtx) as string
+	      expect(calendar).toContain("1 trip calendar entry")
+	      expect(calendar).toContain("Taxi Lugano Station")
+	      expect(calendar).toContain("where: Lugano Station")
+	    })
+
+	    it("renders fallback labels, destination-only routes, and stable same-time ordering", async () => {
+	      mountAgent()
+	      await tool("trip_ensure_ledger").handler({}, familyCtx)
+	      const fallbackTrip = trip({
+	        tripId: "trip_fallbacks_aaaaaaaaaaaa",
+	        name: "Fallbacks",
+	        legs: [
+	          {
+	            legId: "leg_lodging_same_day",
+	            kind: "lodging",
+	            status: "tentative",
+	            city: "Basel",
+	            checkInDate: "2026-08-02",
+	            checkOutDate: "2026-08-02",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_flight_fallback",
+	            kind: "flight",
+	            status: "tentative",
+	            departureAt: "2026-08-04T10:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_train_destination",
+	            kind: "train",
+	            status: "tentative",
+	            destinationStation: "Milano Centrale",
+	            arrivalAt: "2026-08-04T10:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_ground_vendor_destination",
+	            kind: "ground-transport",
+	            status: "tentative",
+	            vendor: "ShuttleCo",
+	            destination: "Wedding venue",
+	            departureAt: "2026-08-05T09:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_ground_default",
+	            kind: "ground-transport",
+	            status: "tentative",
+	            departureAt: "2026-08-05T10:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_rental_fallback",
+	            kind: "rental-car",
+	            status: "tentative",
+	            pickupAt: "2026-08-06T09:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_ferry_destination",
+	            kind: "ferry",
+	            status: "tentative",
+	            destinationPort: "Varenna",
+	            departureAt: "2026-08-07T09:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_event_fallback",
+	            kind: "event",
+	            status: "tentative",
+	            endsAt: "2026-08-08T21:00:00.000Z",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_undated_a",
+	            kind: "event",
+	            status: "tentative",
+	            vendor: "Open planning window",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	          {
+	            legId: "leg_undated_b",
+	            kind: "lodging",
+	            status: "tentative",
+	            vendor: "Backup hotel",
+	            evidence: [],
+	            createdAt: "2026-04-01T08:00:00.000Z",
+	            updatedAt: "2026-04-01T08:00:00.000Z",
+	          },
+	        ],
+	      })
+	      await tool("trip_upsert").handler({ record: JSON.stringify(fallbackTrip) }, familyCtx)
+
+	      const calendar = await tool("trip_calendar").handler({ tripId: fallbackTrip.tripId }, familyCtx) as string
+	      expect(calendar).toContain("2026-08-02 | lodging | tentative | lodging")
+	      expect(calendar).toContain("2026-08-04T10:00:00.000Z | flight | tentative | flight")
+	      expect(calendar).toContain("train | tentative | train Milano Centrale")
+	      expect(calendar).toContain("where: Milano Centrale")
+	      expect(calendar).toContain("ground-transport | tentative | ShuttleCo Wedding venue")
+	      expect(calendar).toContain("ground-transport | tentative | ground transport")
+	      expect(calendar).toContain("rental-car | tentative | rental car")
+	      expect(calendar).toContain("ferry | tentative | ferry Varenna")
+	      expect(calendar).toContain("2026-08-08T21:00:00.000Z | event | tentative | event")
+	      expect(calendar.indexOf("leg_flight_fallback")).toBeLessThan(calendar.indexOf("leg_train_destination"))
+	      expect(calendar).not.toContain("leg_undated_a")
+
+	      const withUndated = await tool("trip_calendar").handler({ tripId: fallbackTrip.tripId, includeUndated: "true" }, familyCtx) as string
+	      expect(withUndated).toContain("(undated) | lodging | tentative | Backup hotel")
+	      expect(withUndated).toContain("(undated) | event | tentative | Open planning window")
+	      expect(withUndated.indexOf("leg_undated_a")).toBeLessThan(withUndated.indexOf("leg_undated_b"))
+	    })
+
+	    it("renders the include-undated empty state for trips with no legs", async () => {
+	      mountAgent()
+	      await tool("trip_ensure_ledger").handler({}, familyCtx)
+	      const emptyTrip = trip({
+	        tripId: "trip_empty_aaaaaaaaaaaaaaaa",
+	        legs: [],
+	      })
+	      await tool("trip_upsert").handler({ record: JSON.stringify(emptyTrip) }, familyCtx)
+
+	      const calendar = await tool("trip_calendar").handler({ tripId: emptyTrip.tripId, includeUndated: "true" }, familyCtx) as string
+	      expect(calendar).toBe("no calendar entries on the trip ledger yet.")
+	    })
+
+	    it("returns not-found for an unknown trip id", async () => {
       mountAgent()
       await tool("trip_ensure_ledger").handler({}, familyCtx)
       const result = await tool("trip_calendar").handler({ tripId: "trip_missing_0000000000000000" }, familyCtx) as string
       expect(result).toContain("trip not found")
+    })
+
+    it("trip_calendar propagates non-TripNotFoundError errors from the store", async () => {
+      mountAgent()
+      vi.spyOn(tripStore, "readTripRecord").mockImplementation(() => {
+        throw new Error("decrypt failure: corrupt calendar envelope")
+      })
+      await expect(
+        tool("trip_calendar").handler({ tripId: "trip_corrupt_aaaaaaaaaaaaaaaa" }, familyCtx),
+      ).rejects.toThrow(/decrypt failure/)
     })
   })
 

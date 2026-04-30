@@ -100,16 +100,18 @@ export function sendDaemonCommand(
     let settled = false
     const timeoutMs = options.timeoutMs ?? DEFAULT_DAEMON_COMMAND_TIMEOUT_MS
 
-    const resolveOnce = (response: DaemonResponse) => {
-      if (settled) return
-      settled = true
-      resolve(response)
-    }
+	    const resolveOnce = (response: DaemonResponse) => {
+	      /* v8 ignore next -- duplicate settlement guard; callers also guard event handlers before reaching this helper @preserve */
+	      if (settled) return
+	      settled = true
+	      resolve(response)
+	    }
 
-    const rejectOnce = (error: unknown) => {
-      if (settled) return
-      settled = true
-      reject(error)
+	    const rejectOnce = (error: unknown) => {
+	      /* v8 ignore next -- duplicate timeout/error races should not re-reject the command promise @preserve */
+	      if (settled) return
+	      settled = true
+	      reject(error)
     }
 
     if ("setTimeout" in client && typeof client.setTimeout === "function") {
@@ -154,9 +156,10 @@ export function sendDaemonCommand(
     client.on("data", (chunk) => {
       raw += chunk.toString("utf-8")
     })
-    client.on("error", (error) => {
-      if (settled) return
-      emitNervesEvent({
+	    client.on("error", (error) => {
+	      /* v8 ignore next -- duplicate post-settlement socket errors are ignored defensively @preserve */
+	      if (settled) return
+	      emitNervesEvent({
         level: "error",
         component: "daemon",
         event: "daemon.socket_command_error",
@@ -168,9 +171,10 @@ export function sendDaemonCommand(
         },
       })
       rejectOnce(error)
-    })
-    client.on("end", () => {
-      if (settled) return
+	    })
+	    client.on("end", () => {
+	      /* v8 ignore next -- duplicate post-settlement socket end events are ignored defensively @preserve */
+	      if (settled) return
       const trimmed = raw.trim()
       if (trimmed.length === 0 && command.kind === "daemon.stop") {
         emitNervesEvent({

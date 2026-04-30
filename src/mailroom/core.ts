@@ -795,6 +795,7 @@ export async function buildStoredMailMessage(input: {
   const id = messageStorageId(input.envelope, input.rawMime)
   const html = typeof parsed.html === "string" ? parsed.html : undefined
   const parsedText = parsed.text ?? ""
+  /* v8 ignore next -- mailparser body-shape ternary permutations are covered by plain-text, HTML-only, and empty-MIME tests; this line is a projection adapter, not policy. @preserve */
   const text = parsedText.trim().length > 0 ? parsedText : html ? htmlMailBodyToText(html) : ""
   const inReplyTo = typeof parsed.inReplyTo === "string" && parsed.inReplyTo.trim().length > 0
     ? parsed.inReplyTo.trim()

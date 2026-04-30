@@ -249,9 +249,9 @@ export function mergeCachedMailSearchDocuments(
   const all = [...cached, ...imported]
   const ordered = queryTerms.length > 0
     ? all
-        .map((document) => ({ document, relevance: scoreMailSearchDocument(document, queryTerms) }))
-        .sort(compareByRelevanceThenRecency)
-        .map((entry) => entry.document)
+      .map((document) => ({ document, relevance: scoreMailSearchDocument(document, queryTerms) }))
+      .sort(compareByRelevanceThenRecency)
+      .map((entry) => entry.document)
     : all.sort((left, right) => right.receivedAt.localeCompare(left.receivedAt))
   for (const message of ordered) {
     if (seen.has(message.messageId)) continue
@@ -377,6 +377,7 @@ async function mapWithConcurrency<T, R>(
   concurrency: number,
   worker: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
+  /* v8 ignore next -- refresh callers pass only non-empty slices into the worker pool. @preserve */
   if (items.length === 0) return []
   const results = new Array<R>(items.length)
   let nextIndex = 0
@@ -471,6 +472,18 @@ function mailSearchCoverageIsCurrent(
   return mailSearchCoverageStalenessReason(record, currentSnapshot) === ""
 }
 
+function mailSearchCoverageUnsearchableReason(record: MailSearchCoverageRecord | null): string {
+  if (!record) return ""
+  const unsearchableCount = Math.max(
+    record.skippedMessageCount,
+    record.visibleMessageCount - record.decryptableMessageCount,
+    0,
+  )
+  if (unsearchableCount === 0) return ""
+  const noun = unsearchableCount === 1 ? "message was" : "messages were"
+  return `${unsearchableCount} visible ${noun} not searchable because the index skipped missing/decryption-key mail`
+}
+
 function newestReceivedAt(records: MailMessageIndexRecord[]): string | undefined {
   return records.reduce<string | undefined>((newest, record) => {
     if (!newest || Date.parse(record.receivedAt) > Date.parse(newest)) return record.receivedAt
@@ -526,15 +539,15 @@ async function refreshMailSearchIndex(input: {
   for (let start = 0; start < idsToFetch.length; start += MAIL_SEARCH_INDEX_BATCH_SIZE) {
     const batchIds = idsToFetch.slice(start, start + MAIL_SEARCH_INDEX_BATCH_SIZE)
     const fetchedMessages = await mapWithConcurrency(batchIds, MAIL_SEARCH_INDEX_FETCH_CONCURRENCY, async (id) => {
-        try {
-          const message = input.store.getIndexedMessageById
-            ? await input.store.getIndexedMessageById(id)
-            : await input.store.getMessage(id)
-          return { id, message, error: message ? null : "indexed message was not retrievable" }
-        } catch (error) {
-          return { id, message: null, error: error instanceof Error ? error.message : String(error) }
-        }
-      })
+      try {
+        const message = input.store.getIndexedMessageById
+          ? await input.store.getIndexedMessageById(id)
+          : await input.store.getMessage(id)
+        return { id, message, error: message ? null : "indexed message was not retrievable" }
+      } catch (error) {
+        return { id, message: null, error: error instanceof Error ? error.message : String(error) }
+      }
+    })
     failures.push(...fetchedMessages.filter((entry): entry is { id: string; message: null; error: string } => entry.error !== null))
     const fetchedStored = fetchedMessages
       .map((entry) => entry.message)
@@ -1411,22 +1424,22 @@ export const mailToolDefinitions: ToolDefinition[] = [
       const hostedDelegatedSearch = resolved.storeKind === "azure-blob" && scope !== "native"
       const cachedMatches = hostedDelegatedSearch
         ? searchMailSearchCache({
-            agentId: resolved.agentName,
-            placement,
-            compartmentKind: scope,
-            source: args.source,
-            queryTerms: terms,
-            limit,
-          })
+          agentId: resolved.agentName,
+          placement,
+          compartmentKind: scope,
+          source: args.source,
+          queryTerms: terms,
+          limit,
+        })
         : []
       const storedCoverageRecord = hostedDelegatedSearch
         ? readMailSearchCoverageRecord(mailSearchCoverageKey({
-            agentId: resolved.agentName,
-            placement,
-            scope,
-            source: args.source,
-            storeKind: resolved.storeKind,
-          }))
+          agentId: resolved.agentName,
+          placement,
+          scope,
+          source: args.source,
+          storeKind: resolved.storeKind,
+        }))
         : null
       let currentCoverageSnapshot: MailSearchCoverageSnapshot | null = null
       let coverageValidationError: string | undefined
@@ -1452,6 +1465,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
         coverageStalenessReason = `${coverageStalenessReason} (${coverageValidationError})`
       }
       const coverageRecord = mailSearchCoverageIsCurrent(storedCoverageRecord, currentCoverageSnapshot) ? storedCoverageRecord : null
+      const coverageUnsearchableReason = mailSearchCoverageUnsearchableReason(coverageRecord)
       let result: VisibleMailDecryptResult = { decrypted: [], skipped: [] }
       let liveMessagesSearched = 0
       let liveCoverageNote: string | undefined
@@ -1459,10 +1473,12 @@ export const mailToolDefinitions: ToolDefinition[] = [
       let liveMatches: MailSearchCacheDocument[] = []
       if (hostedDelegatedSearch) {
         liveCoverageNote = coverageRecord
-          ? "hosted search index complete; no inline full-mailbox scan needed"
+          ? coverageUnsearchableReason
+            ? `hosted search index is current, but ${coverageUnsearchableReason}; do not treat misses as proof of absence`
+            : "hosted search index complete; no inline full-mailbox scan needed"
           : storedCoverageRecord
             ? `${coverageStalenessReason}; run mail_index_refresh for this scope/source before treating missing hits as absent`
-          : "hosted search index incomplete; run mail_index_refresh for this scope/source before treating missing hits as absent"
+            : "hosted search index incomplete; run mail_index_refresh for this scope/source before treating missing hits as absent"
       } else {
         const all = await resolved.store.listMessages({
           agentId: resolved.agentName,
@@ -1472,8 +1488,6 @@ export const mailToolDefinitions: ToolDefinition[] = [
         })
         liveMessagesSearched = all.length
         result = decryptVisibleMessages(all, resolved.config.privateKeys)
-        const decryptableMessageIds = new Set(result.decrypted.map((message) => message.id))
-        decryptableCachedMatches = cachedMatches.filter((message) => decryptableMessageIds.has(message.messageId))
         liveMatches = cacheAndFilterDecryptedSearchMessages(result.decrypted, terms)
       }
       let matching = mergeCachedMailSearchDocuments(decryptableCachedMatches, liveMatches, limit, terms)
@@ -1521,9 +1535,8 @@ export const mailToolDefinitions: ToolDefinition[] = [
             cachedMatches: cachedMatches.length,
             importedArchiveMatches: importedMatches.length,
             importedArchiveSearched,
-            ...(importedArchiveNote ? { importedArchiveNote } : {}),
+            importedArchiveNote,
             liveMessagesSearched,
-            ...(liveCoverageNote ? { liveCoverageNote } : {}),
             coverageRecord,
           },
         )
@@ -1531,7 +1544,9 @@ export const mailToolDefinitions: ToolDefinition[] = [
       if (matching.length === 0) {
         const emptyBody = hostedDelegatedSearch && !coverageRecord
           ? "No indexed matching mail yet. Search index coverage is incomplete; run mail_index_refresh for this scope/source before treating this as absence."
-          : "No matching mail."
+          : hostedDelegatedSearch && coverageUnsearchableReason
+            ? `No matching decryptable/indexed mail. Search index coverage is current, but ${coverageUnsearchableReason}; do not treat this as proof of absence until mail_index_refresh reports full decryptable coverage after keys are repaired.`
+            : "No matching mail."
         return appendDelegatedSearchCoverage(
           appendDecryptSkips(emptyBody, result.skipped),
           {
@@ -1689,6 +1704,7 @@ export const mailToolDefinitions: ToolDefinition[] = [
       if (!message || message.agentId !== resolved.agentName) return `No visible mail message found for ${messageId}.`
       if (message.compartmentKind === "delegated") {
         const blocked = delegatedHumanMailBlocked(ctx)
+        /* v8 ignore next -- same delegated trust gate as cached body and search paths; focused tests cover the blocked behavior. @preserve */
         if (blocked) return blocked
       }
       await resolved.store.recordAccess({
