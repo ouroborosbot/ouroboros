@@ -13,9 +13,9 @@ interface RuntimeCwdDeps {
 }
 
 const defaultDeps: RuntimeCwdDeps = {
-  cwd: () => process.cwd(),
-  chdir: (target) => process.chdir(target),
-  existsSync: (target) => fs.existsSync(target),
+  cwd: process.cwd.bind(process),
+  chdir: process.chdir.bind(process),
+  existsSync: fs.existsSync,
 }
 
 export function recoverRuntimeCwd(

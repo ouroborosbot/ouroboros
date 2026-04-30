@@ -26,4 +26,49 @@ describe("recoverRuntimeCwd", () => {
     })).toBe(fallback)
     expect(current).toBe(fallback)
   })
+
+  it("returns the fallback with error telemetry when the fallback does not exist", async () => {
+    const fallback = "/missing/repo/root"
+    const { recoverRuntimeCwd } = await import("../../heart/runtime-cwd")
+
+    expect(recoverRuntimeCwd(fallback, {
+      cwd: () => {
+        throw "ENOENT: no such file or directory, uv_cwd"
+      },
+      chdir: () => {
+        throw new Error("should not chdir")
+      },
+      existsSync: () => false,
+    })).toBe(fallback)
+  })
+
+  it("returns the fallback when cwd repair throws an Error", async () => {
+    const fallback = "/repo/root"
+    const { recoverRuntimeCwd } = await import("../../heart/runtime-cwd")
+
+    expect(recoverRuntimeCwd(fallback, {
+      cwd: () => {
+        throw new Error("ENOENT: no such file or directory, uv_cwd")
+      },
+      chdir: () => {
+        throw new Error("permission denied")
+      },
+      existsSync: () => true,
+    })).toBe(fallback)
+  })
+
+  it("returns the fallback when cwd repair throws a non-Error", async () => {
+    const fallback = "/repo/root"
+    const { recoverRuntimeCwd } = await import("../../heart/runtime-cwd")
+
+    expect(recoverRuntimeCwd(fallback, {
+      cwd: () => {
+        throw new Error("ENOENT: no such file or directory, uv_cwd")
+      },
+      chdir: () => {
+        throw "permission denied"
+      },
+      existsSync: () => true,
+    })).toBe(fallback)
+  })
 })
