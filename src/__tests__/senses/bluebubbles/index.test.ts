@@ -49,6 +49,7 @@ const mocks = vi.hoisted(() => ({
   enforceTrustGate: vi.fn(),
   findByExternalId: vi.fn().mockResolvedValue(null),
   listAll: vi.fn().mockResolvedValue([]),
+  recoverRuntimeCwd: vi.fn(() => "/repo/root"),
   lastStoreInstance: null as any,
 }))
 
@@ -185,6 +186,10 @@ vi.mock("../../../heart/identity", () => ({
       followup: ["followup"],
     },
   })),
+}))
+
+vi.mock("../../../heart/runtime-cwd", () => ({
+  recoverRuntimeCwd: (...args: any[]) => mocks.recoverRuntimeCwd(...args),
 }))
 
 vi.mock("../../../nerves/runtime", () => ({
@@ -595,6 +600,7 @@ function resetMocks(): void {
   mocks.enforceTrustGate.mockReset().mockReturnValue({ allowed: true })
   mocks.findByExternalId.mockReset().mockResolvedValue(null)
   mocks.listAll.mockReset().mockResolvedValue([])
+  mocks.recoverRuntimeCwd.mockReset().mockReturnValue("/repo/root")
   mocks.lastStoreInstance = null
   // handleInboundTurn: by default, simulate a successful pipeline run that calls
   // the injected runAgent (which triggers BB callbacks for text buffering/flush).
@@ -5431,6 +5437,47 @@ describe("BlueBubbles sense runtime", () => {
         }),
       }),
     )
+  })
+
+  it("repairs runtime cwd before replaying captured inbound recovery", async () => {
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+
+    const { recordBlueBubblesInbound } = await import("../../../senses/bluebubbles/inbound-log")
+    recordBlueBubblesInbound("testagent", {
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "captured-deleted-cwd-guid",
+      timestamp: Date.parse("2026-04-24T23:22:44.289Z"),
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: {
+        chatGuid: "any;-;ari@mendelow.me",
+        chatIdentifier: "ari@mendelow.me",
+        isGroup: false,
+        sessionKey: "chat:any;-;ari@mendelow.me",
+        sendTarget: { kind: "chat_guid", value: "any;-;ari@mendelow.me" },
+        participantHandles: [],
+      },
+      text: "captured after cwd vanished",
+      textForAgent: "captured after cwd vanished",
+      attachments: [],
+      hasPayloadData: false,
+      requiresRepair: false,
+    }, "webhook")
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+
+    const result = await bluebubbles.recoverCapturedBlueBubblesInboundMessages()
+
+    expect(result).toEqual({ recovered: 1, skipped: 0, failed: 0 })
+    expect(mocks.recoverRuntimeCwd).toHaveBeenCalled()
   })
 
   it("serializes distinct same-chat webhook turns instead of running them in parallel", async () => {
