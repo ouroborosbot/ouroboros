@@ -6,7 +6,7 @@ import type { PrivateMailEnvelope, StoredMailMessage } from "../../mailroom/core
 import { provisionMailboxRegistry } from "../../mailroom/core"
 import { FileMailroomStore, ingestRawMailToStore } from "../../mailroom/file-store"
 import { resetIdentity, setAgentName } from "../../heart/identity"
-import { resetMailSearchCacheForTests, upsertMailSearchCacheDocument } from "../../mailroom/search-cache"
+import { resetMailSearchCacheForTests, upsertMailSearchCacheDocument, writeMailSearchCoverageRecord } from "../../mailroom/search-cache"
 import type { ToolContext } from "../../repertoire/tools-base"
 
 const tempRoots: string[] = []
@@ -620,7 +620,7 @@ describe("hosted mail tools", () => {
     }))
   })
 
-  it("falls back to hosted listing when archive hydration cannot read the registry", async () => {
+  it("does not inline-scan hosted delegated mail when archive hydration cannot read the registry", async () => {
     process.env.HOME = tempDir()
     setAgentName("slugger")
 
@@ -662,16 +662,213 @@ describe("hosted mail tools", () => {
       reason: "travel refresh",
     }, trustedContext())
 
-    expect(result).toContain("No visible mail yet.")
-    expect(listMessages).toHaveBeenCalledWith(expect.objectContaining({
-      agentId: "slugger",
-      compartmentKind: "delegated",
-    }))
+    expect(result).toContain("No indexed matching mail yet.")
+    expect(result).toContain("Search index coverage is incomplete")
+    expect(result).toContain("cache hits are not proof of absence")
+    expect(listMessages).not.toHaveBeenCalled()
     expect(recordAccess).toHaveBeenCalledWith(expect.objectContaining({
       agentId: "slugger",
       tool: "mail_search",
       reason: "travel refresh",
     }))
+  })
+
+  it("treats stale hosted search coverage as incomplete until projection refresh runs", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+    writeMailSearchCoverageRecord({
+      schemaVersion: 1,
+      agentId: "slugger",
+      storeKind: "azure-blob",
+      compartmentKind: "delegated",
+      source: "hey",
+      indexedAt: "2026-04-24T18:00:00.000Z",
+      visibleMessageCount: 1,
+      cachedMessageCount: 1,
+      decryptableMessageCount: 1,
+      skippedMessageCount: 0,
+    })
+
+    const listMessages = vi.fn(async () => {
+      throw new Error("hosted full scan should not run when stale coverage is detected")
+    })
+    const recordAccess = vi.fn(async (entry: { tool: string; reason: string }) => ({
+      id: `access_${entry.tool}`,
+      agentId: "slugger",
+      tool: entry.tool,
+      reason: entry.reason,
+      accessedAt: "2026-04-24T18:11:00.000Z",
+    }))
+
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: { key_1: "unused" },
+        },
+        store: { listMessages, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+      readMailroomRegistry: async () => {
+        throw new Error("registry unavailable")
+      },
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const searchTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_search")
+    const result = await searchTool!.handler({
+      query: "replacement outbound",
+      scope: "delegated",
+      source: "hey",
+      reason: "travel refresh",
+    }, trustedContext())
+
+    expect(result).toContain("No indexed matching mail yet.")
+    expect(result).toContain("needs projection refresh")
+    expect(result).toContain("cache hits are not proof of absence")
+    expect(listMessages).not.toHaveBeenCalled()
+  })
+
+  it("refreshes hosted delegated search coverage before allowing cache-backed absence", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    const fileStore = new FileMailroomStore({ rootDir: tempDir() })
+    await ingestRawMailToStore({
+      registry,
+      store: fileStore,
+      envelope: {
+        mailFrom: "rebook@example.com",
+        rcptTo: ["me.mendelow.ari.slugger@ouro.bot"],
+      },
+      rawMime: Buffer.from([
+        "From: Rebook Desk <rebook@example.com>",
+        "To: Slugger <me.mendelow.ari.slugger@ouro.bot>",
+        "Subject: Replacement outbound REBOOK42",
+        "",
+        "Replacement outbound flight evidence lives here.",
+      ].join("\r\n")),
+      receivedAt: new Date("2026-04-25T18:00:00.000Z"),
+    })
+    await ingestRawMailToStore({
+      registry,
+      store: fileStore,
+      envelope: {
+        mailFrom: "hotel@example.com",
+        rcptTo: ["me.mendelow.ari.slugger@ouro.bot"],
+      },
+      rawMime: Buffer.from([
+        "From: Hotel Desk <hotel@example.com>",
+        "To: Slugger <me.mendelow.ari.slugger@ouro.bot>",
+        "Subject: Italy lodging",
+        "",
+        "Italy lodging evidence lives here.",
+      ].join("\r\n")),
+      receivedAt: new Date("2026-04-26T18:00:00.000Z"),
+    })
+    const messages = await fileStore.listMessages({
+      agentId: "slugger",
+      compartmentKind: "delegated",
+      source: "hey",
+    })
+    fs.rmSync(path.join(process.env.HOME!, "AgentBundles", "slugger.ouro", "state", "mail-search"), { recursive: true, force: true })
+    resetMailSearchCacheForTests()
+    const listMessages = vi.fn(async () => {
+      throw new Error("hosted full scan should not run after index records are available")
+    })
+    const getMessage = vi.fn(async (id: string) => messages.find((message) => message.id === id) ?? null)
+    const listMessageIndexRecords = vi.fn(async () => messages.map((message) => ({
+      schemaVersion: 1 as const,
+      id: message.id,
+      agentId: message.agentId,
+      compartmentKind: message.compartmentKind,
+      placement: message.placement,
+      ...(message.source ? { source: message.source } : {}),
+      receivedAt: message.receivedAt,
+    })))
+    const recordAccess = vi.fn(async (entry: { tool: string; reason: string }) => ({
+      id: `access_${entry.tool}`,
+      agentId: "slugger",
+      tool: entry.tool,
+      reason: entry.reason,
+      accessedAt: "2026-04-24T18:11:00.000Z",
+    }))
+
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: keys,
+        },
+        store: { getMessage, listMessageIndexRecords, listMessages, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const indexTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_index_refresh")
+    const searchTool = mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_search")
+    expect(indexTool).toBeTruthy()
+    expect(searchTool).toBeTruthy()
+
+    const refresh = await indexTool!.handler({
+      scope: "delegated",
+      source: "hey",
+      reason: "travel evidence readiness",
+    }, trustedContext())
+    expect(refresh).toContain("mail search index refreshed.")
+    expect(refresh).toContain("visible messages: 2")
+    expect(refresh).toContain("fetched this run: 2")
+
+    const hit = await searchTool!.handler({
+      query: "REBOOK42",
+      scope: "delegated",
+      source: "hey",
+      reason: "travel evidence retrieval",
+    }, trustedContext())
+    expect(hit).toContain("Replacement outbound REBOOK42")
+    expect(hit).toContain("hosted search index coverage=2/2")
+
+    const miss = await searchTool!.handler({
+      query: "not-present-in-index",
+      scope: "delegated",
+      source: "hey",
+      reason: "absence proof",
+    }, trustedContext())
+    expect(miss).toContain("No matching mail.")
+    expect(miss).toContain("hosted search index coverage=2/2")
+    expect(miss).not.toContain("No indexed matching mail yet")
+    expect(listMessages).not.toHaveBeenCalled()
+
+    messages[1] = {
+      ...messages[1]!,
+      id: "mail_visible_after_coverage_same_count",
+      receivedAt: messages[1]!.receivedAt,
+    }
+    const staleMiss = await searchTool!.handler({
+      query: "still-not-present-in-index",
+      scope: "delegated",
+      source: "hey",
+      reason: "stale corpus proof",
+    }, trustedContext())
+    expect(staleMiss).toContain("No indexed matching mail yet.")
+    expect(staleMiss).toContain("current message index differs from coverage")
+    expect(staleMiss).toContain("mail_index_refresh")
+    expect(staleMiss).not.toContain("No matching mail.")
   })
 
   it("blocks mail_status in untrusted contexts before touching mailroom state", async () => {

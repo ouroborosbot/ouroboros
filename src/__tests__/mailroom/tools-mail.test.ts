@@ -306,6 +306,11 @@ afterEach(() => {
 describe("mail tools", () => {
   it("fails fast when runtime mail credentials are missing", async () => {
     setAgentName("slugger")
+    vi.spyOn(credentialAccess, "getCredentialStore").mockReturnValue({
+      getRawSecret: async () => {
+        throw new Error('no credential found for domain "runtime/config"')
+      },
+    } as any)
     const result = await tool("mail_recent").handler({}, trustedContext())
     expect(result).toContain("AUTH_REQUIRED:mailroom")
     await expect(tool("mail_search").handler({ query: "pancakes" }, trustedContext()))
@@ -348,6 +353,11 @@ describe("mail tools", () => {
 
   it("reports setup and trust failures consistently across write-side mail tools", async () => {
     setAgentName("slugger")
+    vi.spyOn(credentialAccess, "getCredentialStore").mockReturnValue({
+      getRawSecret: async () => {
+        throw new Error('no credential found for domain "runtime/config"')
+      },
+    } as any)
     await expect(tool("mail_compose").handler({ to: "ari@example.com", subject: "Hi", text: "Hi" }, trustedContext()))
       .resolves.toContain("AUTH_REQUIRED:mailroom")
     await expect(tool("mail_send").handler({ draft_id: "draft_missing", confirmation: "CONFIRM_SEND" }, trustedContext()))
@@ -1420,6 +1430,81 @@ describe("mail tools", () => {
       reason: "source setup check",
     }, trustedContext())
     expect(recent).toContain("No visible mail yet.")
+  })
+
+  it("does not let delegated cache hits hide uncached live mail matches", async () => {
+    const homeRoot = tempDir()
+    process.env.HOME = homeRoot
+    setAgentName("slugger")
+    const storePath = path.join(homeRoot, "mailroom-store")
+    const { registry, keys } = provisionMailboxRegistry({
+      agentId: "slugger",
+      ownerEmail: "ari@mendelow.me",
+      source: "hey",
+    })
+    const store = new FileMailroomStore({ rootDir: storePath })
+    await ingestRawMailToStore({
+      registry,
+      store,
+      envelope: {
+        mailFrom: "hotel@example.com",
+        rcptTo: ["me.mendelow.ari.slugger@ouro.bot"],
+      },
+      rawMime: Buffer.from([
+        "From: Hotel <hotel@example.com>",
+        "To: Slugger <me.mendelow.ari.slugger@ouro.bot>",
+        "Subject: Basel cached note",
+        "",
+        "Basel logistics cached from an earlier lookup.",
+      ].join("\r\n")),
+      receivedAt: new Date("2026-04-21T10:00:00.000Z"),
+    })
+    const liveOnly = await ingestRawMailToStore({
+      registry,
+      store,
+      envelope: {
+        mailFrom: "airline@example.com",
+        rcptTo: ["me.mendelow.ari.slugger@ouro.bot"],
+      },
+      rawMime: Buffer.from([
+        "From: Airline <airline@example.com>",
+        "To: Slugger <me.mendelow.ari.slugger@ouro.bot>",
+        "Subject: Replacement outbound confirmation",
+        "",
+        "Confirmation code REBOOK42. SEA to BSL arrives before Basel check-in.",
+      ].join("\r\n")),
+      receivedAt: new Date("2026-04-22T10:00:00.000Z"),
+    })
+
+    const liveOnlyCachePath = path.join(
+      homeRoot,
+      "AgentBundles",
+      "slugger.ouro",
+      "state",
+      "mail-search",
+      `${liveOnly.accepted[0].id}.json`,
+    )
+    fs.rmSync(liveOnlyCachePath, { force: true })
+    resetMailSearchCacheForTests()
+    cacheRuntimeCredentialConfig("slugger", {
+      mailroom: {
+        mailboxAddress: "slugger@ouro.bot",
+        storePath,
+        privateKeys: keys,
+      },
+    })
+
+    const search = await tool("mail_search").handler({
+      query: "Basel OR REBOOK42",
+      scope: "delegated",
+      source: "hey",
+      reason: "fill travel plan from mail evidence",
+    }, trustedContext())
+
+    expect(search).toContain("Basel cached note")
+    expect(search).toContain("Replacement outbound confirmation")
+    expect(search).toContain("search coverage:")
+    expect(search).toContain("cache hits are not proof of absence")
   })
 
   it("handles native mail fallbacks, validation paths, truncation, and access-log targets", async () => {

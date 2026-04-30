@@ -303,6 +303,37 @@ describe("mailroom core", () => {
     expect(groupedPrivate.to).toEqual(["one@example.com", "two@example.com"])
     expect(groupedPrivate.cc).toEqual(["three@example.com", "four@example.com"])
     expect(groupedPrivate.html).toContain("Hello from HTML")
+    expect(groupedPrivate.text).toBe("Hello from HTML.")
+
+    const htmlOnlyBooking = await buildStoredMailMessage({
+      resolved: imboxNative,
+      envelope: {
+        mailFrom: "booking@example.test",
+        rcptTo: ["slugger@ouro.bot"],
+      },
+      rawMime: Buffer.from([
+        "From: Booking <booking@example.test>",
+        "To: Slugger <slugger@ouro.bot>",
+        "Subject: HTML booking",
+        "Content-Type: text/html; charset=UTF-8",
+        "",
+        "<html><head><style>.tiny{font-size:8px}</style></head><body>",
+        "<h1>Booking overview</h1><p>Seattle&nbsp;to&nbsp;Zurich &amp; Lugano.</p>",
+        "<script>ignore()</script><div>Confirmation &#35;5313227</div>",
+        "</body></html>",
+      ].join("\r\n")),
+    })
+    const bookingPrivate = decryptStoredMailMessage(htmlOnlyBooking.message, keys).private
+    expect(bookingPrivate.text).toMatch(/booking overview/i)
+    expect(bookingPrivate.text.replace(/\u00a0/g, " ")).toContain("Seattle to Zurich & Lugano.")
+    expect(bookingPrivate.text).toContain("Confirmation #5313227")
+    expect(bookingPrivate.text).not.toContain("font-size")
+    expect(mailroomCore.htmlMailBodyToText([
+      "<html><head><style>.tiny{font-size:8px}</style></head><body>",
+      "<h1>Booking overview</h1><p>Seattle&nbsp;to&nbsp;Zurich &amp; Lugano.</p>",
+      "<script>ignore()</script><div>Confirmation &#35;5313227</div>",
+      "</body></html>",
+    ].join(""))).toContain("Seattle to Zurich & Lugano.")
 
     const longBody = "launch ".repeat(80)
     const longMessage = await buildStoredMailMessage({

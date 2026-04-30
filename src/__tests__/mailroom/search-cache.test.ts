@@ -4,6 +4,7 @@ import * as path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 import type { PrivateMailEnvelope, StoredMailMessage } from "../../mailroom/core"
 import {
+  MAIL_SEARCH_TEXT_PROJECTION_VERSION,
   buildMailSearchCacheDocument,
   resetMailSearchCacheForTests,
   searchMailSearchCache,
@@ -122,6 +123,25 @@ describe("mail search cache", () => {
     })
     expect(native).toHaveLength(1)
     expect(native[0]?.messageId).toBe("mail_native_1")
+  })
+
+  it("projects html-only legacy envelopes into searchable text", () => {
+    const document = buildMailSearchCacheDocument(
+      message({ id: "mail_html_only" }),
+      privateEnvelope({
+        subject: "HTML-only booking",
+        text: "",
+        html: "<html><head><style>.hidden{display:none}</style></head><body><h1>Booking overview</h1><p>Seattle&nbsp;to&nbsp;Zurich</p><div>Confirmation &#35;5313227</div></body></html>",
+        snippet: "HTML-only booking",
+      }),
+    )
+
+    expect(document.textExcerpt).toContain("Booking overview")
+    expect(document.textExcerpt).toContain("Seattle to Zurich")
+    expect(document.textExcerpt).toContain("Confirmation #5313227")
+    expect(document.searchText).toContain("confirmation #5313227")
+    expect(document.searchText).not.toContain("display:none")
+    expect(document.textProjectionVersion).toBe(MAIL_SEARCH_TEXT_PROJECTION_VERSION)
   })
 
   it("syncs cached placement metadata after a message moves", () => {
