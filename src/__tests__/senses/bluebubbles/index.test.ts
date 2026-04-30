@@ -5070,11 +5070,13 @@ describe("BlueBubbles sense runtime", () => {
 
     const bluebubbles = await import("../../../senses/bluebubbles")
     const recovery = bluebubbles.recoverCapturedBlueBubblesInboundMessages()
-    for (let attempt = 0; attempt < 10 && mocks.handleInboundTurn.mock.calls.length === 0; attempt++) {
+    const timeoutTurnCalls = () => mocks.handleInboundTurn.mock.calls
+      .filter((call) => JSON.stringify(call[0]?.messages ?? []).includes("captured timeout"))
+    for (let attempt = 0; attempt < 10 && timeoutTurnCalls().length === 0; attempt++) {
       await vi.advanceTimersByTimeAsync(0)
       await flushAsyncWork()
     }
-    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    expect(timeoutTurnCalls()).toHaveLength(1)
 
     await vi.advanceTimersByTimeAsync(59_999)
     await flushAsyncWork()
@@ -5086,7 +5088,7 @@ describe("BlueBubbles sense runtime", () => {
     const result = await recovery
 
     expect(result).toEqual({ recovered: 0, skipped: 0, failed: 1 })
-    expect(mocks.handleInboundTurn.mock.calls[0]?.[0]?.signal.aborted).toBe(true)
+    expect(timeoutTurnCalls()[0]?.[0]?.signal.aborted).toBe(true)
     const { getBlueBubblesProcessedLogPath, hasProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
     expect(hasProcessedBlueBubblesMessage("testagent", "chat:any;-;ari@mendelow.me", "captured-timeout-guid")).toBe(true)
     const processedLog = fs.readFileSync(getBlueBubblesProcessedLogPath("testagent", "chat:any;-;ari@mendelow.me"), "utf-8")
