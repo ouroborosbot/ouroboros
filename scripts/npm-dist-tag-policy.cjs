@@ -40,14 +40,27 @@ function planLatestDistTagRepair({ publishTag, localVersion, latestVersion }) {
 
 function npmViewLatestVersion(packageName, deps = {}) {
   const execFileSyncImpl = deps.execFileSyncImpl ?? execFileSync;
+  let rawDistTags;
   try {
-    return execFileSyncImpl("npm", ["view", `${packageName}@latest`, "version"], {
+    rawDistTags = execFileSyncImpl("npm", ["view", packageName, "dist-tags", "--json"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
-  } catch {
-    return "";
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${packageName}: could not read npm dist-tags: ${reason}`);
   }
+
+  let distTags;
+  try {
+    distTags = JSON.parse(rawDistTags);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${packageName}: npm dist-tags response was not JSON: ${reason}`);
+  }
+
+  const latestVersion = distTags && typeof distTags.latest === "string" ? distTags.latest.trim() : "";
+  return latestVersion;
 }
 
 function addLatestDistTag(packageName, localVersion, deps = {}) {

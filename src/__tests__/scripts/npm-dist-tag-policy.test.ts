@@ -97,4 +97,57 @@ describe("npm dist-tag policy", () => {
     })
     expect(execFileSyncImpl).not.toHaveBeenCalled()
   })
+
+  it("fails closed when npm dist-tag lookup fails", () => {
+    const execFileSyncImpl = vi.fn(() => {
+      throw new Error("registry timeout")
+    })
+
+    expect(() => repairLatestDistTagIfNeeded("@ouro.bot/cli", "0.1.0-alpha.537", "alpha", {
+      execFileSyncImpl,
+    })).toThrow("@ouro.bot/cli: could not read npm dist-tags: registry timeout")
+
+    expect(execFileSyncImpl).toHaveBeenCalledOnce()
+    expect(execFileSyncImpl).toHaveBeenCalledWith(
+      "npm",
+      ["view", "@ouro.bot/cli", "dist-tags", "--json"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    )
+  })
+
+  it("distinguishes a genuinely missing latest key from lookup failure", () => {
+    const execFileSyncImpl = vi.fn((command: string, args: string[]) => {
+      if (command === "npm" && args[0] === "view") return JSON.stringify({ alpha: "0.1.0-alpha.537" })
+      return ""
+    })
+
+    const result = repairLatestDistTagIfNeeded("@ouro.bot/cli", "0.1.0-alpha.537", "alpha", {
+      execFileSyncImpl,
+    })
+
+    expect(result).toEqual({
+      action: "repair",
+      latestVersion: "",
+      reason: "latest dist-tag is missing",
+      repairedTo: "0.1.0-alpha.537",
+    })
+    expect(execFileSyncImpl).toHaveBeenNthCalledWith(
+      1,
+      "npm",
+      ["view", "@ouro.bot/cli", "dist-tags", "--json"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    )
+    expect(execFileSyncImpl).toHaveBeenNthCalledWith(
+      2,
+      "npm",
+      ["dist-tag", "add", "@ouro.bot/cli@0.1.0-alpha.537", "latest"],
+      { stdio: "inherit" },
+    )
+  })
 })
