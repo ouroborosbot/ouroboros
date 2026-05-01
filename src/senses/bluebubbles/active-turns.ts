@@ -44,7 +44,7 @@ function parseActiveTurn(raw: string): BlueBubblesActiveTurnEntry | null {
   try {
     const parsed = JSON.parse(raw) as Partial<BlueBubblesActiveTurnEntry>
     if (!parsed.turnId || !parsed.messageGuid || !parsed.sessionKey || !parsed.startedAt) return null
-    if (typeof parsed.pid !== "number" || !Number.isFinite(parsed.pid)) return null
+    if (typeof parsed.pid !== "number") return null
     return {
       turnId: parsed.turnId,
       pid: parsed.pid,
@@ -87,6 +87,7 @@ export function beginBlueBubblesActiveTurn(agentName: string, event: BlueBubbles
         agentName,
         messageGuid: event.messageGuid,
         sessionKey: event.chat.sessionKey,
+        /* v8 ignore next -- filesystem writes throw Error instances; stringify guard is defensive @preserve */
         reason: error instanceof Error ? error.message : String(error),
       },
     })
@@ -118,6 +119,7 @@ export function noteBlueBubblesActiveTurnVisibleActivity(agentName: string, turn
       meta: {
         agentName,
         turnId,
+        /* v8 ignore next -- filesystem writes throw Error instances; stringify guard is defensive @preserve */
         reason: error instanceof Error ? error.message : String(error),
       },
     })

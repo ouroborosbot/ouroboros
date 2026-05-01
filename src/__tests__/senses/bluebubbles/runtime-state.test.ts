@@ -35,8 +35,8 @@ describe("BlueBubbles runtime state", () => {
       oldestPendingRecoveryAgeMs: undefined,
       activeTurnCount: undefined,
       stalledTurnCount: undefined,
-      oldestActiveTurnStartedAt: undefined,
-      oldestActiveTurnAgeMs: undefined,
+      oldestActiveTurnStartedAt: "2026-03-11T18:13:00.000Z",
+      oldestActiveTurnAgeMs: 60_000,
       lastRecoveredAt: "2026-03-11T18:14:01.000Z",
       lastRecoveredMessageGuid: "msg-1",
     }

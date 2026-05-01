@@ -1114,8 +1114,8 @@ async function handleBlueBubblesNormalizedEvent(
         : undefined,
     )
     const controller = new AbortController()
-    let timeoutTimer: ReturnType<typeof setTimeout> | null = null
-    let timeoutPromise: Promise<never> | null = null
+    let timeoutTimer!: ReturnType<typeof setTimeout>
+    let timeoutPromise!: Promise<never>
     let timeoutReject: ((error: Error) => void) | undefined
     let recoveryTimedOut = false
 
@@ -1152,39 +1152,37 @@ async function handleBlueBubblesNormalizedEvent(
 
     try {
       const liveWebhookTimeout = source === "webhook" && options.timeoutMs === undefined
-      const timeoutMs = options.timeoutMs ?? (liveWebhookTimeout ? BLUEBUBBLES_LIVE_TURN_TIMEOUT_MS : undefined)
-      if (typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0) {
-        timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutReject = reject
-        })
-        timeoutTimer = setTimeout(() => {
-          const reason = new BlueBubblesRecoveryTurnTimeoutError(timeoutMs)
-          recoveryTimedOut = true
-          if (liveWebhookTimeout && ownsInFlightMessage && event.kind === "message") {
-            endBlueBubblesMessageInFlight(event.chat.sessionKey, event.messageGuid)
-            ownsInFlightMessage = false
-          } else {
-            releaseInFlightAfterTurnSettles = true
-          }
-          controller.abort(reason)
-          timeoutReject?.(reason)
-          emitNervesEvent({
-            level: "warn",
-            component: "senses",
-            event: "senses.bluebubbles_turn_timeout",
-            message: "bluebubbles recovery turn timed out",
-            meta: {
-              messageGuid: event.messageGuid,
-              sessionKey: event.chat.sessionKey,
-              source,
-              timeoutMs,
-            },
-          })
-        }, timeoutMs)
-        /* v8 ignore next -- timer handles expose unref only in some runtimes @preserve */
-        if (typeof (timeoutTimer as { unref?: () => void }).unref === "function") {
-          (timeoutTimer as { unref: () => void }).unref()
+      const timeoutMs = options.timeoutMs ?? BLUEBUBBLES_LIVE_TURN_TIMEOUT_MS
+      timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutReject = reject
+      })
+      timeoutTimer = setTimeout(() => {
+        const reason = new BlueBubblesRecoveryTurnTimeoutError(timeoutMs)
+        recoveryTimedOut = true
+        if (liveWebhookTimeout && ownsInFlightMessage && event.kind === "message") {
+          endBlueBubblesMessageInFlight(event.chat.sessionKey, event.messageGuid)
+          ownsInFlightMessage = false
+        } else {
+          releaseInFlightAfterTurnSettles = true
         }
+        controller.abort(reason)
+        timeoutReject?.(reason)
+        emitNervesEvent({
+          level: "warn",
+          component: "senses",
+          event: "senses.bluebubbles_turn_timeout",
+          message: "bluebubbles turn timed out",
+          meta: {
+            messageGuid: event.messageGuid,
+            sessionKey: event.chat.sessionKey,
+            source,
+            timeoutMs,
+          },
+        })
+      }, timeoutMs)
+      /* v8 ignore next -- timer handles expose unref only in some runtimes @preserve */
+      if (typeof (timeoutTimer as { unref?: () => void }).unref === "function") {
+        (timeoutTimer as { unref: () => void }).unref()
       }
 
       const turnPromise = handleInboundTurn({
@@ -1249,35 +1247,31 @@ async function handleBlueBubblesNormalizedEvent(
         })(),
       })
       /* v8 ignore start -- detached late-rejection telemetry is asserted in timeout tests, but V8 does not reliably attribute Promise.catch callbacks @preserve */
-      if (timeoutPromise) {
-        void turnPromise
-          .catch((error) => {
-            if (!recoveryTimedOut) return
-            emitNervesEvent({
-              level: "warn",
-              component: "senses",
-              event: "senses.bluebubbles_recovery_error",
-              message: "bluebubbles recovery turn rejected after timeout",
-              meta: {
-                messageGuid: event.messageGuid,
-                sessionKey: event.chat.sessionKey,
-                source,
-                reason: error instanceof Error ? error.message : String(error),
-              },
-            })
+      void turnPromise
+        .catch((error) => {
+          if (!recoveryTimedOut) return
+          emitNervesEvent({
+            level: "warn",
+            component: "senses",
+            event: "senses.bluebubbles_recovery_error",
+            message: "bluebubbles recovery turn rejected after timeout",
+            meta: {
+              messageGuid: event.messageGuid,
+              sessionKey: event.chat.sessionKey,
+              source,
+              reason: error instanceof Error ? error.message : String(error),
+            },
           })
-          .finally(() => {
-            if (releaseInFlightAfterTurnSettles && ownsInFlightMessage && event.kind === "message") {
-              endBlueBubblesMessageInFlight(event.chat.sessionKey, event.messageGuid)
-            }
-          })
-      }
+        })
+        .finally(() => {
+          if (releaseInFlightAfterTurnSettles && ownsInFlightMessage && event.kind === "message") {
+            endBlueBubblesMessageInFlight(event.chat.sessionKey, event.messageGuid)
+          }
+        })
       /* v8 ignore stop */
       const result = await (async () => {
         try {
-          return timeoutPromise
-            ? await Promise.race([turnPromise, timeoutPromise])
-            : await turnPromise
+          return await Promise.race([turnPromise, timeoutPromise])
         } catch (error) {
           if (error instanceof BlueBubblesRecoveryTurnTimeoutError) {
             callbacks.onError(
@@ -1351,10 +1345,7 @@ async function handleBlueBubblesNormalizedEvent(
         bufferedTerminalError = null
       }
       /* v8 ignore stop */
-      if (timeoutTimer !== null) {
-        clearTimeout(timeoutTimer)
-        timeoutTimer = null
-      }
+      clearTimeout(timeoutTimer)
       await callbacks.finish()
     }
     })
