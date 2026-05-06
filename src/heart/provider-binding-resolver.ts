@@ -15,6 +15,7 @@ import {
   type ProviderCredentialRecord,
   type ProviderCredentialProvenanceSource,
 } from "./provider-credentials"
+import { readProviderLaneReadiness } from "./provider-readiness-cache"
 
 export type { ProviderLaneSelector } from "./provider-lanes"
 
@@ -224,6 +225,10 @@ function resolveCredential(
 }
 
 function resolveReadiness(
+  agentName: string,
+  lane: ProviderLane,
+  provider: AgentProvider,
+  model: string,
   credential: EffectiveProviderCredentialStatus,
 ): EffectiveProviderReadiness {
   if (credential.status === "missing") {
@@ -231,6 +236,23 @@ function resolveReadiness(
   }
   if (credential.status === "invalid-pool") {
     return { status: "unknown", reason: "credential-pool-invalid" }
+  }
+  if (credential.status === "present") {
+    const cached = readProviderLaneReadiness({
+      agentName,
+      lane,
+      provider,
+      model,
+      credentialRevision: credential.revision,
+    })
+    if (cached) {
+      return {
+        status: cached.status,
+        checkedAt: cached.checkedAt,
+        ...(cached.error ? { error: cached.error } : {}),
+        ...(cached.attempts !== undefined ? { attempts: cached.attempts } : {}),
+      }
+    }
   }
   return { status: "unknown" }
 }
@@ -303,7 +325,13 @@ export function resolveEffectiveProviderBinding(
 
   const poolResult = readProviderCredentialPool(input.agentName)
   const credentialResult = resolveCredential(poolResult, agentConfigResult.provider, input.agentName)
-  const readiness = resolveReadiness(credentialResult.credential)
+  const readiness = resolveReadiness(
+    input.agentName,
+    laneResolution.lane,
+    agentConfigResult.provider,
+    agentConfigResult.model,
+    credentialResult.credential,
+  )
   const warnings = [
     ...laneResolution.warnings,
     ...credentialResult.warnings,

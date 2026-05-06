@@ -26,6 +26,10 @@ import {
   normalizeProviderLane,
   resolveEffectiveProviderBinding,
 } from "../../heart/provider-binding-resolver"
+import {
+  clearProviderReadinessCache,
+  recordProviderLaneReadiness,
+} from "../../heart/provider-readiness-cache"
 
 const timestamp = "2026-04-13T12:00:00.000Z"
 const agentName = "slugger"
@@ -91,6 +95,7 @@ function failedPool(reason: "invalid" | "unavailable" | "missing" = "invalid"): 
 describe("effective provider binding resolver", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearProviderReadinessCache()
   })
 
   afterEach(() => {
@@ -203,6 +208,48 @@ describe("effective provider binding resolver", () => {
       binding: {
         credential: { status: "missing" },
         readiness: { status: "unknown", reason: "credential-missing" },
+      },
+    })
+  })
+
+  it("uses matching in-memory live-check readiness without persisting readiness", () => {
+    const bundlesRoot = tempBundlesRoot()
+    const agentRoot = writeAgentConfig(bundlesRoot)
+    mockProviderCredentials.readProviderCredentialPool.mockReturnValue(okPool({
+      minimax: record("minimax", "vault_minimax"),
+    }))
+    recordProviderLaneReadiness({
+      agentName,
+      lane: "outward",
+      provider: "minimax",
+      model: "MiniMax-M2.5",
+      credentialRevision: "vault_minimax",
+      status: "ready",
+      checkedAt: timestamp,
+      attempts: 1,
+    })
+
+    expect(resolveEffectiveProviderBinding({ agentName, agentRoot, lane: "outward" })).toMatchObject({
+      ok: true,
+      binding: {
+        readiness: { status: "ready", checkedAt: timestamp, attempts: 1 },
+      },
+    })
+
+    recordProviderLaneReadiness({
+      agentName,
+      lane: "outward",
+      provider: "minimax",
+      model: "other-model",
+      credentialRevision: "vault_minimax",
+      status: "failed",
+      checkedAt: timestamp,
+      error: "wrong model",
+    })
+    expect(resolveEffectiveProviderBinding({ agentName, agentRoot, lane: "outward" })).toMatchObject({
+      ok: true,
+      binding: {
+        readiness: { status: "unknown" },
       },
     })
   })

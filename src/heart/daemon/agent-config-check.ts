@@ -10,6 +10,7 @@ import {
   type ProviderCredentialPool,
   type ProviderCredentialRecord,
 } from "../provider-credentials"
+import { recordProviderLaneReadiness } from "../provider-readiness-cache"
 import { isCredentialVaultNotConfiguredError, vaultCreateRecoverFix, vaultUnlockReplaceRecoverFix } from "../../repertoire/vault-unlock"
 import {
   providerLiveCheckFix,
@@ -469,10 +470,34 @@ export async function checkAgentConfigWithProviderHealth(
   let firstFailure: ConfigCheckResult | null = null
   for (const { group, result } of pingResults) {
     if (!result.ok) {
+      for (const lane of group.lanes) {
+        recordProviderLaneReadiness({
+          agentName,
+          lane,
+          provider: group.provider,
+          model: group.model,
+          credentialRevision: group.record.revision,
+          status: "failed",
+          checkedAt: new Date().toISOString(),
+          error: result.message,
+          attempts: pingAttemptCount(result),
+        })
+      }
       firstFailure ??= failedPingResult(agentName, group.lanes[0], group.provider, group.model, result)
       continue
     }
-    void pingAttemptCount(result)
+    for (const lane of group.lanes) {
+      recordProviderLaneReadiness({
+        agentName,
+        lane,
+        provider: group.provider,
+        model: group.model,
+        credentialRevision: group.record.revision,
+        status: "ready",
+        checkedAt: new Date().toISOString(),
+        attempts: pingAttemptCount(result),
+      })
+    }
   }
 
   if (firstFailure) return firstFailure
