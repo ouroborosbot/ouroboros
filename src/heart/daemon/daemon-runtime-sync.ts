@@ -21,6 +21,7 @@ export interface DaemonRuntimeSyncDeps {
   startDaemonProcess: (socketPath: string) => Promise<{ pid: number | null }>
   checkSocketAlive?: (socketPath: string) => Promise<boolean>
   onProgress?: (message: string) => void
+  now?: () => number
   waitForDaemonStartup?: (options: { pid: number | null; bootStartedAtMs: number }) => Promise<{
     ok: boolean
     reason?: string
@@ -237,7 +238,7 @@ export async function ensureCurrentDaemonRuntime(
 
       deps.cleanupStaleSocket(deps.socketPath)
       deps.onProgress?.("starting the replacement background service")
-      const bootStartedAtMs = Date.now()
+      const bootStartedAtMs = (deps.now ?? Date.now)()
       const started = await deps.startDaemonProcess(deps.socketPath)
       const pid = started.pid ?? "unknown"
       const startupCheck = deps.waitForDaemonStartup

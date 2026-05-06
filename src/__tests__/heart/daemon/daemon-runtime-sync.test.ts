@@ -274,7 +274,6 @@ describe("ensureCurrentDaemonRuntime", () => {
 
   it("passes a pre-start boot timestamp to the replacement startup monitor", async () => {
     let nowMs = 10_000
-    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => nowMs)
     const waitForDaemonStartup = vi.fn(async () => ({ ok: true as const }))
     const deps = {
       socketPath: "/tmp/ouro-test.sock",
@@ -282,6 +281,7 @@ describe("ensureCurrentDaemonRuntime", () => {
       fetchRunningVersion: vi.fn(async () => "0.1.0-alpha.6"),
       stopDaemon: vi.fn(async () => {}),
       cleanupStaleSocket: vi.fn(),
+      now: () => nowMs,
       startDaemonProcess: vi.fn(async () => {
         nowMs = 20_000
         return { pid: 777 }
@@ -289,14 +289,10 @@ describe("ensureCurrentDaemonRuntime", () => {
       waitForDaemonStartup,
     }
 
-    try {
-      const result = await ensureCurrentDaemonRuntime(deps)
+    const result = await ensureCurrentDaemonRuntime(deps)
 
-      expect(result.ok).toBe(true)
-      expect(waitForDaemonStartup).toHaveBeenCalledWith({ pid: 777, bootStartedAtMs: 10_000 })
-    } finally {
-      nowSpy.mockRestore()
-    }
+    expect(result.ok).toBe(true)
+    expect(waitForDaemonStartup).toHaveBeenCalledWith({ pid: 777, bootStartedAtMs: 10_000 })
   })
 
   it("uses the replacement startup check result when the restarted daemon never answers", async () => {

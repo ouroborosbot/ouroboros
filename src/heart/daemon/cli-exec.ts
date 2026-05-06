@@ -1190,6 +1190,7 @@ export async function ensureDaemonRunning(
       startDaemonProcess: deps.startDaemonProcess,
       checkSocketAlive: deps.checkSocketAlive,
       onProgress: deps.reportDaemonStartupPhase,
+      now: deps.now,
       waitForDaemonStartup: async ({ pid, bootStartedAtMs }) => {
         const startupFailure = await waitForDaemonStartup(deps, {
           bootStartedAtMs,
