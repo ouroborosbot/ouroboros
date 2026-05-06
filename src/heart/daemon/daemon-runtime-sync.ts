@@ -21,7 +21,7 @@ export interface DaemonRuntimeSyncDeps {
   startDaemonProcess: (socketPath: string) => Promise<{ pid: number | null }>
   checkSocketAlive?: (socketPath: string) => Promise<boolean>
   onProgress?: (message: string) => void
-  waitForDaemonStartup?: (options: { pid: number | null }) => Promise<{
+  waitForDaemonStartup?: (options: { pid: number | null; bootStartedAtMs: number }) => Promise<{
     ok: boolean
     reason?: string
   }>
@@ -237,10 +237,11 @@ export async function ensureCurrentDaemonRuntime(
 
       deps.cleanupStaleSocket(deps.socketPath)
       deps.onProgress?.("starting the replacement background service")
+      const bootStartedAtMs = Date.now()
       const started = await deps.startDaemonProcess(deps.socketPath)
       const pid = started.pid ?? "unknown"
       const startupCheck = deps.waitForDaemonStartup
-        ? await deps.waitForDaemonStartup({ pid: started.pid ?? null })
+        ? await deps.waitForDaemonStartup({ pid: started.pid ?? null, bootStartedAtMs })
         : { ok: await verifyDaemonStarted(deps) }
       const verified = startupCheck.ok
       /* v8 ignore next -- daemon liveness failure: requires real daemon crash timing @preserve */
