@@ -2082,6 +2082,60 @@ describe("handleInboundTurn", () => {
       }
     })
 
+    it("switches the inner agent.json provider lane when inner is the failed lane", async () => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-pipeline-failover-inner-"))
+      const agentRoot = path.join(tmp, "slugger.ouro")
+      fs.mkdirSync(agentRoot, { recursive: true })
+      writeAgentProviderSelectionFixture(agentRoot, agentProviderSelection())
+      const agentRootSpy = vi.spyOn(identity, "getAgentRoot" as any).mockReturnValue(agentRoot)
+      const mockRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "settled" })
+      const failoverState = {
+        pending: {
+          errorSummary: "inner provider openai-codex model gpt-5.4 failed live check",
+          classification: "auth-failure" as const,
+          currentProvider: "openai-codex" as const,
+          currentLane: "inner" as const,
+          agentName: "slugger",
+          workingProviders: ["minimax" as const],
+          readyProviders: [{
+            provider: "minimax" as const,
+            model: "MiniMax-M2.7",
+            credentialRevision: "cred_minimax",
+            source: "auth-flow" as const,
+          }],
+          unconfiguredProviders: [],
+          userMessage: "switch available",
+        },
+      } as any
+      const input = makeInput({
+        channel: "inner",
+        failoverState,
+        messages: [{ role: "user", content: "switch to minimax" }],
+        runAgent: mockRunAgent,
+      })
+
+      try {
+        const result = await handleInboundTurn(input)
+
+        expect(result.switchedProvider).toBe("minimax")
+        const stateResult = readAgentProviderSelectionFixture(agentRoot)
+        expect(stateResult.ok).toBe(true)
+        if (!stateResult.ok) throw new Error(stateResult.error)
+        expect(stateResult.state.lanes.inner).toMatchObject({
+          provider: "minimax",
+          model: "MiniMax-M2.7",
+          source: "agent.json",
+        })
+        expect(stateResult.state.lanes.outward).toMatchObject({
+          provider: "openai-codex",
+          model: "gpt-5.4",
+        })
+      } finally {
+        agentRootSpy.mockRestore()
+        fs.rmSync(tmp, { recursive: true, force: true })
+      }
+    })
+
     it("dismisses failover on unrelated reply and processes normally", async () => {
       const failoverState = {
         pending: {

@@ -5310,10 +5310,12 @@ async function executeProviderCheck(
       meta: { agent: command.agent, lane: command.lane, provider: binding.provider, model: binding.model, status: pingResult.ok ? "ready" : "failed" },
     })
     return writeMessage(message)
+  /* v8 ignore start -- defensive rethrow: provider-check dependency failures are covered at the caller boundary @preserve */
   } catch (error) {
     progress.end()
     throw error
   }
+  /* v8 ignore stop */
 }
 
 function renderProviderCredentialLine(agentName: string, credential: EffectiveProviderCredentialStatus): string {
@@ -5370,12 +5372,14 @@ async function executeProviderStatus(
       homeDir,
       lane,
     })
+    /* v8 ignore start -- defensive: provider status pre-validates agent.json before resolving lane details @preserve */
     if (!resolved.ok) {
       lines.push(`  ${lane}: unavailable`)
       lines.push(`    ${resolved.reason}: ${resolved.error}`)
       lines.push(`    repair: ${resolved.repair.command}`)
       continue
     }
+    /* v8 ignore stop */
     const binding = resolved.binding
     lines.push(`  ${lane}: ${binding.provider} / ${binding.model} (${binding.source})`)
     lines.push(`    readiness: ${binding.readiness.status}`)

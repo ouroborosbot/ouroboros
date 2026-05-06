@@ -2,12 +2,7 @@ import * as path from "path"
 import { emitNervesEvent } from "../nerves/runtime"
 import { PROVIDER_CREDENTIALS, type AgentProvider } from "./identity"
 import { readAgentConfigForAgent } from "./auth/auth-flow"
-import {
-  facingKeyForProviderLane,
-  type ProviderLane,
-  type ProviderLaneSelector,
-  type ProviderReadinessStatus,
-} from "./provider-lanes"
+import type { ProviderLane, ProviderLaneSelector, ProviderReadinessStatus } from "./provider-lanes"
 import {
   readProviderCredentialPool,
   isProviderCredentialPoolNotLoaded,
@@ -106,6 +101,10 @@ function legacyLaneWarning(selector: string, lane: ProviderLane): EffectiveProvi
     code: "legacy-lane-selector",
     message: `${selector} is legacy provider wording; using ${lane} lane`,
   }
+}
+
+function facingKeyForProviderLane(lane: ProviderLane): "humanFacing" | "agentFacing" {
+  return lane === "outward" ? "humanFacing" : "agentFacing"
 }
 
 export function normalizeProviderLane(selector: ProviderLaneSelector): ProviderLaneResolution {
@@ -276,6 +275,7 @@ function resolveAgentConfigLane(input: ResolveEffectiveProviderBindingInput, lan
     const { config, configPath: resolvedConfigPath } = readAgentConfigForAgent(input.agentName, path.dirname(input.agentRoot))
     const facingKey = facingKeyForProviderLane(lane)
     const binding = config[facingKey]
+    /* v8 ignore next -- readAgentConfigForAgent rejects unsupported providers before this defensive guard @preserve */
     if (!isAgentProvider(binding.provider)) {
       return { ok: false, configPath: resolvedConfigPath, error: `${facingKey}.provider must be a supported provider` }
     }
@@ -293,6 +293,7 @@ function resolveAgentConfigLane(input: ResolveEffectiveProviderBindingInput, lan
     return {
       ok: false,
       configPath,
+      /* v8 ignore next -- readAgentConfigForAgent/file IO failures are Error instances in supported runtimes @preserve */
       error: error instanceof Error ? error.message : String(error),
     }
   }

@@ -217,6 +217,26 @@ describe("provider visibility", () => {
     expect(formatProviderVisibilityLine({
       lane: "inner",
       status: "configured",
+      provider: "anthropic",
+      model: "claude-opus-4-6",
+      source: "agent.json",
+      readiness: { status: "stale", reason: "credential changed" },
+      credential: { status: "present", source: "manual" },
+      warnings: [],
+    })).toContain("stale: credential changed")
+    expect(formatProviderVisibilityLine({
+      lane: "inner",
+      status: "configured",
+      provider: "anthropic",
+      model: "claude-opus-4-6",
+      source: "agent.json",
+      readiness: { status: "stale" },
+      credential: { status: "invalid-pool" },
+      warnings: [],
+    })).toContain("credentials: vault unavailable")
+    expect(formatProviderVisibilityLine({
+      lane: "inner",
+      status: "configured",
       provider: "azure",
       model: "gpt-4o",
       source: "agent.json",
@@ -241,6 +261,36 @@ describe("provider visibility", () => {
       ],
     })
     expect(rows[0]).toMatchObject({ credential: "vault", readiness: "ready" })
+    expect(providerVisibilityStatusRows({
+      agentName: "slugger",
+      lanes: [
+        {
+          lane: "outward",
+          status: "configured",
+          provider: "minimax",
+          model: "MiniMax-M2.5",
+          source: "agent.json",
+          readiness: { status: "failed", error: "bad token" },
+          credential: { status: "present" },
+          warnings: [],
+        },
+      ],
+    })[0]).toMatchObject({ detail: "bad token" })
+
+    expect(providerVisibilityStatusRows({
+      agentName: "slugger",
+      lanes: [{
+        lane: "outward",
+        status: "unconfigured",
+        reason: "agent-config-invalid",
+        repairCommand: "ouro use --agent slugger --lane outward --provider <provider> --model <model>",
+      }],
+    })[0]).toMatchObject({
+      agent: "slugger",
+      lane: "outward",
+      provider: "unconfigured",
+      detail: "ouro use --agent slugger --lane outward --provider <provider> --model <model>",
+    })
 
     expect(isAgentProviderVisibility({ agentName: "slugger", lanes: [{ lane: "outward", status: "configured" }] })).toBe(true)
     expect(isAgentProviderVisibility(null)).toBe(false)

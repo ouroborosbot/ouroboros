@@ -28,6 +28,7 @@ import {
 } from "../../heart/provider-binding-resolver"
 import {
   clearProviderReadinessCache,
+  readProviderLaneReadiness,
   recordProviderLaneReadiness,
 } from "../../heart/provider-readiness-cache"
 
@@ -176,6 +177,32 @@ describe("effective provider binding resolver", () => {
       reason: "agent-config-invalid",
       error: "humanFacing.model must be a non-empty string",
     })
+
+    writeAgentConfig(bundlesRoot, {
+      humanFacing: { provider: "minimax", model: 42 },
+    })
+    expect(resolveEffectiveProviderBinding({
+      agentName,
+      agentRoot: invalidRoot,
+      lane: "outward",
+    })).toMatchObject({
+      ok: false,
+      reason: "agent-config-invalid",
+      error: "humanFacing.model must be a non-empty string",
+    })
+
+    writeAgentConfig(bundlesRoot, {
+      humanFacing: { provider: "fake-provider", model: "MiniMax-M2.5" },
+    })
+    expect(resolveEffectiveProviderBinding({
+      agentName,
+      agentRoot: invalidRoot,
+      lane: "outward",
+    })).toMatchObject({
+      ok: false,
+      reason: "agent-config-invalid",
+      error: expect.stringContaining("unsupported provider 'fake-provider'"),
+    })
   })
 
   it("marks readiness unknown when credentials are missing or unavailable", () => {
@@ -252,5 +279,47 @@ describe("effective provider binding resolver", () => {
         readiness: { status: "unknown" },
       },
     })
+
+    recordProviderLaneReadiness({
+      agentName,
+      lane: "outward",
+      provider: "minimax",
+      model: "MiniMax-M2.5",
+      credentialRevision: "vault_minimax",
+      status: "failed",
+      checkedAt: timestamp,
+      error: "expired",
+    })
+    expect(resolveEffectiveProviderBinding({ agentName, agentRoot, lane: "outward" })).toMatchObject({
+      ok: true,
+      binding: {
+        readiness: { status: "failed", checkedAt: timestamp, error: "expired" },
+      },
+    })
+  })
+
+  it("keeps provider readiness exact-match and in-memory only", () => {
+    const entry = {
+      agentName,
+      lane: "inner" as const,
+      provider: "openai-codex" as const,
+      model: "gpt-5.5",
+      credentialRevision: "vault_codex",
+      status: "failed" as const,
+      checkedAt: timestamp,
+      error: "expired",
+    }
+
+    expect(readProviderLaneReadiness(entry)).toBeNull()
+    recordProviderLaneReadiness(entry)
+
+    expect(readProviderLaneReadiness(entry)).toEqual(entry)
+    expect(readProviderLaneReadiness({ ...entry, provider: "minimax" })).toBeNull()
+    expect(readProviderLaneReadiness({ ...entry, model: "gpt-5.4" })).toBeNull()
+    expect(readProviderLaneReadiness({ ...entry, credentialRevision: "vault_new" })).toBeNull()
+    expect(mockEmitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      component: "config/identity",
+      event: "config.provider_readiness_recorded",
+    }))
   })
 })

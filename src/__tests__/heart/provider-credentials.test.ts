@@ -1,3 +1,4 @@
+import * as os from "node:os"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockCredentialStore = vi.hoisted(() => {
@@ -200,6 +201,7 @@ describe("provider credentials vault store", () => {
     expect(result.pool.updatedAt).toBe("2026-04-13T12:01:00.000Z")
     expect(providerCredentialsVaultPath("slugger")).toBe("vault:slugger:providers/*")
     expect(providerCredentialMachineHomeDir("/tmp/home")).toBe("/tmp/home")
+    expect(providerCredentialMachineHomeDir()).toBe(os.homedir())
 
     expect(readProviderCredentialPool("slugger")).toBe(result)
     expect(readCachedProviderCredentialRecord("slugger", "azure")).toMatchObject({
