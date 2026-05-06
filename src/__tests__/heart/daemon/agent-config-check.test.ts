@@ -31,7 +31,7 @@ function agentJson(overrides: Record<string, unknown> = {}): string {
   })
 }
 
-function providerStateJson(overrides: Record<string, unknown> = {}): string {
+function agentProviderSelectionJson(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     schemaVersion: 1,
     machineId: "machine_test",
@@ -84,18 +84,18 @@ function credentialPool(providers: Record<string, Record<string, unknown>>) {
   } as const
 }
 
-function mockAgentAndProviderState(input: {
+function mockAgentAndAgentProviderSelectionFixture(input: {
   agentConfig?: string
-  providerState?: string
+  agentProviderSelection?: string
 } = {}): void {
-  mockExistsSync.mockImplementation((filePath: fs.PathLike) => String(filePath).endsWith("/state/providers.json"))
+  mockExistsSync.mockImplementation((filePath: fs.PathLike) => String(filePath).endsWith("/agent.json"))
   mockReadFileSync.mockImplementation((filePath: fs.PathOrFileDescriptor) => {
     const p = String(filePath)
     if (p === path.join(BUNDLES, "myagent.ouro", "agent.json")) {
       return input.agentConfig ?? agentJson()
     }
-    if (p === path.join(BUNDLES, "myagent.ouro", "state", "providers.json")) {
-      return input.providerState ?? providerStateJson()
+    if (p === path.join(BUNDLES, "myagent.ouro", "state", "agent.json")) {
+      return input.agentProviderSelection ?? agentProviderSelectionJson()
     }
     throw Object.assign(new Error(`ENOENT: ${p}`), { code: "ENOENT" })
   })
@@ -183,20 +183,20 @@ describe("checkAgentConfigWithProviderHealth", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     providerPingMock.mockResolvedValue({ ok: true })
-    mockAgentAndProviderState()
+    mockAgentAndAgentProviderSelectionFixture()
     refreshProviderCredentialPoolMock.mockResolvedValue(credentialPool({
       anthropic: providerRecord("anthropic", { credentials: { setupToken: "tok" } }),
     }))
   })
 
-  it("live-checks selected providers from local provider state using vault credentials", async () => {
+  it("live-checks selected providers from agent.json using vault credentials", async () => {
     const pingProvider = vi.fn(async () => ({ ok: true }) as const)
-    mockAgentAndProviderState({
+    mockAgentAndAgentProviderSelectionFixture({
       agentConfig: agentJson({
         humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         agentFacing: { provider: "github-copilot", model: "claude-sonnet-4.6" },
       }),
-      providerState: providerStateJson({
+      agentProviderSelection: agentProviderSelectionJson({
         lanes: {
           outward: {
             provider: "anthropic",
@@ -207,7 +207,7 @@ describe("checkAgentConfigWithProviderHealth", () => {
           inner: {
             provider: "github-copilot",
             model: "claude-sonnet-4.6",
-            source: "local",
+            source: "agent.json",
             updatedAt: "2026-04-12T22:30:00.000Z",
           },
         },
@@ -274,12 +274,12 @@ describe("checkAgentConfigWithProviderHealth", () => {
       releaseFirst = resolve
     })
     const started: string[] = []
-    mockAgentAndProviderState({
+    mockAgentAndAgentProviderSelectionFixture({
       agentConfig: agentJson({
         humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         agentFacing: { provider: "github-copilot", model: "claude-sonnet-4.6" },
       }),
-      providerState: providerStateJson({
+      agentProviderSelection: agentProviderSelectionJson({
         lanes: {
           outward: {
             provider: "anthropic",
@@ -290,7 +290,7 @@ describe("checkAgentConfigWithProviderHealth", () => {
           inner: {
             provider: "github-copilot",
             model: "claude-sonnet-4.6",
-            source: "local",
+            source: "agent.json",
             updatedAt: "2026-04-12T22:30:00.000Z",
           },
         },

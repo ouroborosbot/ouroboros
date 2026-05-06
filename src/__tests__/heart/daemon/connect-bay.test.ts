@@ -33,7 +33,7 @@ function configuredLane(
     status: "configured",
     provider,
     model,
-    source: "local",
+    source: "agent.json",
     readiness: { status: "ready" },
     credential: { status: "present", source: "vault", revision: `${provider}-rev-1` },
     warnings: [],
