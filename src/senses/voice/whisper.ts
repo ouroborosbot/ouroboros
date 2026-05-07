@@ -31,7 +31,7 @@ export function parseWhisperCppTranscriptJson(raw: string): string {
   try {
     parsed = JSON.parse(raw) as WhisperCppJson
   } catch (error) {
-    throw new Error(`invalid whisper.cpp JSON: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(`invalid whisper.cpp JSON: ${String(error)}`)
   }
 
   const text = typeof parsed.text === "string"

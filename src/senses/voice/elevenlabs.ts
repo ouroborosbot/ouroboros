@@ -1,12 +1,13 @@
 import { emitNervesEvent } from "../../nerves/runtime"
 import {
-  DEFAULT_ELEVENLABS_MIME_TYPE,
-  DEFAULT_ELEVENLABS_MODEL_ID,
-  DEFAULT_ELEVENLABS_OUTPUT_FORMAT,
   type VoiceTtsRequest,
   type VoiceTtsResult,
   type VoiceTtsService,
 } from "./types"
+
+export const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_flash_v2_5"
+export const DEFAULT_ELEVENLABS_OUTPUT_FORMAT = "pcm_16000"
+export const DEFAULT_ELEVENLABS_MIME_TYPE = "audio/pcm;rate=16000"
 
 export interface ElevenLabsSocketLike {
   on(event: "open" | "message" | "error" | "close", handler: (payload?: unknown) => void): void

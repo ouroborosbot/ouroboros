@@ -65,7 +65,7 @@ export function normalizeVoiceSessionKey(value: string): string {
       component: "senses",
       event: "senses.voice_transcript_error",
       message: "voice session key is empty",
-      meta: {},
+      meta: { inputLength: value.length },
     })
     throw new Error("voice session key is empty")
   }

@@ -1345,6 +1345,114 @@ describe("provider CLI command parsing", () => {
 })
 
 describe("provider CLI command execution", () => {
+  it("prints Voice setup guidance without collecting secrets in-process", async () => {
+    emitTestEvent("provider cli connect voice")
+    const bundlesRoot = makeTempDir("provider-cli-connect-voice-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-voice-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+
+    const result = await runOuroCli(["connect", "voice", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot))
+
+    expect(result).toContain("Voice foundation for Slugger")
+    expect(result).toContain("integrations.elevenLabsApiKey")
+    expect(result).toContain("voice.whisperCliPath")
+    expect(result).toContain("voice.whisperModelPath")
+    expect(result).toContain("Meeting-link joining")
+  })
+
+  it("routes Voice setup from the root connect bay", async () => {
+    emitTestEvent("provider cli connect menu voice")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-voice-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-voice-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    const prompts: string[] = []
+
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "voice"
+      },
+    }))
+
+    expect(joinedPrompt(prompts)).toContain("7. Voice")
+    expect(result).toContain("Voice foundation for Slugger")
+  })
+
+  it("shows Voice as not attached when the local Whisper.cpp model path is missing", async () => {
+    emitTestEvent("provider cli connect menu voice incomplete")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-voice-incomplete-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-voice-incomplete-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    updateAgentConfig(bundlesRoot, "Slugger", (config) => {
+      config.senses = {
+        ...(config.senses ?? {}),
+        voice: { enabled: true },
+      }
+    })
+    writeProviderCredentialPool(homeDir, credentialPool())
+    writeRuntimeConfig("Slugger", {
+      integrations: {
+        elevenLabsApiKey: "eleven-secret",
+      },
+    })
+    writeMachineIdentity(homeDir, "machine_voice_incomplete")
+    mockVaultDeps.rawSecrets.set("Slugger:runtime/machines/machine_voice_incomplete/config", runtimeConfigSecret({
+      voice: {
+        whisperCliPath: "/opt/homebrew/bin/whisper-cli",
+      },
+    }))
+
+    const prompts: string[] = []
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "cancel"
+      },
+    }))
+
+    const prompt = joinedPrompt(prompts)
+    expect(result).toBe("connect cancelled.")
+    expectConnectStatus(prompt, 7, "Voice", "not attached")
+    expect(prompt).toContain("missing voice.whisperModelPath")
+  })
+
+  it("shows Voice as not attached when the ElevenLabs key and Whisper.cpp CLI path are missing", async () => {
+    emitTestEvent("provider cli connect menu voice missing key and cli")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-voice-missing-key-cli-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-voice-missing-key-cli-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    updateAgentConfig(bundlesRoot, "Slugger", (config) => {
+      config.senses = {
+        ...(config.senses ?? {}),
+        voice: { enabled: true },
+      }
+    })
+    writeProviderCredentialPool(homeDir, credentialPool())
+    writeRuntimeConfig("Slugger", {
+      integrations: {},
+    })
+    writeMachineIdentity(homeDir, "machine_voice_missing_key_cli")
+    mockVaultDeps.rawSecrets.set("Slugger:runtime/machines/machine_voice_missing_key_cli/config", runtimeConfigSecret({
+      voice: {
+        whisperModelPath: "/models/ggml-base.en.bin",
+      },
+    }))
+
+    const prompts: string[] = []
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "cancel"
+      },
+    }))
+
+    const prompt = joinedPrompt(prompts)
+    expect(result).toBe("connect cancelled.")
+    expectConnectStatus(prompt, 7, "Voice", "not attached")
+    expect(prompt).toContain("missing integrations.elevenLabsApiKey")
+    expect(prompt).toContain("missing voice.whisperCliPath")
+  })
+
   it("connects Mail as a vault-coupled portable agent sense", async () => {
     emitTestEvent("provider cli connect mail")
     const bundlesRoot = makeTempDir("provider-cli-connect-mail-bundles")
@@ -7991,6 +8099,7 @@ describe("provider CLI command execution", () => {
         teams: { enabled: true },
         bluebubbles: { enabled: true },
         mail: { enabled: true },
+        voice: { enabled: true },
       }
     })
     writeAgentProviderSelectionFixture(agentRoot(bundlesRoot, "Slugger"), agentProviderSelection({
@@ -8030,6 +8139,7 @@ describe("provider CLI command execution", () => {
       integrations: {
         perplexityApiKey: "pplx-secret",
         openaiEmbeddingsApiKey: "embed-secret",
+        elevenLabsApiKey: "eleven-secret",
       },
       teams: {
         clientId: "teams-client-id",
@@ -8051,6 +8161,10 @@ describe("provider CLI command execution", () => {
         serverUrl: "http://127.0.0.1:1234",
         password: "bb-password",
         accountId: "default",
+      },
+      voice: {
+        whisperCliPath: "/opt/homebrew/bin/whisper-cli",
+        whisperModelPath: "/models/ggml-base.en.bin",
       },
     }))
     mockPingProvider.mockImplementation(async (provider) => {

@@ -1,3 +1,4 @@
+import * as fs from "fs/promises"
 import { describe, expect, it, vi } from "vitest"
 import {
   createWhisperCppTranscriber,
@@ -53,6 +54,8 @@ describe("Whisper.cpp voice transcriber", () => {
   it("rejects invalid JSON and empty transcripts with useful errors", () => {
     expect(() => parseWhisperCppTranscriptJson("{not-json")).toThrow("invalid whisper.cpp JSON")
     expect(() => parseWhisperCppTranscriptJson(JSON.stringify({ transcription: [{ text: " " }] }))).toThrow("empty whisper.cpp transcript")
+    expect(() => parseWhisperCppTranscriptJson(JSON.stringify({}))).toThrow("empty whisper.cpp transcript")
+    expect(parseWhisperCppTranscriptJson(JSON.stringify({ transcription: [{ text: 3 }, { text: " ok " }] }))).toBe("ok")
   })
 
   it("wraps process failures with command context", async () => {
@@ -71,5 +74,81 @@ describe("Whisper.cpp voice transcriber", () => {
       utteranceId: "utt_fail",
       audioPath: "/tmp/input.wav",
     })).rejects.toThrow("whisper.cpp transcription failed: exit 1")
+  })
+
+  it("uses default temp cleanup when no filesystem helpers are injected", async () => {
+    const processRunner = vi.fn(async (_command: string, args: string[]) => {
+      const outputBase = args[args.indexOf("-of") + 1]
+      await fs.writeFile(`${outputBase}.json`, JSON.stringify({ text: "Default temp works." }), "utf8")
+      return { exitCode: 0 }
+    })
+    const transcriber = createWhisperCppTranscriber({
+      whisperCliPath: "/opt/whisper-cli",
+      modelPath: "/models/model.bin",
+      processRunner,
+      timeoutMs: 42,
+    })
+
+    const result = await transcriber.transcribe({
+      utteranceId: "utt_default_fs",
+      audioPath: "/tmp/input.wav",
+    })
+
+    expect(processRunner).toHaveBeenCalledWith(
+      "/opt/whisper-cli",
+      ["-m", "/models/model.bin", "-f", "/tmp/input.wav", "-oj", "-of", expect.stringContaining("transcript")],
+      { timeoutMs: 42 },
+    )
+    expect(result.text).toBe("Default temp works.")
+  })
+
+  it("wraps non-zero whisper exit codes and stderr", async () => {
+    const transcriber = createWhisperCppTranscriber({
+      whisperCliPath: "/opt/whisper-cli",
+      modelPath: "/models/model.bin",
+      processRunner: async () => ({ exitCode: 2, stderr: "bad audio" }),
+      readFile: async () => "{}",
+      makeTempDir: async () => "/tmp/ouro-voice-exit",
+      removeDir: async () => undefined,
+    })
+
+    await expect(transcriber.transcribe({
+      utteranceId: "utt_exit",
+      audioPath: "/tmp/input.wav",
+    })).rejects.toThrow("whisper.cpp transcription failed: exit 2: bad audio")
+  })
+
+  it("wraps non-zero whisper exit codes without stderr", async () => {
+    const transcriber = createWhisperCppTranscriber({
+      whisperCliPath: "/opt/whisper-cli",
+      modelPath: "/models/model.bin",
+      processRunner: async () => ({ exitCode: 3 }),
+      readFile: async () => "{}",
+      makeTempDir: async () => "/tmp/ouro-voice-exit-no-stderr",
+      removeDir: async () => undefined,
+    })
+
+    await expect(transcriber.transcribe({
+      utteranceId: "utt_exit_no_stderr",
+      audioPath: "/tmp/input.wav",
+    })).rejects.toThrow("whisper.cpp transcription failed: exit 3")
+  })
+
+  it("wraps non-Error transcription failures defensively", async () => {
+    const transcriber = createWhisperCppTranscriber({
+      whisperCliPath: "/opt/whisper-cli",
+      modelPath: "/models/model.bin",
+      processRunner: async () => ({ exitCode: 0 }),
+      readFile: async () => {
+        throw "raw read failure"
+      },
+      makeTempDir: async () => "/tmp/ouro-voice-raw-fail",
+      removeDir: async () => undefined,
+    })
+
+    await expect(transcriber.transcribe({
+      utteranceId: "utt_raw_fail",
+      audioPath: "/tmp/input.wav",
+    })).rejects.toThrow("whisper.cpp transcription failed: raw read failure")
   })
 })

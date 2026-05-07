@@ -115,4 +115,58 @@ describe("voice loopback turn", () => {
       },
     })
   })
+
+  it("reports non-Error transcript and TTS failures defensively", async () => {
+    const runSenseTurn = vi.fn(async () => ({
+      response: "Still text.",
+      ponderDeferred: false,
+    }))
+    const throwingTranscript = {
+      utteranceId: "utt_raw_transcript",
+      get text(): string {
+        throw "raw transcript failure"
+      },
+      source: "loopback" as const,
+      audioPath: null,
+      language: null,
+      startedAt: null,
+      endedAt: null,
+    }
+
+    await expect(runVoiceLoopbackTurn({
+      agentName: "slugger",
+      friendId: "ari",
+      sessionKey: "riverside",
+      transcript: throwingTranscript,
+      runSenseTurn,
+      tts: { synthesize: vi.fn() },
+    })).rejects.toBe("raw transcript failure")
+    expect(runSenseTurn).not.toHaveBeenCalled()
+
+    const transcript = buildVoiceTranscript({
+      utteranceId: "utt_raw_tts_fail",
+      text: "please answer",
+      source: "loopback",
+    })
+    const result = await runVoiceLoopbackTurn({
+      agentName: "slugger",
+      friendId: "ari",
+      sessionKey: "riverside",
+      transcript,
+      runSenseTurn,
+      tts: {
+        synthesize: vi.fn(async () => {
+          throw "raw tts failure"
+        }),
+      },
+    })
+
+    expect(result).toMatchObject({
+      responseText: "Still text.",
+      tts: {
+        status: "failed",
+        error: "raw tts failure",
+      },
+    })
+  })
 })

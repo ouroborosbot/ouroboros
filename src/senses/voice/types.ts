@@ -30,10 +30,6 @@ export interface VoiceTranscriber {
   transcribe(request: VoiceTranscriptionRequest): Promise<VoiceTranscript>
 }
 
-export const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_flash_v2_5"
-export const DEFAULT_ELEVENLABS_OUTPUT_FORMAT = "pcm_16000"
-export const DEFAULT_ELEVENLABS_MIME_TYPE = "audio/pcm;rate=16000"
-
 export interface VoiceTtsRequest {
   utteranceId: string
   text: string
