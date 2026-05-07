@@ -1215,6 +1215,16 @@ describe("provider CLI command parsing", () => {
       agent: "Slugger",
       target: "mail",
     })
+    expect(parseOuroCommand(["connect", "voice", "--agent", "Slugger"])).toEqual({
+      kind: "connect",
+      agent: "Slugger",
+      target: "voice",
+    })
+    expect(parseOuroCommand(["connect", "audio", "--agent", "Slugger"])).toEqual({
+      kind: "connect",
+      agent: "Slugger",
+      target: "voice",
+    })
     expect(parseOuroCommand(["connect", "mail", "--agent", "Slugger", "--owner-email", "ari@mendelow.me", "--source", "hey"])).toEqual({
       kind: "connect",
       agent: "Slugger",
@@ -1296,8 +1306,8 @@ describe("provider CLI command parsing", () => {
     expect(parseOuroCommand(["account", "ensure"])).toEqual({
       kind: "account.ensure",
     })
-    expect(() => parseOuroCommand(["connect", "perplexity", "bluebubbles", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail")
-    expect(() => parseOuroCommand(["connect", "unknown", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail")
+    expect(() => parseOuroCommand(["connect", "perplexity", "bluebubbles", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail|voice")
+    expect(() => parseOuroCommand(["connect", "unknown", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail|voice")
     expect(() => parseOuroCommand(["connect", "teams", "--agent", "Slugger", "--owner-email", "ari@mendelow.me"])).toThrow("Mail source flags require")
     expect(() => parseOuroCommand(["connect", "mail", "--agent", "Slugger", "--owner-email"])).toThrow("ouro connect")
     expect(() => parseOuroCommand(["connect", "mail", "--agent", "Slugger", "--source", "hey"])).toThrow("--source requires --owner-email")
