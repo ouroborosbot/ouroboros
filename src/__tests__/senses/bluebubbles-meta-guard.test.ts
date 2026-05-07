@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest"
-import { containsInternalMetaMarkers } from "../../senses/bluebubbles-meta-guard"
+import { describe, expect, it, vi, beforeEach } from "vitest"
+
+vi.mock("../../nerves/runtime", () => ({
+  emitNervesEvent: vi.fn(),
+}))
+
+import { containsInternalMetaMarkers, emitBluebubblesMetaBlocked } from "../../senses/bluebubbles-meta-guard"
+import { emitNervesEvent } from "../../nerves/runtime"
 
 describe("containsInternalMetaMarkers", () => {
   it("blocks the surfaced-from-inner-dialog prefix", () => {
@@ -39,5 +45,42 @@ describe("containsInternalMetaMarkers", () => {
     expect(containsInternalMetaMarkers("")).toBe(false)
     expect(containsInternalMetaMarkers(undefined)).toBe(false)
     expect(containsInternalMetaMarkers(null)).toBe(false)
+  })
+})
+
+describe("emitBluebubblesMetaBlocked", () => {
+  beforeEach(() => {
+    vi.mocked(emitNervesEvent).mockReset()
+  })
+
+  it("emits a warn-level senses.bluebubbles_meta_blocked event with site in meta", () => {
+    emitBluebubblesMetaBlocked({
+      site: "flushNow",
+      message: "speak text blocked",
+      meta: { chatGuid: "chat-1", messageLength: 12 },
+    })
+
+    expect(emitNervesEvent).toHaveBeenCalledTimes(1)
+    expect(emitNervesEvent).toHaveBeenCalledWith({
+      level: "warn",
+      component: "senses",
+      event: "senses.bluebubbles_meta_blocked",
+      message: "speak text blocked",
+      meta: { site: "flushNow", chatGuid: "chat-1", messageLength: 12 },
+    })
+  })
+
+  it("emits with site only when no extra meta is supplied", () => {
+    emitBluebubblesMetaBlocked({
+      site: "drain",
+      message: "drain blocked",
+    })
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      level: "warn",
+      component: "senses",
+      event: "senses.bluebubbles_meta_blocked",
+      meta: { site: "drain" },
+    }))
   })
 })

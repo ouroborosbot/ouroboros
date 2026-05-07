@@ -9,6 +9,8 @@
 // is NOT blocked, so user-facing replies that legitimately discuss those
 // concepts still pass.
 
+import { emitNervesEvent } from "../nerves/runtime"
+
 const META_CONTENT_PATTERNS: readonly RegExp[] = [
   /\[surfaced from inner dialog\]/i,
   /\[pending from [^\]]+\]:/i,
@@ -21,4 +23,23 @@ const META_CONTENT_PATTERNS: readonly RegExp[] = [
 export function containsInternalMetaMarkers(text: string | undefined | null): boolean {
   if (!text) return false
   return META_CONTENT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export interface BluebubblesMetaBlockedOptions {
+  site: "flush" | "flushNow" | "proactive" | "drain"
+  message: string
+  meta?: Record<string, unknown>
+}
+
+export function emitBluebubblesMetaBlocked(options: BluebubblesMetaBlockedOptions): void {
+  emitNervesEvent({
+    level: "warn",
+    component: "senses",
+    event: "senses.bluebubbles_meta_blocked",
+    message: options.message,
+    meta: {
+      site: options.site,
+      ...options.meta,
+    },
+  })
 }

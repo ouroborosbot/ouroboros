@@ -19,7 +19,7 @@ import { buildSystem, flattenSystemPrompt } from "../../mind/prompt"
 import { getSharedMcpManager } from "../../repertoire/mcp-manager"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { getProactiveInternalContentBlockReason, emitProactiveInternalContentBlocked } from "../proactive-content-guard"
-import { containsInternalMetaMarkers } from "../bluebubbles-meta-guard"
+import { containsInternalMetaMarkers, emitBluebubblesMetaBlocked } from "../bluebubbles-meta-guard"
 import type { BlueBubblesReplyTargetSelection } from "../../repertoire/tools-base"
 import {
   BlueBubblesIgnoredEventError,
@@ -713,13 +713,10 @@ export function createBlueBubblesCallbacks(
       if (!trimmed) return
       textBuffer = ""
       if (containsInternalMetaMarkers(trimmed)) {
-        emitNervesEvent({
-          level: "warn",
-          component: "senses",
-          event: "senses.bluebubbles_meta_blocked",
+        emitBluebubblesMetaBlocked({
+          site: "flushNow",
           message: "bluebubbles speak text blocked: internal meta markers",
           meta: {
-            site: "flushNow",
             chatGuid: chat.chatGuid ?? null,
             messageLength: trimmed.length,
           },
@@ -762,13 +759,10 @@ export function createBlueBubblesCallbacks(
         await queue
       }
       if (containsInternalMetaMarkers(trimmed)) {
-        emitNervesEvent({
-          level: "warn",
-          component: "senses",
-          event: "senses.bluebubbles_meta_blocked",
+        emitBluebubblesMetaBlocked({
+          site: "flush",
           message: "bluebubbles outbound text blocked: internal meta markers",
           meta: {
-            site: "flush",
             chatGuid: chat.chatGuid ?? null,
             messageLength: trimmed.length,
           },
@@ -2205,13 +2199,10 @@ export async function sendProactiveBlueBubblesMessageToSession(
   deps: Partial<RuntimeDeps> = {},
 ): Promise<ProactiveBlueBubblesSessionSendResult> {
   if (containsInternalMetaMarkers(params.text)) {
-    emitNervesEvent({
-      level: "warn",
-      component: "senses",
-      event: "senses.bluebubbles_meta_blocked",
+    emitBluebubblesMetaBlocked({
+      site: "proactive",
       message: "bluebubbles proactive send blocked: internal meta markers",
       meta: {
-        site: "proactive",
         friendId: params.friendId,
         sessionKey: params.sessionKey,
       },
@@ -2442,13 +2433,10 @@ export async function drainAndSendPendingBlueBubbles(
     if (containsInternalMetaMarkers(messageText)) {
       result.skipped++
       try { fs.unlinkSync(filePath) } catch { /* ignore */ }
-      emitNervesEvent({
-        level: "warn",
-        component: "senses",
-        event: "senses.bluebubbles_meta_blocked",
+      emitBluebubblesMetaBlocked({
+        site: "drain",
         message: "bluebubbles drain blocked: internal meta markers",
         meta: {
-          site: "drain",
           friendId,
           filePath,
         },
