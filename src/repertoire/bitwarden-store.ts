@@ -67,7 +67,11 @@ function isBwSessionUnavailableMessage(message: string): boolean {
 }
 
 function isBwInvalidUnlockSecretMessage(message: string): boolean {
-  return /invalid master password/i.test(message) || /saved vault unlock secret/i.test(message)
+  return (
+    /invalid master password/i.test(message) ||
+    /saved vault unlock secret/i.test(message) ||
+    /username or password is incorrect/i.test(message)
+  )
 }
 
 function isBwTimeoutError(err: Error): boolean {
@@ -121,6 +125,16 @@ function isBwConfigLogoutRequired(err: Error): boolean {
 
 function isBwAlreadyLoggedInError(err: Error): boolean {
   return err.message.toLowerCase().includes("already logged in")
+}
+
+function isBwLoggedOutOrUnauthenticatedError(err: Error): boolean {
+  const message = err.message.toLowerCase()
+  return (
+    message.includes("not logged in") ||
+    message.includes("not authenticated") ||
+    message.includes("unauthenticated") ||
+    message.includes("local bitwarden session because it is locked, missing, or expired")
+  )
 }
 
 function shouldUseStructuredItemLookup(domain: string): boolean {
@@ -406,6 +420,12 @@ interface BwLoginItem {
   revisionDate?: string
 }
 
+interface BwStatus {
+  status?: string
+  serverUrl?: string
+  userEmail?: string
+}
+
 // ---------------------------------------------------------------------------
 // BitwardenCredentialStore
 // ---------------------------------------------------------------------------
@@ -415,7 +435,10 @@ export class BitwardenCredentialStore implements CredentialStore {
   private readonly email: string
   private readonly masterPassword: string
   private readonly appDataDir?: string
+  private readonly onInvalidUnlockSecret?: (error: Error) => void | Promise<void>
+  private readonly onLoginSuccess?: () => void | Promise<void>
   private sessionToken: string | null = null
+  private terminalLoginError: Error | null = null
   private bwBinaryPath = "bw"
   private structuredItemCache: Map<string, BwLoginItem> | null = null
 
@@ -423,12 +446,18 @@ export class BitwardenCredentialStore implements CredentialStore {
     serverUrl: string,
     email: string,
     masterPassword: string,
-    options: { appDataDir?: string } = {},
+    options: {
+      appDataDir?: string
+      onInvalidUnlockSecret?: (error: Error) => void | Promise<void>
+      onLoginSuccess?: () => void | Promise<void>
+    } = {},
   ) {
     this.serverUrl = serverUrl
     this.email = email
     this.masterPassword = masterPassword
     this.appDataDir = options.appDataDir
+    this.onInvalidUnlockSecret = options.onInvalidUnlockSecret
+    this.onLoginSuccess = options.onLoginSuccess
   }
 
   isReady(): boolean {
@@ -450,12 +479,36 @@ export class BitwardenCredentialStore implements CredentialStore {
     )
   }
 
+  private async notifyInvalidUnlockSecret(error: Error): Promise<void> {
+    if (!this.onInvalidUnlockSecret) return
+    try {
+      await this.onInvalidUnlockSecret(error)
+    } catch (callbackError) {
+      emitNervesEvent({
+        level: "warn",
+        event: "repertoire.bw_invalid_unlock_cleanup_failed",
+        component: "repertoire",
+        message: "failed to clean up rejected local vault unlock material",
+        meta: {
+          email: this.email,
+          serverUrl: this.serverUrl,
+          error: callbackError instanceof Error ? callbackError.message : String(callbackError),
+          originalError: error.message,
+        },
+      })
+    }
+  }
+
   /**
    * Ensure the bw CLI is authenticated and unlocked.
    * Handles three states: logged out → login, locked → unlock, already unlocked → no-op.
    * Retries transient failures (network/timeout) up to MAX_RETRIES with exponential backoff.
    */
   async login(): Promise<void> {
+    if (this.terminalLoginError) {
+      throw this.terminalLoginError
+    }
+
     // Ensure bw CLI is installed before any bw commands
     this.bwBinaryPath = await ensureBwCli()
     if (this.appDataDir) {
@@ -467,6 +520,7 @@ export class BitwardenCredentialStore implements CredentialStore {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         await this.loginAttempt()
+        await this.onLoginSuccess?.()
         return
       } catch (err) {
         /* v8 ignore next -- defensive: loginAttempt always throws Error instances @preserve */
@@ -474,6 +528,10 @@ export class BitwardenCredentialStore implements CredentialStore {
 
         // Don't retry non-transient errors (auth failures, bw not installed)
         if (!isTransientError(lastError)) {
+          this.terminalLoginError = lastError
+          if (isBwInvalidUnlockSecretMessage(lastError.message)) {
+            await this.notifyInvalidUnlockSecret(lastError)
+          }
           throw lastError
         }
 
@@ -491,23 +549,21 @@ export class BitwardenCredentialStore implements CredentialStore {
         await delay(backoffMs)
       }
     }
-
+    this.terminalLoginError = lastError!
+    /* v8 ignore next -- invalid unlock errors are non-transient and exit through the non-retry path above @preserve */
+    if (isBwInvalidUnlockSecretMessage(lastError!.message)) {
+      await this.notifyInvalidUnlockSecret(lastError!)
+    }
     throw lastError!
   }
 
   /** Single login attempt — called by login() retry loop. */
   private async loginAttempt(): Promise<void> {
-    // Check current status
-    let status: { status?: string; serverUrl?: string; userEmail?: string } = {}
-    try {
-      const raw = await this.execBw(["status"])
-      status = JSON.parse(raw)
-    } catch (err) {
-      // If bw CLI is not installed or a transient error, propagate it for retry
-      if (err instanceof Error && (isBwNotInstalled(err) || isTransientError(err))) {
-        throw err
-      }
-      // CLI not configured or broken — proceed with full setup
+    let status = await this.readStatus()
+
+    if (this.shouldRebuildLocalProfile(status)) {
+      await this.rebuildLocalProfile("local bw profile did not match requested vault", status)
+      status = { status: "unlocked", serverUrl: this.serverUrl, userEmail: this.email }
     }
 
     // Configure server URL if needed (only works when logged out)
@@ -516,39 +572,33 @@ export class BitwardenCredentialStore implements CredentialStore {
         await this.execBw(["config", "server", this.serverUrl])
       } catch (error) {
         const err = error as Error
-        // "Logout required" means already logged in — that's fine, skip config.
-        if (!isBwConfigLogoutRequired(err)) {
-          throw err
-        }
+        if (!isBwConfigLogoutRequired(err)) throw err
+        // "Logout required" means bw already has local auth state; keep the
+        // existing behavior and proceed to login/unlock below.
       }
     }
 
-    if (status.status === "locked") {
-      // Already logged in, just needs unlock
-      const unlockOutput = await this.execBwWithPasswordEnv(["unlock", "--raw"])
-      this.sessionToken = unlockOutput.trim()
-    } else if (status.status === "unauthenticated" || !status.status) {
-      // Not logged in — full login
-      let loginOutput: string
-      try {
-        loginOutput = await this.execBwWithPasswordEnv(["login", this.email, "--raw"])
-      } catch (error) {
-        const err = error as Error
-        if (!isBwAlreadyLoggedInError(err)) {
-          throw err
-        }
-        loginOutput = await this.execBwWithPasswordEnv(["unlock", "--raw"])
+    if (!this.sessionToken) {
+      if (status.status === "locked") {
+        // Already logged in, just needs unlock.
+        const unlockOutput = await this.execWithLocalProfileRebuild(
+          "unlock rejected saved local unlock material",
+          status,
+          () => this.execBwWithPasswordEnv(["unlock", "--raw"]),
+        )
+        this.sessionToken = unlockOutput.trim()
+      } else if (status.status === "unauthenticated" || !status.status) {
+        // Not logged in -- full login.
+        this.sessionToken = this.sessionTokenFromLoginOutput(await this.loginWithPassword())
+      } else {
+        // Status is "unlocked" -- already good, just need the session token.
+        const unlockOutput = await this.execWithLocalProfileRebuild(
+          "unlocked bw profile rejected saved local unlock material",
+          status,
+          () => this.execBwWithPasswordEnv(["unlock", "--raw"]),
+        )
+        this.sessionToken = unlockOutput.trim()
       }
-      try {
-        const parsed = JSON.parse(loginOutput)
-        this.sessionToken = parsed.access_token ?? loginOutput.trim()
-      } catch {
-        this.sessionToken = loginOutput.trim()
-      }
-    } else {
-      // Status is "unlocked" — already good, just need the session token
-      const unlockOutput = await this.execBwWithPasswordEnv(["unlock", "--raw"])
-      this.sessionToken = unlockOutput.trim()
     }
 
     if (this.shouldSyncVaultAfterSession(status)) {
@@ -562,6 +612,127 @@ export class BitwardenCredentialStore implements CredentialStore {
         message: "skipping bw sync because local vault cache is still fresh",
         meta: { email: this.email, serverUrl: this.serverUrl, freshnessWindowMs: BW_SYNC_FRESH_MS },
       })
+    }
+    this.terminalLoginError = null
+  }
+
+  private async readStatus(): Promise<BwStatus> {
+    try {
+      const raw = await this.execBw(["status"])
+      const parsed = JSON.parse(raw) as unknown
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+      const record = parsed as Record<string, unknown>
+      return {
+        ...(typeof record.status === "string" ? { status: record.status } : {}),
+        ...(typeof record.serverUrl === "string" ? { serverUrl: record.serverUrl } : {}),
+        ...(typeof record.userEmail === "string" ? { userEmail: record.userEmail } : {}),
+      }
+    } catch (err) {
+      // If bw CLI is not installed or a transient error, propagate it for retry.
+      if (err instanceof Error && (isBwNotInstalled(err) || isTransientError(err))) {
+        throw err
+      }
+      // CLI not configured or broken -- proceed with full setup.
+      return {}
+    }
+  }
+
+  private normalizedServerUrl(value: string): string {
+    return value.trim().replace(/\/+$/, "").toLowerCase()
+  }
+
+  private shouldRebuildLocalProfile(status: BwStatus): boolean {
+    if (status.status !== "locked" && status.status !== "unlocked") return false
+    if (status.serverUrl && this.normalizedServerUrl(status.serverUrl) !== this.normalizedServerUrl(this.serverUrl)) return true
+    if (status.userEmail && status.userEmail.trim().toLowerCase() !== this.email.trim().toLowerCase()) return true
+    return false
+  }
+
+  private sessionTokenFromLoginOutput(loginOutput: string): string {
+    try {
+      const parsed = JSON.parse(loginOutput) as { access_token?: unknown }
+      return typeof parsed.access_token === "string" && parsed.access_token.trim()
+        ? parsed.access_token.trim()
+        : loginOutput.trim()
+    } catch {
+      return loginOutput.trim()
+    }
+  }
+
+  private async loginWithPassword(): Promise<string> {
+    try {
+      return await this.execBwWithPasswordEnv(["login", this.email, "--raw"])
+    } catch (error) {
+      const err = error as Error
+      if (!isBwAlreadyLoggedInError(err)) throw err
+      return this.execBwWithPasswordEnv(["unlock", "--raw"])
+    }
+  }
+
+  private forgetLocalSyncMarker(): void {
+    if (!this.appDataDir) return
+    try {
+      fs.rmSync(path.join(this.appDataDir, BW_SYNC_MARKER_FILENAME), { force: true })
+    } catch {
+      // A stale sync marker is only a cache hint; failure to remove it should not block auth repair.
+    }
+  }
+
+  private async logoutLocalProfile(reason: string, status: BwStatus, cause?: unknown): Promise<void> {
+    this.sessionToken = null
+    this.structuredItemCache = null
+    this.forgetLocalSyncMarker()
+    emitNervesEvent({
+      level: "warn",
+      event: "repertoire.bw_local_profile_rebuild",
+      component: "repertoire",
+      message: "rebuilding local bw profile for agent vault",
+      meta: {
+        email: this.email,
+        serverUrl: this.serverUrl,
+        reason,
+        /* v8 ignore next -- defensive: every profile rebuild path starts from a locked/unlocked bw status @preserve */
+        previousStatus: status.status ?? "unknown",
+        previousServerUrl: status.serverUrl ?? null,
+        previousUserEmail: status.userEmail ?? null,
+        /* v8 ignore next -- defensive: internal rebuild callers pass Error or undefined causes @preserve */
+        error: cause instanceof Error ? cause.message : cause ? String(cause) : undefined,
+      },
+    })
+    try {
+      await this.execBw(["logout"])
+    } catch (error) {
+      const err = error as Error
+      if (isBwLoggedOutOrUnauthenticatedError(err)) return
+      emitNervesEvent({
+        level: "warn",
+        event: "repertoire.bw_local_profile_logout_failed",
+        component: "repertoire",
+        message: "failed to logout local bw profile before rebuild",
+        meta: { email: this.email, serverUrl: this.serverUrl, error: err.message },
+      })
+    }
+  }
+
+  private async rebuildLocalProfile(reason: string, status: BwStatus, cause?: unknown): Promise<void> {
+    await this.logoutLocalProfile(reason, status, cause)
+    await this.execBw(["config", "server", this.serverUrl])
+    this.sessionToken = this.sessionTokenFromLoginOutput(await this.loginWithPassword())
+  }
+
+  private async execWithLocalProfileRebuild(
+    reason: string,
+    status: BwStatus,
+    operation: () => Promise<string>,
+  ): Promise<string> {
+    try {
+      return await operation()
+    } catch (error) {
+      const err = error as Error
+      if (!isBwInvalidUnlockSecretMessage(err.message)) throw err
+      await this.rebuildLocalProfile(reason, status, err)
+      /* v8 ignore next -- defensive: rebuildLocalProfile always stores a string session token on success @preserve */
+      return this.sessionToken ?? ""
     }
   }
 

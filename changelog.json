@@ -2,6 +2,46 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.561",
+      "changes": [
+        "Voice golden-path orchestration now accepts meeting URLs, checks local BlackHole/Multi-Output readiness, runs Whisper.cpp STT, routes text through ordinary `voice` sessions, streams ElevenLabs TTS, and writes playback-ready audio artifacts.",
+        "Voice runtime edges now include default Node Whisper.cpp process execution, default Node WebSocket adaptation for ElevenLabs, and tested playback artifact handling while keeping credentials injected at runtime.",
+        "Shared sense turns now store sessions under the explicit agent's bundle instead of depending on process argv for the session path, and voice setup guidance now reflects meeting URL intake plus live-browser handoff limits truthfully."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.560",
+      "changes": [
+        "Voice is now a first-class disabled-by-default sense and channel, with daemon inventory, connect-menu, prompt status, session transcript, and Mailbox UI surfaces.",
+        "Voice foundation modules now define Whisper.cpp STT, ElevenLabs streaming TTS, canonical transcript metadata, and loopback voice turns through ordinary `voice` sessions.",
+        "The daemon can launch a managed voice entrypoint, and docs now spell out voice runtime credential ownership plus the next meeting/Riverside joining milestone."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.559",
+      "changes": [
+        "Cached agent-name lookups no longer emit `identity.resolve` on every call, cutting the largest repeated daemon log event source while preserving the first argv resolution event.",
+        "Identity tests now lock the lower-volume logging contract so cached `getAgentName()` calls stay quiet.",
+        "`@ouro.bot/cli` and the `ouro.bot` wrapper are version-synced for the daemon log volume release."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.558",
+      "changes": [
+        "Rejected local vault unlock material is now cleared after Bitwarden proves it is wrong, so a stale Keychain/DPAPI/Secret Service/plaintext entry cannot keep retrying across fresh CLI processes and rate-limit the agent vault.",
+        "Legacy vault unlock entries are no longer copied to canonical coordinates during read. Ouro now canonicalizes them only after a successful vault login, preventing unvalidated local material from poisoning the primary unlock slot.",
+        "`@ouro.bot/cli` and the `ouro.bot` wrapper are version-synced for the invalid local unlock quarantine release."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.557",
+      "changes": [
+        "`ouro vault unlock` now validates the typed unlock secret against the agent vault before replacing this machine's saved local unlock material, so a failed unlock attempt cannot poison a previously working Keychain/DPAPI/Secret Service/plaintext entry.",
+        "The Bitwarden adapter now rebuilds stale per-agent local `bw` profiles when they point at the wrong vault account/server or reject a saved unlock during unlock, reducing restart-time false locked-vault failures while keeping wrong saved secrets explicit.",
+        "`@ouro.bot/cli` and the `ouro.bot` wrapper are version-synced for the vault unlock hardening release."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.556",
       "changes": [
         "`ouro up` runtime replacement now captures the daemon boot timestamp before starting the replacement process, so a fast healthy daemon is not rejected for publishing health before the monitor begins polling."

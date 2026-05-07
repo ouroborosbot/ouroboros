@@ -45,6 +45,7 @@ const mockVaultDeps = vi.hoisted(() => ({
     fix: "run ouro vault unlock",
   })),
   resetCredentialStore: vi.fn(),
+  probeCredentialVaultAccess: vi.fn(async () => undefined),
   credentialProbeGet: vi.fn(async () => null),
   credentialProbeList: vi.fn(async () => []),
   rawSecrets: new Map<string, string>(),
@@ -89,6 +90,7 @@ vi.mock("../../../repertoire/vault-unlock", async () => {
 
 vi.mock("../../../repertoire/credential-access", () => ({
   resetCredentialStore: () => mockVaultDeps.resetCredentialStore(),
+  probeCredentialVaultAccess: (...args: unknown[]) => mockVaultDeps.probeCredentialVaultAccess(...args),
   getCredentialStore: (agentName = "Slugger") => ({
     get: (...args: unknown[]) => mockVaultDeps.credentialProbeGet(...args),
     getRawSecret: async (domain: string) => {
@@ -639,6 +641,8 @@ afterEach(() => {
     fix: "run ouro vault unlock",
   })
   mockVaultDeps.resetCredentialStore.mockClear()
+  mockVaultDeps.probeCredentialVaultAccess.mockReset()
+  mockVaultDeps.probeCredentialVaultAccess.mockResolvedValue(undefined)
   mockVaultDeps.credentialProbeGet.mockReset()
   mockVaultDeps.credentialProbeGet.mockResolvedValue(null)
   mockVaultDeps.credentialProbeList.mockReset()
@@ -1211,6 +1215,16 @@ describe("provider CLI command parsing", () => {
       agent: "Slugger",
       target: "mail",
     })
+    expect(parseOuroCommand(["connect", "voice", "--agent", "Slugger"])).toEqual({
+      kind: "connect",
+      agent: "Slugger",
+      target: "voice",
+    })
+    expect(parseOuroCommand(["connect", "audio", "--agent", "Slugger"])).toEqual({
+      kind: "connect",
+      agent: "Slugger",
+      target: "voice",
+    })
     expect(parseOuroCommand(["connect", "mail", "--agent", "Slugger", "--owner-email", "ari@mendelow.me", "--source", "hey"])).toEqual({
       kind: "connect",
       agent: "Slugger",
@@ -1292,8 +1306,8 @@ describe("provider CLI command parsing", () => {
     expect(parseOuroCommand(["account", "ensure"])).toEqual({
       kind: "account.ensure",
     })
-    expect(() => parseOuroCommand(["connect", "perplexity", "bluebubbles", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail")
-    expect(() => parseOuroCommand(["connect", "unknown", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail")
+    expect(() => parseOuroCommand(["connect", "perplexity", "bluebubbles", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail|voice")
+    expect(() => parseOuroCommand(["connect", "unknown", "--agent", "Slugger"])).toThrow("providers|perplexity|embeddings|teams|bluebubbles|mail|voice")
     expect(() => parseOuroCommand(["connect", "teams", "--agent", "Slugger", "--owner-email", "ari@mendelow.me"])).toThrow("Mail source flags require")
     expect(() => parseOuroCommand(["connect", "mail", "--agent", "Slugger", "--owner-email"])).toThrow("ouro connect")
     expect(() => parseOuroCommand(["connect", "mail", "--agent", "Slugger", "--source", "hey"])).toThrow("--source requires --owner-email")
@@ -1331,6 +1345,114 @@ describe("provider CLI command parsing", () => {
 })
 
 describe("provider CLI command execution", () => {
+  it("prints Voice setup guidance without collecting secrets in-process", async () => {
+    emitTestEvent("provider cli connect voice")
+    const bundlesRoot = makeTempDir("provider-cli-connect-voice-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-voice-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+
+    const result = await runOuroCli(["connect", "voice", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot))
+
+    expect(result).toContain("Voice foundation for Slugger")
+    expect(result).toContain("integrations.elevenLabsApiKey")
+    expect(result).toContain("voice.whisperCliPath")
+    expect(result).toContain("voice.whisperModelPath")
+    expect(result).toContain("Meeting links use URL intake")
+  })
+
+  it("routes Voice setup from the root connect bay", async () => {
+    emitTestEvent("provider cli connect menu voice")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-voice-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-voice-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    const prompts: string[] = []
+
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "voice"
+      },
+    }))
+
+    expect(joinedPrompt(prompts)).toContain("7. Voice")
+    expect(result).toContain("Voice foundation for Slugger")
+  })
+
+  it("shows Voice as not attached when the local Whisper.cpp model path is missing", async () => {
+    emitTestEvent("provider cli connect menu voice incomplete")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-voice-incomplete-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-voice-incomplete-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    updateAgentConfig(bundlesRoot, "Slugger", (config) => {
+      config.senses = {
+        ...(config.senses ?? {}),
+        voice: { enabled: true },
+      }
+    })
+    writeProviderCredentialPool(homeDir, credentialPool())
+    writeRuntimeConfig("Slugger", {
+      integrations: {
+        elevenLabsApiKey: "eleven-secret",
+      },
+    })
+    writeMachineIdentity(homeDir, "machine_voice_incomplete")
+    mockVaultDeps.rawSecrets.set("Slugger:runtime/machines/machine_voice_incomplete/config", runtimeConfigSecret({
+      voice: {
+        whisperCliPath: "/opt/homebrew/bin/whisper-cli",
+      },
+    }))
+
+    const prompts: string[] = []
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "cancel"
+      },
+    }))
+
+    const prompt = joinedPrompt(prompts)
+    expect(result).toBe("connect cancelled.")
+    expectConnectStatus(prompt, 7, "Voice", "not attached")
+    expect(prompt).toContain("missing voice.whisperModelPath")
+  })
+
+  it("shows Voice as not attached when the ElevenLabs key and Whisper.cpp CLI path are missing", async () => {
+    emitTestEvent("provider cli connect menu voice missing key and cli")
+    const bundlesRoot = makeTempDir("provider-cli-connect-menu-voice-missing-key-cli-bundles")
+    const homeDir = makeTempDir("provider-cli-connect-menu-voice-missing-key-cli-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    updateAgentConfig(bundlesRoot, "Slugger", (config) => {
+      config.senses = {
+        ...(config.senses ?? {}),
+        voice: { enabled: true },
+      }
+    })
+    writeProviderCredentialPool(homeDir, credentialPool())
+    writeRuntimeConfig("Slugger", {
+      integrations: {},
+    })
+    writeMachineIdentity(homeDir, "machine_voice_missing_key_cli")
+    mockVaultDeps.rawSecrets.set("Slugger:runtime/machines/machine_voice_missing_key_cli/config", runtimeConfigSecret({
+      voice: {
+        whisperModelPath: "/models/ggml-base.en.bin",
+      },
+    }))
+
+    const prompts: string[] = []
+    const result = await runOuroCli(["connect", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot, {
+      promptInput: async (question) => {
+        prompts.push(question)
+        return "cancel"
+      },
+    }))
+
+    const prompt = joinedPrompt(prompts)
+    expect(result).toBe("connect cancelled.")
+    expectConnectStatus(prompt, 7, "Voice", "not attached")
+    expect(prompt).toContain("missing integrations.elevenLabsApiKey")
+    expect(prompt).toContain("missing voice.whisperCliPath")
+  })
+
   it("connects Mail as a vault-coupled portable agent sense", async () => {
     emitTestEvent("provider cli connect mail")
     const bundlesRoot = makeTempDir("provider-cli-connect-mail-bundles")
@@ -4964,17 +5086,22 @@ describe("provider CLI command execution", () => {
 
     expect(result).toContain("vault unlocked for Slugger")
     expect(result).toContain("explicit plaintext fallback")
-    expect(output).toContain("... saving local unlock")
-    expect(output).toContain("✓ saving local unlock")
     expect(output).toContain("... checking vault access")
     expect(output).toContain("✓ checking vault access")
+    expect(output).toContain("... saving local unlock")
+    expect(output).toContain("✓ saving local unlock")
+    expect(output.indexOf("... checking vault access")).toBeLessThan(output.indexOf("... saving local unlock"))
+    expect(mockVaultDeps.probeCredentialVaultAccess).toHaveBeenCalledWith(
+      "Slugger",
+      "unlock-material",
+      { homeDir },
+    )
     expect(mockVaultDeps.storeVaultUnlockSecret).toHaveBeenCalledWith(
       { agentName: "Slugger", email: "slugger@ouro.bot", serverUrl: "https://vault.ouroboros.bot" },
       "unlock-material",
       { homeDir, store: "plaintext-file" },
     )
     expect(mockVaultDeps.resetCredentialStore).toHaveBeenCalled()
-    expect(mockVaultDeps.credentialProbeGet).toHaveBeenCalledWith("__ouro_vault_probe__")
 
     mockVaultDeps.storeVaultUnlockSecret.mockReturnValueOnce({ kind: "macos-keychain", secure: true, location: "macOS Keychain" })
     const secureResult = await runOuroCli([
@@ -4987,6 +5114,32 @@ describe("provider CLI command execution", () => {
     }))
     expect(secureResult).toContain("local unlock store: macos-keychain")
     expect(secureResult).not.toContain("explicit plaintext fallback")
+  })
+
+  it("vault unlock does not overwrite local unlock material when the candidate secret fails validation", async () => {
+    emitTestEvent("provider cli vault unlock validates before storing")
+    const bundlesRoot = makeTempDir("provider-cli-vault-unlock-validate-bundles")
+    const homeDir = makeTempDir("provider-cli-vault-unlock-validate-home")
+    writeAgentConfig(bundlesRoot, "Slugger")
+    mockVaultDeps.probeCredentialVaultAccess.mockRejectedValueOnce(new Error("bw CLI rejected the saved vault unlock secret"))
+
+    await expect(runOuroCli([
+      "vault",
+      "unlock",
+      "--agent",
+      "Slugger",
+      "--store",
+      "plaintext-file",
+    ], makeCliDeps(homeDir, bundlesRoot, {
+      promptSecret: async () => "wrong-unlock-material",
+    }))).rejects.toThrow("bw CLI rejected the saved vault unlock secret")
+
+    expect(mockVaultDeps.probeCredentialVaultAccess).toHaveBeenCalledWith(
+      "Slugger",
+      "wrong-unlock-material",
+      { homeDir },
+    )
+    expect(mockVaultDeps.storeVaultUnlockSecret).not.toHaveBeenCalled()
   })
 
   it("vault unlock rejects SerpentGuide and non-interactive runs", async () => {
@@ -7946,6 +8099,7 @@ describe("provider CLI command execution", () => {
         teams: { enabled: true },
         bluebubbles: { enabled: true },
         mail: { enabled: true },
+        voice: { enabled: true },
       }
     })
     writeAgentProviderSelectionFixture(agentRoot(bundlesRoot, "Slugger"), agentProviderSelection({
@@ -7985,6 +8139,7 @@ describe("provider CLI command execution", () => {
       integrations: {
         perplexityApiKey: "pplx-secret",
         openaiEmbeddingsApiKey: "embed-secret",
+        elevenLabsApiKey: "eleven-secret",
       },
       teams: {
         clientId: "teams-client-id",
@@ -8006,6 +8161,10 @@ describe("provider CLI command execution", () => {
         serverUrl: "http://127.0.0.1:1234",
         password: "bb-password",
         accountId: "default",
+      },
+      voice: {
+        whisperCliPath: "/opt/homebrew/bin/whisper-cli",
+        whisperModelPath: "/models/ggml-base.en.bin",
       },
     }))
     mockPingProvider.mockImplementation(async (provider) => {

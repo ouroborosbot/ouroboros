@@ -231,6 +231,13 @@ describe("BitwardenCredentialStore", () => {
     })
 
     it("surfaces a wrong saved vault unlock secret clearly", async () => {
+      const onInvalidUnlockSecret = vi.fn()
+      store = new BitwardenCredentialStore(
+        "https://vault.ouroboros.bot",
+        "ouroboros@ouro.bot",
+        "masterpass123",
+        { onInvalidUnlockSecret },
+      )
       mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
         if (args[0] === "status") {
           cb(null, JSON.stringify({ status: "locked", serverUrl: "https://vault.ouroboros.bot" }), "")
@@ -240,12 +247,374 @@ describe("BitwardenCredentialStore", () => {
           cb(new Error("invalid master password"), "", "invalid master password")
           return
         }
+        if (args[0] === "login") {
+          cb(new Error("invalid master password"), "", "invalid master password")
+          return
+        }
         cb(null, "", "")
       })
 
       await expect(store.login()).rejects.toThrow(
         "bw CLI error: bw CLI rejected the saved vault unlock secret for this machine",
       )
+      expect(onInvalidUnlockSecret).toHaveBeenCalledWith(expect.objectContaining({
+        message: "bw CLI error: bw CLI rejected the saved vault unlock secret for this machine",
+      }))
+    })
+
+    it("runs a post-login hook after a successful login", async () => {
+      const onLoginSuccess = vi.fn()
+      store = new BitwardenCredentialStore(
+        "https://vault.ouroboros.bot",
+        "ouroboros@ouro.bot",
+        "masterpass123",
+        { onLoginSuccess },
+      )
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "unauthenticated" }), "")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, "session-token", "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      expect(onLoginSuccess).toHaveBeenCalledTimes(1)
+    })
+
+    it("keeps the original login error when invalid-unlock cleanup fails", async () => {
+      store = new BitwardenCredentialStore(
+        "https://vault.ouroboros.bot",
+        "ouroboros@ouro.bot",
+        "masterpass123",
+        {
+          onInvalidUnlockSecret: () => {
+            throw new Error("keychain cleanup failed")
+          },
+        },
+      )
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "locked", serverUrl: "https://vault.ouroboros.bot" }), "")
+          return
+        }
+        if (args[0] === "unlock") {
+          cb(new Error("invalid master password"), "", "invalid master password")
+          return
+        }
+        if (args[0] === "login") {
+          cb(new Error("invalid master password"), "", "invalid master password")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await expect(store.login()).rejects.toThrow(
+        "bw CLI error: bw CLI rejected the saved vault unlock secret for this machine",
+      )
+      expect(nervesEvents).toContainEqual(expect.objectContaining({
+        event: "repertoire.bw_invalid_unlock_cleanup_failed",
+        meta: expect.objectContaining({ error: "keychain cleanup failed" }),
+      }))
+    })
+
+    it("reports non-Error invalid-unlock cleanup failures", async () => {
+      store = new BitwardenCredentialStore(
+        "https://vault.ouroboros.bot",
+        "ouroboros@ouro.bot",
+        "masterpass123",
+        {
+          onInvalidUnlockSecret: () => {
+            throw "keychain cleanup failed"
+          },
+        },
+      )
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "locked", serverUrl: "https://vault.ouroboros.bot" }), "")
+          return
+        }
+        if (args[0] === "unlock" || args[0] === "login") {
+          cb(new Error("invalid master password"), "", "invalid master password")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await expect(store.login()).rejects.toThrow("bw CLI rejected the saved vault unlock secret")
+      expect(nervesEvents).toContainEqual(expect.objectContaining({
+        event: "repertoire.bw_invalid_unlock_cleanup_failed",
+        meta: expect.objectContaining({ error: "keychain cleanup failed" }),
+      }))
+    })
+
+    it("rebuilds a stale local bw profile before using the saved unlock secret", async () => {
+      const calls: string[][] = []
+      const appDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bw-stale-profile-"))
+      const isolatedStore = new BitwardenCredentialStore(
+        "https://vault.ouroboros.bot",
+        "ouroboros@ouro.bot",
+        "masterpass123",
+        { appDataDir },
+      )
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({
+            status: "locked",
+            serverUrl: "https://vault.ouroboros.bot",
+            userEmail: "someone-else@ouro.bot",
+          }), "")
+          return
+        }
+        if (args[0] === "logout") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, '{"access_token":"rebuilt-session"}', "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      try {
+        await isolatedStore.login()
+        expect(calls.map((call) => call[0])).toEqual(["status", "logout", "config", "login", "sync"])
+        expect(calls.find((call) => call[0] === "login")).toEqual(["login", "ouroboros@ouro.bot", "--raw", "--passwordenv", "OURO_BW_MASTER_PASSWORD"])
+        expect(nervesEvents.some((event) => event.event === "repertoire.bw_local_profile_rebuild")).toBe(true)
+      } finally {
+        fs.rmSync(appDataDir, { recursive: true, force: true })
+      }
+    })
+
+    it("rebuilds a stale local bw profile when the saved profile points at a different server", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({
+            status: "locked",
+            serverUrl: "https://other.vault/",
+            userEmail: "ouroboros@ouro.bot",
+          }), "")
+          return
+        }
+        if (args[0] === "logout") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, '{"access_token":"rebuilt-session"}', "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      expect(calls.map((call) => call[0])).toEqual(["status", "logout", "config", "login", "sync"])
+      expect(nervesEvents).toContainEqual(expect.objectContaining({
+        event: "repertoire.bw_local_profile_rebuild",
+        meta: expect.objectContaining({
+          previousServerUrl: "https://other.vault/",
+          previousUserEmail: "ouroboros@ouro.bot",
+        }),
+      }))
+    })
+
+    it("treats an already-logged-out response as successful local profile cleanup", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({
+            status: "locked",
+            serverUrl: "https://vault.ouroboros.bot",
+            userEmail: "someone-else@ouro.bot",
+          }), "")
+          return
+        }
+        if (args[0] === "logout") {
+          cb(new Error("not logged in"), "", "You are not logged in.")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, '{"access_token":"rebuilt-session"}', "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      expect(calls.map((call) => call[0])).toEqual(["status", "logout", "config", "login", "sync"])
+      expect(nervesEvents.some((event) => event.event === "repertoire.bw_local_profile_logout_failed")).toBe(false)
+    })
+
+    it("keeps rebuilding and logs context when local profile logout fails", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({
+            status: "locked",
+            serverUrl: "https://vault.ouroboros.bot",
+            userEmail: "someone-else@ouro.bot",
+          }), "")
+          return
+        }
+        if (args[0] === "logout") {
+          cb(new Error("profile cleanup failed"), "", "profile cleanup failed")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, '{"access_token":"rebuilt-session"}', "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      expect(calls.map((call) => call[0])).toEqual(["status", "logout", "config", "login", "sync"])
+      expect(nervesEvents).toContainEqual(expect.objectContaining({
+        event: "repertoire.bw_local_profile_logout_failed",
+        meta: expect.objectContaining({
+          email: "ouroboros@ouro.bot",
+          serverUrl: "https://vault.ouroboros.bot",
+          error: "bw CLI error: profile cleanup failed",
+        }),
+      }))
+    })
+
+    it("rebuilds a matching local bw profile when unlock rejects but fresh login succeeds", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({
+            status: "locked",
+            serverUrl: "https://vault.ouroboros.bot",
+            userEmail: "ouroboros@ouro.bot",
+          }), "")
+          return
+        }
+        if (args[0] === "unlock") {
+          cb(new Error("invalid master password"), "", "invalid master password")
+          return
+        }
+        if (args[0] === "logout") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, '{"access_token":"rebuilt-session"}', "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      expect(calls.map((call) => call[0])).toEqual(["status", "unlock", "logout", "config", "login", "sync"])
+      expect(nervesEvents.some((event) => event.event === "repertoire.bw_local_profile_rebuild")).toBe(true)
+    })
+
+    it("records omitted bw status coordinates as null during unlock-triggered rebuilds", async () => {
+      const calls: string[][] = []
+      mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+        calls.push(args)
+        if (args[0] === "status") {
+          cb(null, JSON.stringify({ status: "locked" }), "")
+          return
+        }
+        if (args[0] === "unlock") {
+          cb(new Error("invalid master password"), "", "invalid master password")
+          return
+        }
+        if (args[0] === "logout") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "config") {
+          cb(null, "", "")
+          return
+        }
+        if (args[0] === "login") {
+          cb(null, '{"access_token":"rebuilt-session"}', "")
+          return
+        }
+        if (args[0] === "sync") {
+          cb(null, "", "")
+          return
+        }
+        cb(null, "", "")
+      })
+
+      await store.login()
+
+      expect(calls.map((call) => call[0])).toEqual(["status", "config", "unlock", "logout", "config", "login", "sync"])
+      expect(nervesEvents).toContainEqual(expect.objectContaining({
+        event: "repertoire.bw_local_profile_rebuild",
+        meta: expect.objectContaining({
+          previousServerUrl: null,
+          previousUserEmail: null,
+        }),
+      }))
     })
 
     it("does not swallow config-server failures that are not logout-required", async () => {
@@ -2349,7 +2718,7 @@ describe("BitwardenCredentialStore", () => {
         cb(null, "", "")
       })
 
-      await expect(store.login()).rejects.toThrow(/incorrect/)
+      await expect(store.login()).rejects.toThrow("bw CLI rejected the saved vault unlock secret")
       // Should only try login once — no retry on auth errors
       expect(statusCalls).toBe(1)
     })
