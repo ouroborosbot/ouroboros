@@ -33,6 +33,7 @@ describe("voice meeting intake", () => {
 
   it("rejects blank, non-web, insecure generic, and malformed Riverside links", () => {
     expect(() => parseVoiceMeetingUrl("   ")).toThrow("voice meeting URL is empty")
+    expect(() => parseVoiceMeetingUrl("not a url")).toThrow("voice meeting URL is invalid")
     expect(() => parseVoiceMeetingUrl("mailto:ari@example.com")).toThrow("voice meeting URL must be http or https")
     expect(() => parseVoiceMeetingUrl("http://meet.example.com/private-room")).toThrow("generic voice meeting URLs must use https")
     expect(() => parseVoiceMeetingUrl("https://riverside.fm/not-studio/ari")).toThrow("Riverside voice meeting URLs must use /studio/")

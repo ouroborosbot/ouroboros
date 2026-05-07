@@ -62,7 +62,7 @@ export function parseVoiceMeetingUrl(input: string): VoiceMeeting {
       component: "senses",
       event: "senses.voice_meeting_rejected",
       message: "voice meeting URL is invalid",
-      meta: { reason: error instanceof Error ? error.message : String(error) },
+      meta: { reason: "invalid_url" },
     })
     throw new Error("voice meeting URL is invalid")
   }

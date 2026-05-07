@@ -1,8 +1,7 @@
-import { spawn } from "child_process"
 import * as fs from "fs/promises"
 import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
-import type { VoiceCommandResult, VoiceCommandRunner } from "./audio-routing"
+import { createNodeVoiceCommandRunner, type VoiceCommandResult, type VoiceCommandRunner } from "./audio-routing"
 import type { VoiceTtsDelivery } from "./turn"
 
 export type VoicePlaybackStatus = "written" | "played" | "failed"
@@ -28,33 +27,6 @@ export interface VoicePlaybackRequest {
   writeFile?: (filePath: string, data: Uint8Array) => Promise<unknown>
 }
 
-function nodeCommandRunner(command: string, args: string[], options: { timeoutMs: number }): Promise<VoiceCommandResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] })
-    const stdout: Buffer[] = []
-    const stderr: Buffer[] = []
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM")
-      reject(new Error(`command timed out after ${options.timeoutMs}ms`))
-    }, options.timeoutMs)
-
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
-    child.on("error", (error) => {
-      clearTimeout(timer)
-      reject(error)
-    })
-    child.on("close", (exitCode) => {
-      clearTimeout(timer)
-      resolve({
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8"),
-        exitCode: exitCode ?? 0,
-      })
-    })
-  })
-}
-
 function audioExtension(mimeType: string): string {
   if (mimeType === "audio/mpeg") return "mp3"
   if (mimeType === "audio/wav" || mimeType === "audio/x-wav") return "wav"
@@ -71,18 +43,18 @@ function safeFileStem(input: string): string {
   return stem || "utterance"
 }
 
-function commandFailureMessage(result: VoiceCommandResult): string {
+function commandFailureMessage(exitCode: number, result: VoiceCommandResult): string {
   const stderr = result.stderr?.trim()
-  if (stderr) return `exit ${result.exitCode ?? "unknown"}: ${stderr}`
+  if (stderr) return `exit ${exitCode}: ${stderr}`
   const stdout = result.stdout?.trim()
-  if (stdout) return `exit ${result.exitCode ?? "unknown"}: ${stdout}`
-  return `exit ${result.exitCode ?? "unknown"}`
+  if (stdout) return `exit ${exitCode}: ${stdout}`
+  return `exit ${exitCode}`
 }
 
 export async function writeVoicePlaybackArtifact(request: VoicePlaybackRequest): Promise<VoicePlaybackResult> {
   const mkdir = request.mkdir ?? fs.mkdir
   const writeFile = request.writeFile ?? fs.writeFile
-  const commandRunner = request.commandRunner ?? nodeCommandRunner
+  const commandRunner = request.commandRunner ?? createNodeVoiceCommandRunner()
   const timeoutMs = request.timeoutMs ?? 30_000
   const playbackCommandPath = request.playbackCommandPath ?? "afplay"
   const audioPath = path.join(
@@ -125,7 +97,7 @@ export async function writeVoicePlaybackArtifact(request: VoicePlaybackRequest):
   try {
     const result = await commandRunner(playbackCommandPath, [audioPath], { timeoutMs })
     if (typeof result.exitCode === "number" && result.exitCode !== 0) {
-      throw new Error(commandFailureMessage(result))
+      throw new Error(commandFailureMessage(result.exitCode, result))
     }
 
     emitNervesEvent({

@@ -58,6 +58,45 @@ class FakeNativeWebSocket {
   }
 }
 
+class FakeOnNativeWebSocket {
+  static last: FakeOnNativeWebSocket | null = null
+  readonly handlers: Partial<Record<"open" | "message" | "error" | "close", Handler>> = {}
+  readonly sent: string[] = []
+
+  constructor(readonly url: string) {
+    FakeOnNativeWebSocket.last = this
+  }
+
+  on(event: "open" | "message" | "error" | "close", handler: Handler): void {
+    this.handlers[event] = handler
+  }
+
+  send(payload: string): void {
+    this.sent.push(payload)
+  }
+
+  close(): void {}
+}
+
+class FakePropertyNativeWebSocket {
+  static last: FakePropertyNativeWebSocket | null = null
+  onopen?: Handler
+  onmessage?: Handler
+  onerror?: Handler
+  onclose?: Handler
+  readonly sent: string[] = []
+
+  constructor(readonly url: string) {
+    FakePropertyNativeWebSocket.last = this
+  }
+
+  send(payload: string): void {
+    this.sent.push(payload)
+  }
+
+  close(): void {}
+}
+
 describe("ElevenLabs streaming TTS client", () => {
   it("opens the low-latency stream URL, sends text chunks, and collects audio bytes", async () => {
     const socket = new FakeSocket()
@@ -182,6 +221,67 @@ describe("ElevenLabs streaming TTS client", () => {
     expect(FakeNativeWebSocket.last?.sent).toEqual(["hello"])
     expect(FakeNativeWebSocket.last?.closed).toBe(true)
     expect(messages).toEqual([{ data: "world" }])
+  })
+
+  it("adapts .on and property-style native WebSocket APIs", () => {
+    const onSocket = createNodeElevenLabsSocketFactory(FakeOnNativeWebSocket)("wss://on.example")
+    const onMessages: unknown[] = []
+    onSocket.on("message", (payload) => onMessages.push(payload))
+    FakeOnNativeWebSocket.last?.handlers.message?.("hello")
+
+    const propertySocket = createNodeElevenLabsSocketFactory(FakePropertyNativeWebSocket)("wss://property.example")
+    const propertyMessages: unknown[] = []
+    propertySocket.on("message", (payload) => propertyMessages.push(payload))
+    FakePropertyNativeWebSocket.last?.onmessage?.("world")
+
+    expect(onMessages).toEqual(["hello"])
+    expect(propertyMessages).toEqual(["world"])
+  })
+
+  it("reads DOM-style message event data while streaming TTS", async () => {
+    const socket = new FakeSocket()
+    const client = createElevenLabsTtsClient({
+      apiKey: "eleven-secret",
+      voiceId: "voice_123",
+      socketFactory: () => socket,
+    })
+
+    const resultPromise = client.synthesize({
+      utteranceId: "utt_dom_message",
+      text: "DOM payload",
+    })
+
+    socket.emit("open")
+    socket.emit("message", { data: JSON.stringify({ audio: Buffer.from("dom").toString("base64"), isFinal: true }) })
+
+    await expect(resultPromise).resolves.toMatchObject({ byteLength: 3, chunkCount: 1 })
+  })
+
+  it("uses the global WebSocket constructor when no socketFactory is injected", async () => {
+    const globals = globalThis as unknown as { WebSocket?: unknown }
+    const original = globals.WebSocket
+    try {
+      globals.WebSocket = FakeNativeWebSocket
+      const client = createElevenLabsTtsClient({
+        apiKey: "eleven-secret",
+        voiceId: "voice_123",
+      })
+
+      const resultPromise = client.synthesize({
+        utteranceId: "utt_global_socket",
+        text: "Global socket",
+      })
+
+      FakeNativeWebSocket.last?.emit("open")
+      FakeNativeWebSocket.last?.emit(
+        "message",
+        { data: JSON.stringify({ audio: Buffer.from("global").toString("base64"), isFinal: true }) },
+      )
+
+      await expect(resultPromise).resolves.toMatchObject({ byteLength: 6, chunkCount: 1 })
+    } finally {
+      globals.WebSocket = original
+    }
   })
 
   it("requires a WebSocket constructor when no global WebSocket exists", () => {

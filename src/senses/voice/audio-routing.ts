@@ -33,8 +33,8 @@ export interface VoiceAudioRoutingOptions {
   timeoutMs?: number
 }
 
-function nodeCommandRunner(command: string, args: string[], options: { timeoutMs: number }): Promise<VoiceCommandResult> {
-  return new Promise((resolve, reject) => {
+export function createNodeVoiceCommandRunner(): VoiceCommandRunner {
+  return (command, args, options) => new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
@@ -67,12 +67,12 @@ function parseDeviceLines(output: string): string[] {
     .filter(Boolean)
 }
 
-function commandFailureMessage(result: VoiceCommandResult): string {
+function commandFailureMessage(exitCode: number, result: VoiceCommandResult): string {
   const stderr = result.stderr?.trim()
   if (stderr) return stderr
   const stdout = result.stdout?.trim()
   if (stdout) return stdout
-  return typeof result.exitCode === "number" ? `exit ${result.exitCode}` : "command failed"
+  return `exit ${exitCode}`
 }
 
 function setupGuidance(missing: string[], currentOutput: string | null, outputDeviceName: string): string[] {
@@ -84,7 +84,7 @@ function setupGuidance(missing: string[], currentOutput: string | null, outputDe
 }
 
 export async function inspectVoiceAudioRouting(options: VoiceAudioRoutingOptions = {}): Promise<VoiceAudioRoutingInspection> {
-  const commandRunner = options.commandRunner ?? nodeCommandRunner
+  const commandRunner = options.commandRunner ?? createNodeVoiceCommandRunner()
   const switchAudioSourcePath = options.switchAudioSourcePath ?? "SwitchAudioSource"
   const captureDeviceName = options.captureDeviceName ?? "BlackHole 2ch"
   const outputDeviceName = options.outputDeviceName ?? "Multi-Output Device"
@@ -93,11 +93,11 @@ export async function inspectVoiceAudioRouting(options: VoiceAudioRoutingOptions
   try {
     const devicesResult = await commandRunner(switchAudioSourcePath, ["-a"], { timeoutMs })
     if (typeof devicesResult.exitCode === "number" && devicesResult.exitCode !== 0) {
-      throw new Error(commandFailureMessage(devicesResult))
+      throw new Error(commandFailureMessage(devicesResult.exitCode, devicesResult))
     }
     const currentResult = await commandRunner(switchAudioSourcePath, ["-c"], { timeoutMs })
     if (typeof currentResult.exitCode === "number" && currentResult.exitCode !== 0) {
-      throw new Error(commandFailureMessage(currentResult))
+      throw new Error(commandFailureMessage(currentResult.exitCode, currentResult))
     }
 
     const devices = parseDeviceLines(devicesResult.stdout ?? "")

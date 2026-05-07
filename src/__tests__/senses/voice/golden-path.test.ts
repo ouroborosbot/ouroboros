@@ -157,4 +157,65 @@ describe("voice golden path orchestrator", () => {
       meetingJoiner: { join: async () => ({ status: "simulated", detail: "fixture" }) },
     })).rejects.toThrow("voice golden path failed: no speech")
   })
+
+  it("can use default routing inspection and generated utterance ids", async () => {
+    const result = await runVoiceGoldenPath({
+      agentName: "slugger",
+      friendId: "ari",
+      meetingUrl: "https://meet.example.com/private-room",
+      audioPath: "/tmp/input.wav",
+      outputDir: "/tmp/out",
+      transcriber: {
+        transcribe: async (request) => ({
+          utteranceId: request.utteranceId,
+          text: "Default edges are visible.",
+          source: "whisper.cpp",
+          audioPath: request.audioPath,
+          language: null,
+          startedAt: null,
+          endedAt: null,
+        }),
+      },
+      tts: {
+        synthesize: async (request) => ({
+          utteranceId: request.utteranceId,
+          audio: Buffer.from("audio"),
+          byteLength: 5,
+          chunkCount: 1,
+          modelId: "eleven_flash_v2_5",
+          voiceId: "voice_123",
+          mimeType: "audio/mpeg",
+        }),
+      },
+      runSenseTurn: async () => ({ response: "Default response.", ponderDeferred: false }),
+      writePlaybackArtifact: async () => ({
+        status: "written",
+        audioPath: "/tmp/out/default.mp3",
+        byteLength: 5,
+        mimeType: "audio/mpeg",
+        playbackAttempted: false,
+      }),
+    })
+
+    expect(["ready", "unknown"]).toContain(result.audioRouting.status)
+    expect(result.join.status).toBe("manual_required")
+    expect(result.transcript.utteranceId).toMatch(/^voice-/)
+  })
+
+  it("wraps non-Error golden-path failures defensively", async () => {
+    await expect(runVoiceGoldenPath({
+      agentName: "slugger",
+      friendId: "ari",
+      meetingUrl: "https://riverside.fm/studio/ari-weekly",
+      audioPath: "/tmp/input.wav",
+      outputDir: "/tmp/out",
+      transcriber: {
+        transcribe: async () => {
+          throw "raw stt failure"
+        },
+      },
+      tts: { synthesize: vi.fn() },
+      inspectAudioRouting: async () => readyRouting,
+    })).rejects.toThrow("voice golden path failed: raw stt failure")
+  })
 })
