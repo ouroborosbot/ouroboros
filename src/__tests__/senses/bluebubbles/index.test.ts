@@ -2191,6 +2191,55 @@ describe("BlueBubbles sense runtime", () => {
     )
   })
 
+  it("blocks internal meta final text when only chat identifier routing is present", async () => {
+    mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any) => {
+      callbacks.onModelStart()
+      callbacks.onTextChunk("[surfaced from inner dialog] heartbeat check-in")
+      return {
+        usage: { input_tokens: 1, output_tokens: 1, reasoning_tokens: 0, total_tokens: 2 },
+      }
+    })
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(identifierOnlyPayload)
+
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "senses.bluebubbles_meta_blocked",
+        meta: expect.objectContaining({
+          site: "flush",
+          chatGuid: null,
+        }),
+      }),
+    )
+  })
+
+  it("blocks internal meta speak flushes when only chat identifier routing is present", async () => {
+    mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any) => {
+      callbacks.onModelStart()
+      callbacks.onTextChunk("<think>private scratch</think>")
+      await callbacks.flushNow()
+      return {
+        usage: { input_tokens: 1, output_tokens: 1, reasoning_tokens: 0, total_tokens: 2 },
+      }
+    })
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(identifierOnlyPayload)
+
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "senses.bluebubbles_meta_blocked",
+        meta: expect.objectContaining({
+          site: "flushNow",
+          chatGuid: null,
+        }),
+      }),
+    )
+  })
+
   it("reuses existing session state and allows callback lifecycle hooks to no-op safely", async () => {
     mocks.loadSession.mockReturnValueOnce({
       messages: [{ role: "system", content: "existing prompt" }],
