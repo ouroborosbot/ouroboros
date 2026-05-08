@@ -5113,13 +5113,14 @@ async function executeConnectVoice(agent: string, deps: OuroCliDeps): Promise<st
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPublicUrl`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioBasePath --value /voice/agents/${agentPathSegment}/twilio`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPort --value 18910`,
+    `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioTransportMode --value media-stream`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPlaybackMode --value stream`,
-    `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioGreetingPrebufferMs --value 3500`,
+    `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioGreetingPrebufferMs --value 12000`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioDefaultFriendId --value ari`,
     "Then enable agent.json: senses.voice.enabled = true and restart with `ouro up`.",
     `The managed Voice entrypoint will listen at POST <public-url>/voice/agents/${agentPathSegment}/twilio/incoming.`,
     `Standalone local smoke remains available with: node dist/senses/voice-twilio-entry.js --agent ${agent} --port 18910 --public-url https://<cloudflare-tunnel>.`,
-    "Meeting links use URL intake plus BlackHole/Multi-Output readiness checks. Phone testing uses Twilio Record -> Whisper.cpp -> stable voice session -> tool-delivered speak/settle text -> ElevenLabs -> Twilio Play, with managed playback streaming ElevenLabs chunks by default.",
+    "Meeting links use URL intake plus BlackHole/Multi-Output readiness checks. Phone testing can use record-play for compatibility or media-stream for bidirectional low-latency calls with greeting prebuffering, VAD, barge-in clear, Whisper.cpp, stable voice sessions, and ElevenLabs audio chunks.",
   ].join("\n")
   deps.writeStdout(message)
   return message

@@ -411,7 +411,7 @@ export function runtimeInfoSection(channel: Channel, options?: BuildSystemOption
     )
   } else if (channel === "voice") {
     lines.push(
-      "i am responding in a live voice session. the person is waiting in real time, so i answer early and often, keep spoken turns to one or two short sentences, stay interrupt-friendly, avoid markdown and lists unless explicitly asked, and use speak before any tool work that may take more than a moment. the overview shows the text transcript as the durable record.",
+      "i am responding in a live voice session. the person is waiting in real time, so i answer early and often, keep spoken turns to one or two short sentences, stay interruption-friendly, avoid markdown and lists unless explicitly asked, and use speak before any tool work that may take more than a moment. if a later transcript says the caller interrupted or followed up while i was speaking, i prioritize that newest utterance before continuing the older answer. the overview shows the text transcript as the durable record.",
     )
   } else {
     lines.push(
@@ -523,7 +523,7 @@ function senseRuntimeGuidance(channel: Channel, preReadStatusLines?: string[]): 
   lines.push("mail validation diagnostics: health checks, bounded mail tools, access logs, and UI inspection can support validation, but they are evidence inside those paths, not additional paths. If asked to name golden paths, do not include diagnostic commands, tool names, or status checks in the answer.")
   lines.push("mail diagnostic naming: `ouro doctor` is installation-wide; do not invent `ouro doctor --agent <agent>`.")
   lines.push("mail setup boundaries: do not invent `ouro auth verify --provider mail`, HEY OAuth, HEY IMAP, `ouro mcp call mail ...`, policy flags, autonomous sending, destructive mail actions, or production MX/DNS/forwarding changes. HEY export, HEY forwarding, DNS, MX cutover, sending, and destructive actions require explicit human confirmation.")
-  lines.push("voice setup truth: voice sessions are transcript-first local sessions. ElevenLabs credentials belong in portable runtime/config at `integrations.elevenLabsApiKey` and `integrations.elevenLabsVoiceId`; Whisper.cpp CLI/model paths belong in the machine runtime item under `voice.whisperCliPath` and `voice.whisperModelPath`. Meeting links have URL intake and local BlackHole/Multi-Output readiness checks; phone testing uses Twilio Record -> Whisper.cpp -> stable voice session -> tool-delivered speak/settle text -> ElevenLabs -> Twilio Play, with managed playback streaming ElevenLabs chunks by default. The current Record/Play transport is half-duplex; true barge-in needs Twilio Media Streams under the same voice sense. Live browser join/injection remains an explicit handoff edge until provider automation lands.")
+  lines.push("voice setup truth: voice sessions are transcript-first local sessions. ElevenLabs credentials belong in portable runtime/config at `integrations.elevenLabsApiKey` and `integrations.elevenLabsVoiceId`; Whisper.cpp CLI/model paths belong in the machine runtime item under `voice.whisperCliPath` and `voice.whisperModelPath`. Meeting links have URL intake and local BlackHole/Multi-Output readiness checks. Twilio phone is a transport under the same voice sense: `voice.twilioTransportMode=record-play` uses Twilio Record -> Whisper.cpp -> stable voice session -> tool-delivered speak/settle text -> ElevenLabs -> Twilio Play, while `voice.twilioTransportMode=media-stream` uses a bidirectional Twilio Media Stream with VAD, greeting prebuffer while the phone is still ringing, barge-in clear, Whisper.cpp utterance files, stable voice sessions, and ElevenLabs `ulaw_8000` chunks back to the call. Live browser join/injection remains an explicit handoff edge until provider automation lands.")
   if (channel === "cli") {
     lines.push("cli is interactive: it is available when the user opens it, not something `ouro up` daemonizes.")
   }
@@ -703,7 +703,7 @@ function toolContractsSection(channel: Channel, options?: BuildSystemOptions): s
       lines.push(`- when told to work autonomously, I use ponder to absorb new messages and continue using tools. I settle only with the final result.`)
       lines.push(`- if nothing calls for words, I observe.`)
       if (channel === "voice") {
-        lines.push(`- voice is synchronous: I keep \`speak\` and \`settle\` short, plain, and fast. If I need a tool, I first call \`speak\` with a tiny status line, then call the tool, then \`settle\` with the shortest useful answer.`)
+        lines.push(`- voice is synchronous: I keep \`speak\` and \`settle\` short, plain, and fast. If I need a tool, I first call \`speak\` with a tiny status line, then call the tool, then \`settle\` with the shortest useful answer. If the caller interrupts, I acknowledge the interruption and answer the newest thing first.`)
       }
     }
   }

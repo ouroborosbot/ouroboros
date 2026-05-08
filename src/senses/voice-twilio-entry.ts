@@ -49,6 +49,8 @@ function standaloneOverrides(): TwilioPhoneTransportRuntimeOverrides {
     recordTimeoutSeconds: numberArg("--record-timeout"),
     recordMaxLengthSeconds: numberArg("--record-max-length"),
     greetingPrebufferMs: numberArg("--greeting-prebuffer-ms"),
+    transportMode: argValue("--transport-mode") as TwilioPhoneTransportRuntimeOverrides["transportMode"],
+    playbackMode: argValue("--playback-mode") as TwilioPhoneTransportRuntimeOverrides["playbackMode"],
   }
 }
 

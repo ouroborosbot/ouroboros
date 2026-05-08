@@ -47,11 +47,15 @@ These are not outward delivery:
 
 Voice is one transcript-first sense with multiple speaking transports.
 
-- Twilio phone: call webhook -> record -> Whisper.cpp -> stable voice session
-  -> tool-delivered text -> ElevenLabs -> Twilio Play. The default managed
-  phone path gives Twilio a streaming Play URL, so ElevenLabs audio chunks can
-  flow as they arrive. Full duplex interruption/barge-in is a future
-  bidirectional media-stream transport, not a separate voice sense.
+- Twilio phone: `record-play` mode keeps the conservative call webhook ->
+  record -> Whisper.cpp -> stable voice session -> tool-delivered text ->
+  ElevenLabs -> Twilio Play smoke path. `media-stream` mode uses the same
+  voice session/STT/TTS contract over a bidirectional Twilio Media Stream: VAD
+  frames caller utterances, Whisper.cpp transcribes generated utterance WAVs,
+  the agent-authored greeting can prebuffer while the phone is still ringing,
+  ElevenLabs emits `ulaw_8000` chunks back to Twilio, and caller speech during
+  playback sends Twilio `clear` before the utterance is queued as an
+  interruption/follow-up.
 - Meeting/browser: meeting URL intake and audio routing should feed the same
   Voice session contract. Browser automation joins the room; it should not
   become a separate conversational sense unless it has a distinct durable

@@ -1359,9 +1359,10 @@ describe("provider CLI command execution", () => {
     expect(result).toContain("voice.whisperCliPath")
     expect(result).toContain("voice.whisperModelPath")
     expect(result).toContain("voice.twilioPublicUrl")
+    expect(result).toContain("voice.twilioTransportMode")
     expect(result).toContain("voice.twilioPlaybackMode")
     expect(result).toContain("/voice/agents/slugger/twilio")
-    expect(result).toContain("Twilio Record -> Whisper.cpp")
+    expect(result).toContain("media-stream for bidirectional low-latency calls")
   })
 
   it("uses a safe fallback segment in Voice setup guidance for punctuation-only agent names", async () => {

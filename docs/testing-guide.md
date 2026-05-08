@@ -157,7 +157,7 @@ ouro connect voice --agent <agent>
 
 ### Voice
 
-Voice is a single transcript-first sense with multiple transports. The Twilio phone transport is the current end-to-end phone smoke path: Twilio records the caller, Ouro downloads the recording, Whisper.cpp transcribes it, the normal stable `voice` session turn runs, ElevenLabs generates MP3 audio from tool-delivered `speak`/`settle` text, and Twilio plays that response before listening again. Managed Twilio playback defaults to a streaming Play URL so ElevenLabs chunks can reach Twilio as they arrive. This Record/Play transport is half-duplex; true barge-in and continuous transcription belong in a Twilio Media Streams transport that shares the same voice session/STT/TTS code.
+Voice is a single transcript-first sense with multiple transports. The Twilio phone transport has two modes. `record-play` is the conservative phone smoke path: Twilio records the caller, Ouro downloads the recording, Whisper.cpp transcribes it, the normal stable `voice` session turn runs, ElevenLabs generates MP3 audio from tool-delivered `speak`/`settle` text, and Twilio plays that response before listening again. `media-stream` is the lower-latency conversational path: Twilio opens a bidirectional Media Stream, Ouro frames caller utterances with VAD, Whisper.cpp transcribes generated utterance WAVs, the same stable `voice` session turn runs, the agent-authored greeting can prebuffer while the phone is still ringing, ElevenLabs generates Twilio-native `ulaw_8000` chunks, and caller speech during playback sends Twilio `clear` before the utterance is queued as an interruption/follow-up.
 
 For implementation work, keep the sense/transport boundary in [Sense Development Contract](sense-development.md) in view. In particular, outward sense turns run in tool-required mode: transports that need replayable text must recover `settle.answer` only after `(delivered)` and `speak.message` only after `(spoken)`, not by reading `assistant.content` directly.
 
@@ -167,6 +167,7 @@ For a managed phone smoke, attach the transport to this machine and expose the V
 ouro connect voice --agent <agent>
 ouro vault config set --agent <agent> --scope machine --key voice.twilioPublicUrl --value https://<cloudflare-tunnel-or-hostname>
 ouro vault config set --agent <agent> --scope machine --key voice.twilioBasePath --value /voice/agents/<agent>/twilio
+ouro vault config set --agent <agent> --scope machine --key voice.twilioTransportMode --value media-stream
 ouro up --agent <agent>
 ```
 

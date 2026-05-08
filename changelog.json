@@ -2,6 +2,22 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.571",
+      "changes": [
+        "Twilio media-stream calls now prebuffer the agent-authored greeting before returning TwiML, so callers keep hearing normal ringing until the first voice audio is ready or the Twilio webhook budget is nearly spent.",
+        "The Media Stream WebSocket now reuses that prebuffered greeting job instead of starting a duplicate greeting turn, then continues with the same VAD, barge-in clear, and stable voice session path.",
+        "Managed phone Voice startup now trusts daemon-bootstrapped runtime and provider credentials when present, avoiding redundant vault reads before the Twilio bridge binds."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.570",
+      "changes": [
+        "Twilio phone voice now has an optional `media-stream` transport mode under the same Voice sense, using bidirectional Twilio Media Streams, VAD-framed caller utterances, Whisper.cpp utterance WAVs, stable voice sessions, and ElevenLabs `ulaw_8000` chunks back to the call.",
+        "Media Streams playback now sends Twilio `clear` when the caller speaks during agent audio and queues the utterance as an interruption/follow-up instead of losing it.",
+        "Voice prompt/runtime guidance now tells agents to prioritize interrupted or follow-up caller utterances and keep spoken tool-required deliveries short enough for synchronous conversation."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.569",
       "changes": [
         "Twilio phone voice now defaults to a shorter record timeout and can prebuffer the initial streamed greeting so inbound calls keep ringing briefly until first audio is ready.",

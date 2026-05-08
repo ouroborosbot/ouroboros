@@ -2,7 +2,7 @@ import * as path from "path"
 import type { Server } from "http"
 import { getAgentRoot, loadAgentConfig, type AgentConfig, type AgentProvider } from "../../heart/identity"
 import { loadOrCreateMachineIdentity, type MachineIdentity } from "../../heart/machine-identity"
-import { refreshProviderCredentialPool } from "../../heart/provider-credentials"
+import { readProviderCredentialPool, refreshProviderCredentialPool } from "../../heart/provider-credentials"
 import {
   readMachineRuntimeCredentialConfig,
   readRuntimeCredentialConfig,
@@ -21,12 +21,15 @@ import {
   DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS,
   TWILIO_PHONE_WEBHOOK_BASE_PATH,
   DEFAULT_TWILIO_PHONE_PLAYBACK_MODE,
+  DEFAULT_TWILIO_PHONE_TRANSPORT_MODE,
   normalizeTwilioPhoneBasePath,
   normalizeTwilioPhonePlaybackMode,
+  normalizeTwilioPhoneTransportMode,
   startTwilioPhoneBridgeServer,
   twilioPhoneWebhookUrl,
   type StartTwilioPhoneBridgeServerOptions,
   type TwilioPhonePlaybackMode,
+  type TwilioPhoneTransportMode,
   type TwilioPhoneBridgeServer,
 } from "./twilio-phone"
 import { createWhisperCppTranscriber } from "./whisper"
@@ -46,6 +49,7 @@ export interface TwilioPhoneTransportRuntimeOverrides {
   recordMaxLengthSeconds?: number
   greetingPrebufferMs?: number
   playbackMode?: TwilioPhonePlaybackMode
+  transportMode?: TwilioPhoneTransportMode
 }
 
 export interface TwilioPhoneTransportRuntimeSettings {
@@ -67,6 +71,7 @@ export interface TwilioPhoneTransportRuntimeSettings {
   recordMaxLengthSeconds: number
   greetingPrebufferMs: number
   playbackMode: TwilioPhonePlaybackMode
+  transportMode: TwilioPhoneTransportMode
 }
 
 export type TwilioPhoneTransportRuntimeResolution =
@@ -175,6 +180,8 @@ function selectedAgentProviders(config: AgentConfig): AgentProvider[] {
 
 async function cacheSelectedProviderCredentials(agentName: string): Promise<void> {
   const providers = selectedAgentProviders(loadAgentConfig())
+  const cached = readProviderCredentialPool(agentName)
+  if (cached.ok && providers.every((provider) => cached.pool.providers[provider])) return
   const pool = await refreshProviderCredentialPool(agentName, { providers })
   if (!pool.ok) {
     throw new Error(`provider credentials unavailable for phone voice: ${pool.error}`)
@@ -280,6 +287,8 @@ export function resolveTwilioPhoneTransportRuntime(
       ?? DEFAULT_TWILIO_GREETING_PREBUFFER_MS,
     playbackMode: overrides.playbackMode
       ?? normalizeTwilioPhonePlaybackMode(configString(options.machineConfig, "voice.twilioPlaybackMode") ?? DEFAULT_TWILIO_PHONE_PLAYBACK_MODE),
+    transportMode: overrides.transportMode
+      ?? normalizeTwilioPhoneTransportMode(configString(options.machineConfig, "voice.twilioTransportMode") ?? DEFAULT_TWILIO_PHONE_TRANSPORT_MODE),
   }
   return { status: "configured", settings }
 }
@@ -301,12 +310,17 @@ export async function startConfiguredTwilioPhoneTransport(
   options: StartConfiguredTwilioPhoneTransportOptions,
   deps: TwilioPhoneTransportRuntimeDeps = defaultTwilioPhoneTransportRuntimeDeps,
 ): Promise<TwilioPhoneTransportRuntimeState> {
-  await deps.waitForRuntimeCredentialBootstrap(options.agentName)
-  const machine = deps.loadMachineIdentity()
-  await Promise.all([
-    deps.refreshRuntimeConfig(options.agentName, { preserveCachedOnFailure: true }).catch(() => undefined),
-    deps.refreshMachineRuntimeConfig(options.agentName, machine.machineId, { preserveCachedOnFailure: true }).catch(() => undefined),
-  ])
+  const bootstrapped = await deps.waitForRuntimeCredentialBootstrap(options.agentName)
+  const hasBootstrappedConfig = bootstrapped
+    && deps.readRuntimeConfig(options.agentName).ok
+    && deps.readMachineRuntimeConfig(options.agentName).ok
+  if (!hasBootstrappedConfig) {
+    const machine = deps.loadMachineIdentity()
+    await Promise.all([
+      deps.refreshRuntimeConfig(options.agentName, { preserveCachedOnFailure: true }).catch(() => undefined),
+      deps.refreshMachineRuntimeConfig(options.agentName, machine.machineId, { preserveCachedOnFailure: true }).catch(() => undefined),
+    ])
+  }
   const runtimeConfig = requireConfig(deps.readRuntimeConfig(options.agentName), "portable runtime/config")
   const machineConfig = requireConfig(deps.readMachineRuntimeConfig(options.agentName), "machine runtime config")
   const resolution = resolveTwilioPhoneTransportRuntime({
@@ -336,7 +350,7 @@ export async function startConfiguredTwilioPhoneTransport(
   const tts = deps.createTts({
     apiKey: settings.elevenLabsApiKey,
     voiceId: settings.elevenLabsVoiceId,
-    outputFormat: "mp3_44100_128",
+    outputFormat: settings.transportMode === "media-stream" ? "ulaw_8000" : "mp3_44100_128",
   })
   const bridge = await deps.startBridgeServer({
     agentName: settings.agentName,
@@ -353,6 +367,7 @@ export async function startConfiguredTwilioPhoneTransport(
     recordTimeoutSeconds: settings.recordTimeoutSeconds,
     recordMaxLengthSeconds: settings.recordMaxLengthSeconds,
     greetingPrebufferMs: settings.greetingPrebufferMs,
+    transportMode: settings.transportMode,
     playbackMode: settings.playbackMode,
   })
 
@@ -366,6 +381,7 @@ export async function startConfiguredTwilioPhoneTransport(
       publicBaseUrl: settings.publicBaseUrl,
       basePath: settings.basePath,
       webhookUrl: settings.webhookUrl,
+      transportMode: settings.transportMode,
     },
   })
 
@@ -373,7 +389,10 @@ export async function startConfiguredTwilioPhoneTransport(
 }
 
 export function closeTwilioPhoneBridgeServer(server: TwilioPhoneBridgeServer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ;(server.server as Server).close((error?: Error) => error ? reject(error) : resolve())
-  })
+  return Promise.all([
+    server.bridge.close?.() ?? Promise.resolve(),
+    new Promise<void>((resolve, reject) => {
+      ;(server.server as Server).close((error?: Error) => error ? reject(error) : resolve())
+    }),
+  ]).then(() => undefined)
 }

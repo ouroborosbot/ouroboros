@@ -2,6 +2,8 @@ import * as crypto from "node:crypto"
 import * as fs from "fs/promises"
 import * as http from "http"
 import * as path from "path"
+import type { Duplex } from "node:stream"
+import { WebSocket, WebSocketServer, type RawData } from "ws"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { writeVoicePlaybackArtifact } from "./playback"
 import { buildVoiceTranscript } from "./transcript"
@@ -14,6 +16,11 @@ export const DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS = 30
 export const DEFAULT_TWILIO_GREETING_PREBUFFER_MS = 3_500
 export const TWILIO_PHONE_WEBHOOK_BASE_PATH = "/voice/twilio"
 export const DEFAULT_TWILIO_PHONE_PLAYBACK_MODE = "stream"
+export const DEFAULT_TWILIO_PHONE_TRANSPORT_MODE = "record-play"
+export const DEFAULT_TWILIO_MEDIA_SPEECH_RMS_THRESHOLD = 650
+export const DEFAULT_TWILIO_MEDIA_SILENCE_END_MS = 650
+export const DEFAULT_TWILIO_MEDIA_MIN_SPEECH_MS = 160
+export const DEFAULT_TWILIO_MEDIA_MAX_UTTERANCE_MS = 15_000
 
 const TWILIO_STREAM_FAILURE_SILENCE_MP3 = Buffer.from(
   "SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYyLjMuMTAwAAAAAAAAAAAAAAD/+0DAAAAAAAAAAAAAAAAAAAAAAABJbmZvAAAADwAAAAsAAAUuADc3Nzc3Nzc3N0tLS0tLS0tLS19fX19fX19fX3Nzc3Nzc3Nzc4eHh4eHh4eHh5ubm5ubm5ubm6+vr6+vr6+vr8PDw8PDw8PDw9fX19fX19fX1+vr6+vr6+vr6////////////wAAAABMYXZjNjIuMTEAAAAAAAAAAAAAAAAkBC8AAAAAAAAFLpJQTFMAAAAAAP/7EMQAA8AAAaQAAAAgAAA0gAAABExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVV//sQxCmDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVX/+xDEUwPAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVf/7EMR8g8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVV//sQxKYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVX/+xDEz4PAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EMTWA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQxNYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xDE1gPAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EMTWA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQxNYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=",
@@ -21,6 +28,7 @@ const TWILIO_STREAM_FAILURE_SILENCE_MP3 = Buffer.from(
 )
 
 export type TwilioPhonePlaybackMode = "stream" | "buffered"
+export type TwilioPhoneTransportMode = "record-play" | "media-stream"
 
 export interface TwilioSignatureInput {
   authToken: string
@@ -63,12 +71,19 @@ export interface TwilioPhoneBridgeOptions {
   recordTimeoutSeconds?: number
   recordMaxLengthSeconds?: number
   greetingPrebufferMs?: number
+  transportMode?: TwilioPhoneTransportMode
+  mediaSpeechRmsThreshold?: number
+  mediaSilenceEndMs?: number
+  mediaMinSpeechMs?: number
+  mediaMaxUtteranceMs?: number
   downloadRecording?: TwilioRecordingDownloader
   playbackMode?: TwilioPhonePlaybackMode
 }
 
 export interface TwilioPhoneBridge {
   handle(request: TwilioPhoneBridgeRequest): Promise<TwilioPhoneBridgeResponse>
+  handleUpgrade?(request: http.IncomingMessage, socket: Duplex, head: Buffer): boolean
+  close?(): Promise<void>
 }
 
 export interface TwilioPhoneBridgeServer {
@@ -191,6 +206,12 @@ export function normalizeTwilioPhonePlaybackMode(value: string | undefined): Twi
   throw new Error(`invalid Twilio phone playback mode: ${value}`)
 }
 
+export function normalizeTwilioPhoneTransportMode(value: string | undefined): TwilioPhoneTransportMode {
+  const normalized = (value ?? DEFAULT_TWILIO_PHONE_TRANSPORT_MODE).trim().toLowerCase()
+  if (normalized === "record-play" || normalized === "media-stream") return normalized
+  throw new Error(`invalid Twilio phone transport mode: ${value}`)
+}
+
 export function twilioPhoneWebhookUrl(
   publicBaseUrl: string,
   basePath: string | undefined = TWILIO_PHONE_WEBHOOK_BASE_PATH,
@@ -221,6 +242,38 @@ function sayTwiml(message: string): string {
 
 function playTwiml(url: string): string {
   return `<Play>${escapeXml(url)}</Play>`
+}
+
+function parameterTwiml(name: string, value: string | undefined): string {
+  const trimmed = value?.trim()
+  if (!trimmed) return ""
+  return `<Parameter name="${escapeXml(name)}" value="${escapeXml(trimmed)}" />`
+}
+
+function websocketRouteUrl(publicBaseUrl: string, route: string): string {
+  const url = new URL(route, publicBaseUrl)
+  if (url.protocol !== "https:") {
+    throw new Error("Twilio Media Streams require an https public voice URL")
+  }
+  url.protocol = "wss:"
+  return url.toString()
+}
+
+function mediaStreamTwiml(
+  options: TwilioPhoneBridgeOptions,
+  basePath: string,
+  params: Record<string, string>,
+  greetingJobId?: string,
+): string {
+  const streamUrl = websocketRouteUrl(options.publicBaseUrl, `${basePath}/media-stream`)
+  return [
+    `<Connect><Stream url="${escapeXml(streamUrl)}">`,
+    parameterTwiml("From", params.From),
+    parameterTwiml("To", params.To),
+    parameterTwiml("Agent", options.agentName),
+    parameterTwiml("GreetingJobId", greetingJobId),
+    `</Stream></Connect>`,
+  ].join("")
 }
 
 function safeSegment(input: string): string {
@@ -321,6 +374,107 @@ function buildNoSpeechTranscript(utteranceId: string): VoiceTranscript {
   })
 }
 
+interface TwilioMediaStreamStart {
+  streamSid?: unknown
+  callSid?: unknown
+  customParameters?: unknown
+}
+
+interface TwilioMediaPayload {
+  payload?: unknown
+}
+
+interface TwilioMediaMark {
+  name?: unknown
+}
+
+interface TwilioMediaStreamMessage {
+  event?: unknown
+  streamSid?: unknown
+  start?: TwilioMediaStreamStart
+  media?: TwilioMediaPayload
+  mark?: TwilioMediaMark
+}
+
+function parseTwilioMediaStreamMessage(raw: RawData): TwilioMediaStreamMessage | null {
+  const text = Buffer.isBuffer(raw)
+    ? raw.toString("utf8")
+    : Array.isArray(raw)
+      ? Buffer.concat(raw).toString("utf8")
+      : Buffer.from(raw as ArrayBuffer).toString("utf8")
+  try {
+    const parsed = JSON.parse(text) as unknown
+    return parsed && typeof parsed === "object" ? parsed as TwilioMediaStreamMessage : null
+  } catch {
+    return null
+  }
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function customParameter(start: TwilioMediaStreamStart | undefined, name: string): string {
+  const params = start?.customParameters
+  if (!params || typeof params !== "object" || Array.isArray(params)) return ""
+  return stringField((params as Record<string, unknown>)[name])
+}
+
+function mulawByteToPcm16(value: number): number {
+  const decoded = (~value) & 0xff
+  let sample = ((decoded & 0x0f) << 3) + 0x84
+  sample <<= (decoded & 0x70) >> 4
+  return (decoded & 0x80) ? 0x84 - sample : sample - 0x84
+}
+
+function mulawFrameRms(frame: Uint8Array): number {
+  if (frame.byteLength === 0) return 0
+  let sumSquares = 0
+  for (const byte of frame) {
+    const sample = mulawByteToPcm16(byte)
+    sumSquares += sample * sample
+  }
+  return Math.sqrt(sumSquares / frame.byteLength)
+}
+
+function pcm16WavHeader(dataByteLength: number, sampleRate: number): Buffer {
+  const header = Buffer.alloc(44)
+  header.write("RIFF", 0)
+  header.writeUInt32LE(36 + dataByteLength, 4)
+  header.write("WAVE", 8)
+  header.write("fmt ", 12)
+  header.writeUInt32LE(16, 16)
+  header.writeUInt16LE(1, 20)
+  header.writeUInt16LE(1, 22)
+  header.writeUInt32LE(sampleRate, 24)
+  header.writeUInt32LE(sampleRate * 2, 28)
+  header.writeUInt16LE(2, 32)
+  header.writeUInt16LE(16, 34)
+  header.write("data", 36)
+  header.writeUInt32LE(dataByteLength, 40)
+  return header
+}
+
+function mulawFramesToPcm16Wav(frames: Uint8Array[], sampleRate = 16_000): Buffer {
+  const sampleCount = frames.reduce((sum, frame) => sum + frame.byteLength, 0) * 2
+  const pcm = Buffer.alloc(sampleCount * 2)
+  let offset = 0
+  for (const frame of frames) {
+    for (const byte of frame) {
+      const sample = mulawByteToPcm16(byte)
+      pcm.writeInt16LE(sample, offset)
+      offset += 2
+      pcm.writeInt16LE(sample, offset)
+      offset += 2
+    }
+  }
+  return Buffer.concat([pcm16WavHeader(pcm.byteLength, sampleRate), pcm])
+}
+
+function frameLimitForMs(ms: number, frameMs = 20): number {
+  return Math.max(1, Math.ceil(ms / frameMs))
+}
+
 async function transcribeRecordingOrNoSpeech(options: {
   transcriber: VoiceTranscriber
   utteranceId: string
@@ -339,6 +493,441 @@ async function transcribeRecordingOrNoSpeech(options: {
       return buildNoSpeechTranscript(options.utteranceId)
     }
     throw error
+  }
+}
+
+interface TwilioMediaStreamUtterance {
+  utteranceId: string
+  frames: Buffer[]
+  wasBargeIn: boolean
+}
+
+class TwilioMediaStreamSession {
+  private streamSid = ""
+  private callSid = "media-stream"
+  private from = ""
+  private to = ""
+  private friendId = ""
+  private sessionKey = ""
+  private callDir = ""
+  private utteranceIndex = 0
+  private playbackGeneration = 0
+  private playbackActive = false
+  private closed = false
+  private inSpeech = false
+  private currentFrames: Buffer[] = []
+  private preRollFrames: Buffer[] = []
+  private currentVoicedFrames = 0
+  private currentSilenceFrames = 0
+  private currentWasBargeIn = false
+  private turnQueue: Promise<void> = Promise.resolve()
+  private readonly playbackBytesByGeneration = new Map<number, number>()
+  private readonly speechRmsThreshold: number
+  private readonly preRollLimitFrames = frameLimitForMs(200)
+  private readonly silenceEndFrames: number
+  private readonly minSpeechFrames: number
+  private readonly maxUtteranceFrames: number
+
+  constructor(
+    private readonly ws: WebSocket,
+    private readonly options: TwilioPhoneBridgeOptions,
+    private readonly mediaGreetingJobs: TwilioAudioStreamJobStore,
+  ) {
+    this.speechRmsThreshold = options.mediaSpeechRmsThreshold ?? DEFAULT_TWILIO_MEDIA_SPEECH_RMS_THRESHOLD
+    this.silenceEndFrames = frameLimitForMs(options.mediaSilenceEndMs ?? DEFAULT_TWILIO_MEDIA_SILENCE_END_MS)
+    this.minSpeechFrames = frameLimitForMs(options.mediaMinSpeechMs ?? DEFAULT_TWILIO_MEDIA_MIN_SPEECH_MS)
+    this.maxUtteranceFrames = frameLimitForMs(options.mediaMaxUtteranceMs ?? DEFAULT_TWILIO_MEDIA_MAX_UTTERANCE_MS)
+  }
+
+  attach(): void {
+    this.ws.on("message", (raw) => this.handleRawMessage(raw))
+    this.ws.on("close", () => this.close())
+    this.ws.on("error", (error) => {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_media_socket_error",
+        message: "Twilio Media Stream socket failed",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), error: errorMessage(error) },
+      })
+    })
+  }
+
+  private handleRawMessage(raw: RawData): void {
+    const message = parseTwilioMediaStreamMessage(raw)
+    if (!message) {
+      emitNervesEvent({
+        level: "warn",
+        component: "senses",
+        event: "senses.voice_twilio_media_message_rejected",
+        message: "Twilio Media Stream message was not valid JSON",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid) },
+      })
+      return
+    }
+
+    const event = stringField(message.event)
+    if (event === "start") {
+      void this.handleStart(message.start)
+      return
+    }
+    if (event === "media") {
+      this.handleMedia(message.media)
+      return
+    }
+    if (event === "mark") {
+      this.handleMark(message.mark)
+      return
+    }
+    if (event === "stop") {
+      this.close()
+    }
+  }
+
+  private async handleStart(start: TwilioMediaStreamStart | undefined): Promise<void> {
+    this.streamSid = stringField(start?.streamSid)
+    this.callSid = stringField(start?.callSid) || this.callSid
+    this.from = customParameter(start, "From")
+    this.to = customParameter(start, "To")
+    this.friendId = voiceFriendId(this.options, this.from, this.callSid)
+    this.sessionKey = twilioPhoneVoiceSessionKey({
+      defaultFriendId: this.options.defaultFriendId,
+      from: this.from,
+      to: this.to,
+      callSid: this.callSid,
+    })
+    this.callDir = path.join(this.options.outputDir, safeSegment(this.callSid))
+    await fs.mkdir(this.callDir, { recursive: true })
+
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_start",
+      message: "Twilio Media Stream started",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        streamSid: safeSegment(this.streamSid || "stream"),
+        sessionKey: this.sessionKey,
+      },
+    })
+
+    const greetingJobId = customParameter(start, "GreetingJobId")
+    const greetingJob = greetingJobId
+      ? this.mediaGreetingJobs.get(safeSegment(this.callSid), greetingJobId)
+      : null
+    if (greetingJob) {
+      this.enqueueGreetingJob(greetingJobId, greetingJob)
+    } else {
+      this.enqueuePrompt({
+        utteranceId: `twilio-${safeSegment(this.callSid)}-connected`,
+        promptText: callConnectedPrompt({ From: this.from, To: this.to }),
+        wasBargeIn: false,
+      })
+    }
+  }
+
+  private handleMedia(media: TwilioMediaPayload | undefined): void {
+    const payload = stringField(media?.payload)
+    if (!payload) return
+    const frame = Buffer.from(payload, "base64")
+    if (frame.byteLength === 0) return
+    const voiced = mulawFrameRms(frame) >= this.speechRmsThreshold
+    const bargeIn = voiced && this.interruptPlayback()
+
+    if (!this.inSpeech) {
+      if (voiced) {
+        this.inSpeech = true
+        this.currentFrames = [...this.preRollFrames, frame]
+        this.preRollFrames = []
+        this.currentVoicedFrames = 1
+        this.currentSilenceFrames = 0
+        this.currentWasBargeIn = bargeIn
+      } else {
+        this.preRollFrames.push(frame)
+        if (this.preRollFrames.length > this.preRollLimitFrames) {
+          this.preRollFrames.shift()
+        }
+      }
+      return
+    }
+
+    this.currentFrames.push(frame)
+    if (voiced) {
+      this.currentVoicedFrames += 1
+      this.currentSilenceFrames = 0
+      this.currentWasBargeIn = this.currentWasBargeIn || bargeIn
+    } else {
+      this.currentSilenceFrames += 1
+    }
+
+    if (this.currentSilenceFrames >= this.silenceEndFrames || this.currentFrames.length >= this.maxUtteranceFrames) {
+      this.finishCurrentUtterance()
+    }
+  }
+
+  private handleMark(mark: TwilioMediaMark | undefined): void {
+    const name = stringField(mark?.name)
+    if (!name || !name.startsWith(`voice-${this.playbackGeneration}-`)) return
+    this.playbackActive = false
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_playback_mark",
+      message: "Twilio Media Stream playback mark reached",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), mark: name },
+    })
+  }
+
+  private close(): void {
+    if (this.closed) return
+    this.closed = true
+    if (this.inSpeech) this.finishCurrentUtterance()
+    this.playbackGeneration += 1
+    this.playbackActive = false
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_stop",
+      message: "Twilio Media Stream stopped",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid) },
+    })
+  }
+
+  private finishCurrentUtterance(): void {
+    const frames = this.currentFrames
+    const voicedFrames = this.currentVoicedFrames
+    const wasBargeIn = this.currentWasBargeIn
+    this.inSpeech = false
+    this.currentFrames = []
+    this.currentVoicedFrames = 0
+    this.currentSilenceFrames = 0
+    this.currentWasBargeIn = false
+
+    if (voicedFrames < this.minSpeechFrames) return
+
+    this.utteranceIndex += 1
+    this.enqueueUtterance({
+      utteranceId: `twilio-${safeSegment(this.callSid)}-${this.utteranceIndex}`,
+      frames,
+      wasBargeIn,
+    })
+  }
+
+  private enqueuePrompt(input: { utteranceId: string; promptText: string; wasBargeIn: boolean }): void {
+    const transcript = buildVoiceTranscript({
+      utteranceId: input.utteranceId,
+      text: input.promptText,
+      source: "loopback",
+    })
+    this.enqueueTurn(transcript, input.wasBargeIn)
+  }
+
+  private enqueueUtterance(utterance: TwilioMediaStreamUtterance): void {
+    this.turnQueue = this.turnQueue
+      .catch(() => undefined)
+      .then(() => this.processUtterance(utterance))
+      .catch((error) => {
+        emitNervesEvent({
+          level: "error",
+          component: "senses",
+          event: "senses.voice_twilio_media_turn_error",
+          message: "Twilio Media Stream voice turn failed",
+          meta: {
+            agentName: this.options.agentName,
+            callSid: safeSegment(this.callSid),
+            utteranceId: utterance.utteranceId,
+            error: errorMessage(error),
+          },
+        })
+      })
+  }
+
+  private enqueueGreetingJob(jobId: string, job: TwilioAudioStreamJob): void {
+    this.turnQueue = this.turnQueue
+      .catch(() => undefined)
+      .then(() => this.streamGreetingJob(jobId, job))
+      .catch((error) => {
+        emitNervesEvent({
+          level: "error",
+          component: "senses",
+          event: "senses.voice_twilio_media_turn_error",
+          message: "Twilio Media Stream greeting playback failed",
+          meta: {
+            agentName: this.options.agentName,
+            callSid: safeSegment(this.callSid),
+            utteranceId: jobId,
+            error: errorMessage(error),
+          },
+        })
+      })
+  }
+
+  private enqueueTurn(transcript: VoiceTranscript, wasBargeIn: boolean): void {
+    this.turnQueue = this.turnQueue
+      .catch(() => undefined)
+      .then(() => this.runTranscriptTurn(transcript, wasBargeIn))
+      .catch((error) => {
+        emitNervesEvent({
+          level: "error",
+          component: "senses",
+          event: "senses.voice_twilio_media_turn_error",
+          message: "Twilio Media Stream voice turn failed",
+          meta: {
+            agentName: this.options.agentName,
+            callSid: safeSegment(this.callSid),
+            utteranceId: transcript.utteranceId,
+            error: errorMessage(error),
+          },
+        })
+      })
+  }
+
+  private async processUtterance(utterance: TwilioMediaStreamUtterance): Promise<void> {
+    await fs.mkdir(this.callDir, { recursive: true })
+    const inputPath = path.join(this.callDir, `${safeSegment(utterance.utteranceId)}.wav`)
+    await fs.writeFile(inputPath, mulawFramesToPcm16Wav(utterance.frames))
+    const transcript = await transcribeRecordingOrNoSpeech({
+      transcriber: this.options.transcriber,
+      utteranceId: utterance.utteranceId,
+      inputPath,
+    })
+    const turnTranscript = utterance.wasBargeIn
+      ? buildVoiceTranscript({
+          utteranceId: transcript.utteranceId,
+          text: [
+            "The caller spoke while my previous voice output was still playing.",
+            "Treat this as an interruption or follow-up, acknowledge it first, and do not repeat the interrupted answer unless it is still useful.",
+            `Caller said: ${transcript.text}`,
+          ].join("\n"),
+          audioPath: transcript.audioPath ?? undefined,
+          language: transcript.language ?? undefined,
+          source: transcript.source,
+        })
+      : transcript
+    await this.runTranscriptTurn(turnTranscript, utterance.wasBargeIn)
+  }
+
+  private async runTranscriptTurn(transcript: VoiceTranscript, wasBargeIn: boolean): Promise<void> {
+    if (this.closed || !this.streamSid) return
+    const generation = this.startPlayback()
+    const turn = await runVoiceLoopbackTurn({
+      agentName: this.options.agentName,
+      friendId: this.friendId || voiceFriendId(this.options, this.from, this.callSid),
+      sessionKey: this.sessionKey || twilioPhoneVoiceSessionKey({
+        defaultFriendId: this.options.defaultFriendId,
+        from: this.from,
+        to: this.to,
+        callSid: this.callSid,
+      }),
+      transcript,
+      tts: this.options.tts,
+      runSenseTurn: this.options.runSenseTurn,
+      onAudioChunk: (chunk) => this.sendAudioChunk(chunk, generation),
+    })
+
+    if (generation !== this.playbackGeneration || this.closed) return
+    const deliveries = deliveredSegments(turn)
+    if ((this.playbackBytesByGeneration.get(generation) ?? 0) === 0) {
+      for (const delivery of deliveries) {
+        this.sendAudioChunk(delivery.audio, generation)
+      }
+    }
+    if (deliveries.length === 0) {
+      this.playbackActive = false
+      return
+    }
+    this.sendMark(generation, transcript.utteranceId)
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_turn_end",
+      message: "Twilio Media Stream voice turn delivered playback",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        utteranceId: transcript.utteranceId,
+        bargeIn: String(wasBargeIn),
+        segmentCount: String(turn.speechSegments.length),
+      },
+    })
+  }
+
+  private async streamGreetingJob(jobId: string, job: TwilioAudioStreamJob): Promise<void> {
+    if (this.closed || !this.streamSid) return
+    const generation = this.startPlayback()
+    try {
+      for await (const chunk of job.stream()) {
+        if (generation !== this.playbackGeneration || this.closed) return
+        this.sendAudioChunk(chunk, generation)
+      }
+    } catch (error) {
+      if (generation === this.playbackGeneration) this.playbackActive = false
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_media_greeting_error",
+        message: "Twilio Media Stream prebuffered greeting failed",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), utteranceId: jobId, error: errorMessage(error) },
+      })
+      return
+    }
+
+    if (generation !== this.playbackGeneration || this.closed) return
+    if ((this.playbackBytesByGeneration.get(generation) ?? 0) === 0) {
+      this.playbackActive = false
+      return
+    }
+    this.sendMark(generation, jobId)
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_greeting_end",
+      message: "Twilio Media Stream prebuffered greeting delivered playback",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        utteranceId: jobId,
+        byteLength: String(this.playbackBytesByGeneration.get(generation) ?? 0),
+      },
+    })
+  }
+
+  private startPlayback(): number {
+    this.playbackGeneration += 1
+    this.playbackActive = true
+    return this.playbackGeneration
+  }
+
+  private sendAudioChunk(chunk: Uint8Array, generation: number): void {
+    if (this.closed || generation !== this.playbackGeneration || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return
+    this.ws.send(JSON.stringify({
+      event: "media",
+      streamSid: this.streamSid,
+      media: { payload: Buffer.from(chunk).toString("base64") },
+    }))
+    this.playbackBytesByGeneration.set(
+      generation,
+      (this.playbackBytesByGeneration.get(generation) ?? 0) + chunk.byteLength,
+    )
+  }
+
+  private sendMark(generation: number, utteranceId: string): void {
+    if (this.closed || generation !== this.playbackGeneration || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return
+    this.ws.send(JSON.stringify({
+      event: "mark",
+      streamSid: this.streamSid,
+      mark: { name: `voice-${generation}-${safeSegment(utteranceId)}` },
+    }))
+  }
+
+  private interruptPlayback(): boolean {
+    if (!this.playbackActive || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return false
+    this.playbackGeneration += 1
+    this.playbackActive = false
+    this.ws.send(JSON.stringify({ event: "clear", streamSid: this.streamSid }))
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_barge_in",
+      message: "caller interrupted Twilio Media Stream playback",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid) },
+    })
+    return true
   }
 }
 
@@ -739,6 +1328,65 @@ async function handleIncoming(
     meta: { agentName: options.agentName, callSid: safeCallSid, sessionKey },
   })
 
+  if (normalizeTwilioPhoneTransportMode(options.transportMode) === "media-stream") {
+    try {
+      await fs.mkdir(callDir, { recursive: true })
+      const transcript = buildVoiceTranscript({
+        utteranceId,
+        text: callConnectedPrompt(params),
+        source: "loopback",
+      })
+      const greetingJobId = safeSegment(utteranceId)
+      const job = startTwilioPlaybackStreamJob({
+        jobs,
+        bridgeOptions: options,
+        basePath,
+        callDir,
+        safeCallSid,
+        jobId: greetingJobId,
+        baseUtteranceId: utteranceId,
+        runTurn: (onAudioChunk) => runVoiceLoopbackTurn({
+          agentName: options.agentName,
+          friendId,
+          sessionKey,
+          transcript,
+          tts: options.tts,
+          runSenseTurn: options.runSenseTurn,
+          onAudioChunk,
+        }),
+        meta: { agentName: options.agentName, callSid: safeCallSid, utteranceId, transportMode: "media-stream" },
+      })
+      const prebufferState = await job.waitForFirstChunk(options.greetingPrebufferMs ?? DEFAULT_TWILIO_GREETING_PREBUFFER_MS)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_greeting_prebuffer",
+        message: "Twilio Media Stream greeting prebuffer completed",
+        meta: { agentName: options.agentName, callSid: safeCallSid, utteranceId, state: prebufferState, transportMode: "media-stream" },
+      })
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_media_connect",
+        message: "answering Twilio call with a bidirectional Media Stream",
+        meta: { agentName: options.agentName, callSid: safeCallSid, sessionKey, greetingJob: prebufferState },
+      })
+      return xmlResponse(mediaStreamTwiml(
+        options,
+        basePath,
+        params,
+        prebufferState === "failed" ? undefined : greetingJobId,
+      ))
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_incoming_error",
+        message: "Twilio incoming media-stream greeting turn failed",
+        meta: { agentName: options.agentName, callSid: safeCallSid, error: errorMessage(error), transportMode: "media-stream" },
+      })
+      return xmlResponse(mediaStreamTwiml(options, basePath, params))
+    }
+  }
+
   try {
     await fs.mkdir(callDir, { recursive: true })
     if (normalizeTwilioPhonePlaybackMode(options.playbackMode) === "stream") {
@@ -1037,6 +1685,12 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
   new URL(options.publicBaseUrl)
   const basePath = normalizeTwilioPhoneBasePath(options.basePath)
   const jobs = new TwilioAudioStreamJobStore()
+  const mediaStreams = new WebSocketServer({ noServer: true })
+
+  mediaStreams.on("connection", (ws) => {
+    const session = new TwilioMediaStreamSession(ws, options, jobs)
+    session.attach()
+  })
 
   return {
     async handle(request): Promise<TwilioPhoneBridgeResponse> {
@@ -1070,6 +1724,32 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
       if (routePath === `${basePath}/listen`) return handleListen(options, basePath)
       if (routePath === `${basePath}/recording`) return handleRecording(options, basePath, params, jobs)
       return textResponse(404, "not found")
+    },
+    handleUpgrade(request, socket, head): boolean {
+      const requestPath = request.url?.startsWith("/") ? request.url : `/${request.url ?? ""}`
+      const routePath = requestPath.split("?")[0]!
+      if (
+        routePath !== `${basePath}/media-stream`
+        || normalizeTwilioPhoneTransportMode(options.transportMode) !== "media-stream"
+      ) {
+        return false
+      }
+
+      mediaStreams.handleUpgrade(request, socket, head, (ws) => {
+        mediaStreams.emit("connection", ws, request)
+      })
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_media_upgrade",
+        message: "accepted Twilio Media Stream WebSocket upgrade",
+        meta: { agentName: options.agentName, path: routePath },
+      })
+      return true
+    },
+    close(): Promise<void> {
+      return new Promise((resolve, reject) => {
+        mediaStreams.close((error?: Error) => error ? reject(error) : resolve())
+      })
     },
   }
 }
@@ -1192,6 +1872,12 @@ export async function startTwilioPhoneBridgeServer(
         res.writeHead(500, { "content-type": "text/plain; charset=utf-8" })
         res.end("internal server error")
       }
+    }
+  })
+  server.on("upgrade", (req, socket, head) => {
+    const handled = bridge.handleUpgrade?.(req, socket, head) ?? false
+    if (!handled) {
+      socket.destroy()
     }
   })
 

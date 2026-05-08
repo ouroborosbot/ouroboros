@@ -69,6 +69,7 @@ describe("Twilio phone transport runtime", () => {
       twilioDefaultFriendId: "ari",
       twilioRecordTimeoutSeconds: "3",
       twilioGreetingPrebufferMs: "4200",
+      twilioTransportMode: "media-stream",
       whisperCliPath: "/opt/whisper.cpp/main",
       whisperModelPath: "/models/ggml-base.en.bin",
     },
@@ -116,6 +117,7 @@ describe("Twilio phone transport runtime", () => {
         recordMaxLengthSeconds: 30,
         greetingPrebufferMs: 4200,
         playbackMode: "stream",
+        transportMode: "media-stream",
       },
     })
   })
@@ -270,6 +272,7 @@ describe("Twilio phone transport runtime", () => {
         recordTimeoutSeconds: 4,
         greetingPrebufferMs: 750,
         playbackMode: "buffered",
+        transportMode: "record-play",
       },
     })
 
@@ -288,6 +291,7 @@ describe("Twilio phone transport runtime", () => {
         recordMaxLengthSeconds: 12,
         greetingPrebufferMs: 750,
         playbackMode: "buffered",
+        transportMode: "record-play",
       },
     })
   })
@@ -314,6 +318,7 @@ describe("Twilio phone transport runtime", () => {
         recordMaxLengthSeconds: 30,
         greetingPrebufferMs: 3500,
         playbackMode: "stream",
+        transportMode: "record-play",
       },
     })
 
@@ -431,6 +436,9 @@ describe("Twilio phone transport runtime", () => {
     expect(deps.waitForRuntimeCredentialBootstrap).toHaveBeenCalledWith("slugger")
     expect(deps.refreshMachineRuntimeConfig).toHaveBeenCalledWith("slugger", "machine_voice", { preserveCachedOnFailure: true })
     expect(deps.cacheSelectedProviderCredentials).toHaveBeenCalledWith("slugger")
+    expect(deps.createTts).toHaveBeenCalledWith(expect.objectContaining({
+      outputFormat: "mp3_44100_128",
+    }))
     expect(deps.startBridgeServer).toHaveBeenCalledWith(expect.objectContaining({
       agentName: "slugger",
       publicBaseUrl: "https://voice.example.test/",
@@ -441,6 +449,40 @@ describe("Twilio phone transport runtime", () => {
       recordMaxLengthSeconds: 30,
       greetingPrebufferMs: 3500,
       playbackMode: "stream",
+      transportMode: "record-play",
+    }))
+  })
+
+  it("uses daemon-bootstrapped runtime config without re-reading the vault", async () => {
+    const deps = fakeDeps(configuredRuntime, configuredMachine)
+    deps.waitForRuntimeCredentialBootstrap = vi.fn(async () => true)
+
+    const result = await startConfiguredTwilioPhoneTransport({
+      agentName: "slugger",
+      defaultBasePath: agentScopedTwilioPhoneBasePath("slugger"),
+    }, deps)
+
+    expect(result.status).toBe("started")
+    expect(deps.loadMachineIdentity).not.toHaveBeenCalled()
+    expect(deps.refreshRuntimeConfig).not.toHaveBeenCalled()
+    expect(deps.refreshMachineRuntimeConfig).not.toHaveBeenCalled()
+    expect(deps.startBridgeServer).toHaveBeenCalledOnce()
+  })
+
+  it("uses Twilio-native ulaw TTS for Media Streams transports", async () => {
+    const deps = fakeDeps(configuredRuntime, configuredMachine)
+
+    const result = await startConfiguredTwilioPhoneTransport({
+      agentName: "slugger",
+      defaultBasePath: agentScopedTwilioPhoneBasePath("slugger"),
+    }, deps)
+
+    expect(result.status).toBe("started")
+    expect(deps.createTts).toHaveBeenCalledWith(expect.objectContaining({
+      outputFormat: "ulaw_8000",
+    }))
+    expect(deps.startBridgeServer).toHaveBeenCalledWith(expect.objectContaining({
+      transportMode: "media-stream",
     }))
   })
 
@@ -497,6 +539,7 @@ describe("Twilio phone transport runtime", () => {
       error: "vault locked",
     }))
     vi.doMock("../../../heart/provider-credentials", () => ({
+      readProviderCredentialPool: vi.fn(() => ({ ok: false })),
       refreshProviderCredentialPool,
     }))
     vi.doMock("../../../senses/voice/whisper", () => ({
@@ -551,6 +594,7 @@ describe("Twilio phone transport runtime", () => {
       pool: { providers: { anthropic: {} } },
     }))
     vi.doMock("../../../heart/provider-credentials", () => ({
+      readProviderCredentialPool: vi.fn(() => ({ ok: false })),
       refreshProviderCredentialPool,
     }))
     vi.doMock("../../../senses/voice/whisper", () => ({
@@ -602,6 +646,7 @@ describe("Twilio phone transport runtime", () => {
       readMachineRuntimeCredentialConfig: vi.fn(() => runtimeReadResult(configuredMachine)),
     }))
     vi.doMock("../../../heart/provider-credentials", () => ({
+      readProviderCredentialPool: vi.fn(() => ({ ok: false })),
       refreshProviderCredentialPool: vi.fn(async () => ({
         ok: true,
         pool: {
