@@ -590,7 +590,6 @@ export function createBlueBubblesCallbacks(
 
   function isDuplicateOutwardText(trimmed: string): boolean {
     const norm = trimmed.replace(/\s+/g, " ").trim().toLowerCase()
-    if (norm.length === 0) return false
     if (sentOutwardTextNorms.has(norm)) return true
     sentOutwardTextNorms.add(norm)
     return false

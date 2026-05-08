@@ -485,7 +485,7 @@ export function getSettleRetryError(
   _sawQuerySession?: boolean,
   currentObligation?: string | null,
   innerJob?: InnerJob,
-  sawExternalStateQuery?: boolean,
+  _sawExternalStateQuery?: boolean,
 ): string | null {
   // Delegation adherence removed: the delegation decision is surfaced in the
   // system prompt as a suggestion. Hard-gating settle caused infinite
@@ -506,16 +506,6 @@ export function getSettleRetryError(
   // 5. mustResolveBeforeHandoff + complete while a live return loop is still active
   if (mustResolveBeforeHandoff && intent === "complete" && currentObligation && !sawSteeringFollowUp) {
     return "you still owe the live session a visible return on this work. don't end the turn yet — continue until you've brought back the external-state update, or use intent=blocked with the concrete blocker.";
-  }
-  // 6. External-state grounding: an active must-resolve loop that ends with
-  //    intent=complete still requires fresh external verification. Gating on
-  //    `mustResolveBeforeHandoff` is load-bearing — `currentObligation` here
-  //    is set mechanically from the inbound user text in senses/pipeline.ts,
-  //    so an ordinary chat ("what's the plan for tonight?") would otherwise
-  //    trip this rule and force the agent into a settle-retry loop, each pass
-  //    delivering another near-identical iMessage (2026-05-08 06:18 incident).
-  if (mustResolveBeforeHandoff && intent === "complete" && currentObligation && !sawExternalStateQuery && !sawSteeringFollowUp) {
-    return "you're claiming this work is complete, but the external state hasn't been verified this turn. ground your claim with a fresh check (gh pr view, npm view, gh run view, etc.) before calling settle.";
   }
   return null;
 }

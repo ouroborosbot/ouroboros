@@ -148,4 +148,28 @@ describe("BlueBubbles duplicate outward send guard (2026-05-08 06:18 incident)",
     const outward = sendText.mock.calls.filter((call) => call[0]?.text === "on it")
     expect(outward).toHaveLength(2)
   })
+
+  it("logs duplicate suppression even when chat identity is unavailable", async () => {
+    const { client } = makeStubClient()
+    const callbacks = createBlueBubblesCallbacks(client as never, {}, TOP_LEVEL_REPLY_TARGET, false)
+
+    callbacks.onModelStart()
+    callbacks.onTextChunk("same line")
+    await callbacks.flushNow!()
+
+    callbacks.onTextChunk("same line")
+    await callbacks.flushNow!()
+
+    const suppressed = (emitNervesEvent as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call) =>
+        call[0]?.event === "bluebubbles.duplicate_outward_suppressed" && call[0]?.meta?.messageLength === "same line".length,
+    )
+    expect(suppressed?.[0]?.meta).toMatchObject({
+      site: "flushNow",
+      chatGuid: null,
+      messageLength: "same line".length,
+    })
+
+    await callbacks.finish()
+  })
 })
