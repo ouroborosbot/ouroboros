@@ -94,7 +94,10 @@ const TOOL_DESCRIPTIONS: Record<string, DescriptionBuilder> = {
 
   // Communication
   send_message: (args) => {
-    const to = args.to
+    const to = args.to || args.friendId
+    if (args.channel === "voice") {
+      return to ? `placing a voice call to ${to}...` : "placing a voice call..."
+    }
     return to ? `sending a message to ${to}...` : "sending a message..."
   },
   surface: () => "sharing a thought...",

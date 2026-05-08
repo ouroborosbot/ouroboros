@@ -2,6 +2,14 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.573",
+      "changes": [
+        "`send_message` with `channel=voice` now places a first-class Voice outbound phone call to trusted friends instead of falling through to the generic pending-message queue.",
+        "Voice outbound calling now has a shared policy/routing primitive used by both outward `send_message channel=voice` and inner-dialog `surface channel=voice`, keeping Twilio phone as a transport under the canonical Voice sense.",
+        "Voice prompt and tool status guidance now distinguish normal outward voice calls from inner-dialog surfacing, with regression coverage for trusted calls, untrusted blocks, and missing-phone blocks."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.572",
       "changes": [
         "Twilio phone outbound calls now live under the canonical Voice sense: the runtime writes outbound call jobs, creates Twilio Calls API requests, serves answered-call TwiML, and records status callbacks without creating a separate Twilio sense.",

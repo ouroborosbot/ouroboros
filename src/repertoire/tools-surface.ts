@@ -8,8 +8,7 @@ import { containsInternalMetaMarkers } from "../senses/bluebubbles-meta-guard";
 import { emitNervesEvent } from "../nerves/runtime";
 import * as path from "path";
 import type { AttentionItem } from "../arc/attention-types";
-import { isTrustedLevel, type FriendRecord } from "../mind/friends/types";
-import { normalizeTwilioE164PhoneNumber } from "../senses/voice/twilio-phone";
+import { placeTrustedFriendVoiceOutboundCall } from "../senses/voice/outbound";
 import type { ToolDefinition } from "./tools-base";
 
 type SurfaceDeliveryChannel = "auto" | "voice"
@@ -23,53 +22,6 @@ function normalizeSurfaceDeliveryChannel(value: unknown): SurfaceDeliveryChannel
   if (typeof value !== "string") return "auto"
   const normalized = value.trim().toLowerCase()
   return normalized === "voice" ? "voice" : "auto"
-}
-
-function readFriendRecordById(friendsDir: string, friendId: string): FriendRecord | null {
-  const recordPath = path.join(friendsDir, `${friendId}.json`)
-  if (!fs.existsSync(recordPath)) return null
-  try {
-    return JSON.parse(fs.readFileSync(recordPath, "utf-8")) as FriendRecord
-  } catch {
-    return null
-  }
-}
-
-function findFriendRecord(friendsDir: string, friendId: string): FriendRecord | null {
-  const byId = readFriendRecordById(friendsDir, friendId)
-  if (byId) return byId
-  const normalized = friendId.trim().toLowerCase()
-  if (!normalized) return null
-  try {
-    const records = fs.readdirSync(friendsDir)
-      .filter((file) => file.endsWith(".json"))
-      .map((file) => {
-        try {
-          return JSON.parse(fs.readFileSync(path.join(friendsDir, file), "utf-8")) as FriendRecord
-        } catch {
-          return null
-        }
-      })
-      .filter((record): record is FriendRecord => Boolean(record))
-    return records.find((record) =>
-      record.id === friendId
-      || record.name?.toLowerCase() === normalized
-      || record.externalIds?.some((externalId) => externalId.externalId.toLowerCase() === normalized)
-    ) ?? records.find((record) => record.name?.toLowerCase().startsWith(normalized)) ?? null
-  } catch {
-    return null
-  }
-}
-
-function phoneNumberForVoiceCall(friend: FriendRecord | null, explicitPhoneNumber?: string): string | undefined {
-  const explicit = normalizeTwilioE164PhoneNumber(explicitPhoneNumber)
-  if (explicit) return explicit
-  for (const externalId of friend?.externalIds ?? []) {
-    if (externalId.provider !== "imessage-handle") continue
-    const phoneNumber = normalizeTwilioE164PhoneNumber(externalId.externalId)
-    if (phoneNumber) return phoneNumber
-  }
-  return undefined
 }
 
 // Surface tool schema — canonical home. Handler lives in senses/surface-tool.ts.
@@ -146,43 +98,32 @@ export const surfaceToolDefinition: ToolDefinition = {
 
         // Resolve friend name → UUID if needed (agents may pass name instead of UUID)
         let resolvedFriendId = friendId
-        let resolvedFriendRecord: FriendRecord | null = findFriendRecord(friendsDir, friendId)
         if (!fs.existsSync(path.join(sessionsDir, friendId))) {
           try {
             const friendFiles = fs.readdirSync(friendsDir).filter((f) => f.endsWith(".json"))
             for (const file of friendFiles) {
               const raw = fs.readFileSync(path.join(friendsDir, file), "utf-8")
-              const record = JSON.parse(raw) as FriendRecord
+              const record = JSON.parse(raw) as { id?: string; name?: string }
               if (record.name?.toLowerCase() === friendId.toLowerCase() && record.id) {
                 resolvedFriendId = record.id
-                resolvedFriendRecord = record
                 break
               }
             }
           } catch { /* friends dir unreadable — continue with original friendId */ }
         }
         friendId = resolvedFriendId
-        resolvedFriendRecord = resolvedFriendRecord ?? findFriendRecord(friendsDir, friendId)
 
         if (hint?.channel === "voice") {
-          if (!resolvedFriendRecord) {
-            return { status: "failed", detail: "voice call requires a known friend record" }
-          }
-          if (!isTrustedLevel(resolvedFriendRecord.trustLevel)) {
-            return { status: "failed", detail: "voice calls are limited to trusted friends" }
-          }
-          const phoneNumber = phoneNumberForVoiceCall(resolvedFriendRecord, hint.phoneNumber)
-          if (!phoneNumber) {
-            return { status: "failed", detail: "no phone number is available for voice call" }
-          }
-          const { placeConfiguredTwilioPhoneCall } = await import("../senses/voice/twilio-phone-runtime")
-          const call = await placeConfiguredTwilioPhoneCall({
+          const voiceResult = await placeTrustedFriendVoiceOutboundCall({
             agentName,
+            agentRoot,
             friendId,
-            to: phoneNumber,
             reason: content,
+            phoneNumber: hint.phoneNumber,
           })
-          return { status: "delivered", detail: `voice call initiated${call.status ? ` (${call.status})` : ""}` }
+          return voiceResult.status === "placed"
+            ? { status: "delivered", detail: voiceResult.detail }
+            : { status: "failed", detail: voiceResult.detail }
         }
 
         // Priority 1: Bridge-preferred session (if queue item has a bridgeId)

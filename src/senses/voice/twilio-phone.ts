@@ -9,6 +9,9 @@ import { writeVoicePlaybackArtifact } from "./playback"
 import { buildVoiceTranscript } from "./transcript"
 import { runVoiceLoopbackTurn, type VoiceLoopbackTurnResult, type VoiceRunSenseTurn } from "./turn"
 import type { VoiceTranscript, VoiceTranscriber, VoiceTtsService } from "./types"
+import { normalizeTwilioE164PhoneNumber } from "./phone"
+
+export { normalizeTwilioE164PhoneNumber } from "./phone"
 
 export const DEFAULT_TWILIO_PHONE_PORT = 18910
 export const DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS = 1
@@ -341,18 +344,6 @@ function mediaStreamTwiml(
 function safeSegment(input: string): string {
   const cleaned = input.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
   return cleaned || "unknown"
-}
-
-export function normalizeTwilioE164PhoneNumber(value: string | undefined): string | undefined {
-  const raw = value?.trim()
-  if (!raw) return undefined
-  if (raw.toLowerCase().startsWith("group:")) return undefined
-  const cleaned = raw.replace(/[^\d+]+/g, "")
-  if (/^\+[1-9]\d{6,14}$/.test(cleaned)) return cleaned
-  const digits = cleaned.replace(/\D+/g, "")
-  if (/^1\d{10}$/.test(digits)) return `+${digits}`
-  if (/^\d{10}$/.test(digits)) return `+1${digits}`
-  return undefined
 }
 
 function decodeSafeSegment(input: string): string | null {
