@@ -6,16 +6,22 @@ import { describe, expect, it, vi } from "vitest"
 import { buildVoiceTranscript, closeTwilioPhoneBridgeServer } from "../../../senses/voice"
 import {
   computeTwilioSignature,
+  createTwilioOutboundCall,
   createTwilioPhoneBridge,
   defaultTwilioRecordingDownloader,
+  normalizeTwilioE164PhoneNumber,
   normalizeTwilioPhoneBasePath,
   normalizeTwilioPhonePlaybackMode,
   normalizeTwilioPhoneTransportMode,
+  twilioOutboundCallJobPath,
+  twilioOutboundCallStatusCallbackUrl,
+  twilioOutboundCallWebhookUrl,
   startTwilioPhoneBridgeServer,
   twilioPhoneWebhookUrl,
   twilioPhoneVoiceSessionKey,
   twilioRecordingMediaUrl,
   validateTwilioSignature,
+  writeTwilioOutboundCallJob,
 } from "../../../senses/voice/twilio-phone"
 import type { VoiceTtsService, VoiceTranscriber } from "../../../senses/voice"
 import type { VoiceRunSenseTurn } from "../../../senses/voice/turn"
@@ -166,6 +172,46 @@ describe("Twilio phone voice bridge", () => {
     expect(twilioPhoneVoiceSessionKey({})).toBe("twilio-phone-incoming")
   })
 
+  it("normalizes outbound phone routing and webhook URLs", () => {
+    expect(normalizeTwilioE164PhoneNumber("+1 (555) 123-4567")).toBe("+15551234567")
+    expect(normalizeTwilioE164PhoneNumber("555-123-4567")).toBe("+15551234567")
+    expect(normalizeTwilioE164PhoneNumber("group:any;+;abc")).toBeUndefined()
+    expect(twilioOutboundCallWebhookUrl("https://voice.example.com/base/", "/voice/twilio", "call one"))
+      .toBe("https://voice.example.com/voice/twilio/outgoing/call-one")
+    expect(twilioOutboundCallStatusCallbackUrl("https://voice.example.com/base/", "/voice/twilio", "call one"))
+      .toBe("https://voice.example.com/voice/twilio/outgoing/call-one/status")
+  })
+
+  it("creates Twilio outbound call API requests with TwiML and status callbacks", async () => {
+    const requests: Array<{ input: string; body: URLSearchParams; auth: string | null }> = []
+    const result = await createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+      statusCallbackUrl: "https://voice.example.com/voice/twilio/outgoing/out-1/status",
+    }, async (input, init) => {
+      requests.push({
+        input,
+        body: new URLSearchParams(String(init.body)),
+        auth: init.headers instanceof Headers ? init.headers.get("authorization") : (init.headers as Record<string, string>).authorization,
+      })
+      return new Response(JSON.stringify({ sid: "CAOUT", status: "queued", queue_time: "0" }), { status: 201 })
+    })
+
+    expect(result).toEqual({ callSid: "CAOUT", status: "queued", queueTime: "0" })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.input).toBe("https://api.twilio.com/2010-04-01/Accounts/AC123/Calls.json")
+    expect(requests[0]!.body.get("To")).toBe("+15551234567")
+    expect(requests[0]!.body.get("From")).toBe("+15557654321")
+    expect(requests[0]!.body.get("Url")).toBe("https://voice.example.com/voice/twilio/outgoing/out-1")
+    expect(requests[0]!.body.get("Method")).toBe("POST")
+    expect(requests[0]!.body.get("StatusCallback")).toBe("https://voice.example.com/voice/twilio/outgoing/out-1/status")
+    expect(requests[0]!.body.getAll("StatusCallbackEvent")).toEqual(["initiated", "ringing", "answered", "completed"])
+    expect(requests[0]!.auth).toBe(`Basic ${Buffer.from("AC123:token-secret").toString("base64")}`)
+  })
+
   it("starts an agent voice turn when answering inbound calls", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
     try {
@@ -310,6 +356,154 @@ describe("Twilio phone voice bridge", () => {
     } finally {
       if (socket && socket.readyState === WebSocket.OPEN) await closeSocket(socket)
       if (server) await closeTwilioPhoneBridgeServer(server)
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("answers outbound call webhooks as the trusted friend's stable voice session", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-1",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "check in about the voice alpha",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        transportMode: "media-stream" as const,
+      }
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-1",
+        headers: {},
+        body: formBody({ CallSid: "CAOUT", From: "+15557654321", To: "+15551234567" }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(String(response.body)).toContain("<Connect><Stream url=\"wss://voice.example.com/voice/twilio/media-stream\">")
+      expect(String(response.body)).toContain("<Parameter name=\"Direction\" value=\"outbound\" />")
+      expect(String(response.body)).toContain("<Parameter name=\"Remote\" value=\"+15551234567\" />")
+      expect(String(response.body)).toContain("<Parameter name=\"Line\" value=\"+15557654321\" />")
+      expect(String(response.body)).toContain("<Parameter name=\"FriendId\" value=\"ari\" />")
+      expect(String(response.body)).toContain("<Parameter name=\"OutboundId\" value=\"out-1\" />")
+      expect(String(response.body)).toContain("<Parameter name=\"GreetingJobId\" value=\"twilio-CAOUT-outbound-connected\" />")
+      expect(options.runSenseTurn).toHaveBeenCalledWith(expect.objectContaining({
+        friendId: "ari",
+        sessionKey: "twilio-phone-ari-via-15557654321",
+        userMessage: expect.stringContaining("A Twilio outbound phone voice call was answered."),
+      }))
+      expect(options.runSenseTurn).toHaveBeenCalledWith(expect.objectContaining({
+        userMessage: expect.stringContaining("check in about the voice alpha"),
+      }))
+      const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-1"), "utf8")) as { status?: string; transportCallSid?: string }
+      expect(saved.status).toBe("answered")
+      expect(saved.transportCallSid).toBe("CAOUT")
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("streams prebuffered outbound greetings over the Media Stream socket", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    const options = {
+      ...baseBridgeOptions(outputDir),
+      transportMode: "media-stream" as const,
+    }
+    let server: Awaited<ReturnType<typeof startTwilioPhoneBridgeServer>> | undefined
+    let socket: WebSocket | undefined
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-2",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "say the phone bridge is ready",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      server = await startTwilioPhoneBridgeServer({
+        ...options,
+        publicBaseUrl: "https://voice.example.com",
+        port: 0,
+      })
+      const response = await server.bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-2",
+        headers: {},
+        body: formBody({ CallSid: "CAOUT2", From: "+15557654321", To: "+15551234567" }),
+      })
+      expect(String(response.body)).toContain("<Parameter name=\"GreetingJobId\" value=\"twilio-CAOUT2-outbound-connected\" />")
+
+      socket = new WebSocket(`${server.localUrl.replace("http:", "ws:")}/voice/twilio/media-stream`)
+      const messages = collectSocketMessages(socket)
+      await waitForSocketOpen(socket)
+      sendSocketJson(socket, {
+        event: "start",
+        start: {
+          streamSid: "MZ123",
+          callSid: "CAOUT2",
+          customParameters: {
+            From: "+15557654321",
+            To: "+15551234567",
+            Direction: "outbound",
+            Remote: "+15551234567",
+            Line: "+15557654321",
+            FriendId: "ari",
+            OutboundId: "out-2",
+            GreetingJobId: "twilio-CAOUT2-outbound-connected",
+          },
+        },
+      })
+      await vi.waitFor(() => expect(messages.length).toBeGreaterThanOrEqual(2))
+      expect(messages[0]).toEqual({
+        event: "media",
+        streamSid: "MZ123",
+        media: { payload: Buffer.from("mp3-response").toString("base64") },
+      })
+      expect(options.runSenseTurn).toHaveBeenCalledTimes(1)
+    } finally {
+      if (socket && socket.readyState === WebSocket.OPEN) await closeSocket(socket)
+      if (server) await closeTwilioPhoneBridgeServer(server)
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("records outbound call status callbacks", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-status",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "status test",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      const bridge = createTwilioPhoneBridge(baseBridgeOptions(outputDir))
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-status/status",
+        headers: {},
+        body: formBody({ CallSid: "CAOUT", CallStatus: "completed", AnsweredBy: "human" }),
+      })
+      expect(response.statusCode).toBe(200)
+      expect(String(response.body)).toBe("ok")
+      const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-status"), "utf8")) as { status?: string; events?: Array<{ status: string; answeredBy?: string }> }
+      expect(saved.status).toBe("completed")
+      expect(saved.events?.at(-1)).toMatchObject({ status: "completed", answeredBy: "human" })
+    } finally {
       await fs.rm(outputDir, { recursive: true, force: true })
     }
   })

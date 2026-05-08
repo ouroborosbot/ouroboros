@@ -57,6 +57,46 @@ export interface TwilioRecordingDownloadRequest {
 
 export type TwilioRecordingDownloader = (request: TwilioRecordingDownloadRequest) => Promise<Uint8Array>
 
+export interface TwilioOutboundCallJobEvent {
+  at: string
+  status: string
+  callSid?: string
+  answeredBy?: string
+}
+
+export interface TwilioOutboundCallJob {
+  schemaVersion: 1
+  outboundId: string
+  agentName: string
+  friendId?: string
+  to: string
+  from: string
+  reason: string
+  createdAt: string
+  transportCallSid?: string
+  status?: string
+  updatedAt?: string
+  events?: TwilioOutboundCallJobEvent[]
+  error?: string
+}
+
+export interface TwilioOutboundCallCreateRequest {
+  accountSid: string
+  authToken: string
+  to: string
+  from: string
+  twimlUrl: string
+  statusCallbackUrl?: string
+}
+
+export interface TwilioOutboundCallCreateResult {
+  callSid?: string
+  status?: string
+  queueTime?: string
+}
+
+export type TwilioOutboundCallFetch = (input: string, init: RequestInit) => Promise<Response>
+
 export interface TwilioPhoneBridgeOptions {
   agentName: string
   publicBaseUrl: string
@@ -67,6 +107,7 @@ export interface TwilioPhoneBridgeOptions {
   runSenseTurn?: VoiceRunSenseTurn
   twilioAccountSid?: string
   twilioAuthToken?: string
+  twilioFromNumber?: string
   defaultFriendId?: string
   recordTimeoutSeconds?: number
   recordMaxLengthSeconds?: number
@@ -219,6 +260,22 @@ export function twilioPhoneWebhookUrl(
   return routeUrl(publicBaseUrl, `${normalizeTwilioPhoneBasePath(basePath)}/incoming`)
 }
 
+export function twilioOutboundCallWebhookUrl(
+  publicBaseUrl: string,
+  basePath: string | undefined,
+  outboundId: string,
+): string {
+  return routeUrl(publicBaseUrl, `${normalizeTwilioPhoneBasePath(basePath)}/outgoing/${encodeURIComponent(safeSegment(outboundId))}`)
+}
+
+export function twilioOutboundCallStatusCallbackUrl(
+  publicBaseUrl: string,
+  basePath: string | undefined,
+  outboundId: string,
+): string {
+  return routeUrl(publicBaseUrl, `${normalizeTwilioPhoneBasePath(basePath)}/outgoing/${encodeURIComponent(safeSegment(outboundId))}/status`)
+}
+
 function requestPublicUrl(publicBaseUrl: string, requestPath: string): string {
   return routeUrl(publicBaseUrl, requestPath)
 }
@@ -264,14 +321,19 @@ function mediaStreamTwiml(
   basePath: string,
   params: Record<string, string>,
   greetingJobId?: string,
+  customParams: Record<string, string | undefined> = {},
 ): string {
   const streamUrl = websocketRouteUrl(options.publicBaseUrl, `${basePath}/media-stream`)
+  const twimlParams: Record<string, string | undefined> = {
+    From: params.From,
+    To: params.To,
+    Agent: options.agentName,
+    ...customParams,
+    GreetingJobId: greetingJobId,
+  }
   return [
     `<Connect><Stream url="${escapeXml(streamUrl)}">`,
-    parameterTwiml("From", params.From),
-    parameterTwiml("To", params.To),
-    parameterTwiml("Agent", options.agentName),
-    parameterTwiml("GreetingJobId", greetingJobId),
+    ...Object.entries(twimlParams).map(([name, value]) => parameterTwiml(name, value)),
     `</Stream></Connect>`,
   ].join("")
 }
@@ -279,6 +341,18 @@ function mediaStreamTwiml(
 function safeSegment(input: string): string {
   const cleaned = input.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
   return cleaned || "unknown"
+}
+
+export function normalizeTwilioE164PhoneNumber(value: string | undefined): string | undefined {
+  const raw = value?.trim()
+  if (!raw) return undefined
+  if (raw.toLowerCase().startsWith("group:")) return undefined
+  const cleaned = raw.replace(/[^\d+]+/g, "")
+  if (/^\+[1-9]\d{6,14}$/.test(cleaned)) return cleaned
+  const digits = cleaned.replace(/\D+/g, "")
+  if (/^1\d{10}$/.test(digits)) return `+${digits}`
+  if (/^\d{10}$/.test(digits)) return `+1${digits}`
+  return undefined
 }
 
 function decodeSafeSegment(input: string): string | null {
@@ -341,6 +415,19 @@ function callConnectedPrompt(params: Record<string, string>): string {
     from ? `Twilio caller ID: ${from}.` : "Twilio did not provide caller ID.",
     to ? `Dialed line: ${to}.` : "Twilio did not provide the dialed line.",
     "Respond through the voice channel as yourself. Greet the caller naturally and briefly, then invite them to speak.",
+  ].join("\n")
+}
+
+function outboundCallAnsweredPrompt(job: TwilioOutboundCallJob, params: Record<string, string>): string {
+  const from = params.From?.trim() || job.from
+  const to = params.To?.trim() || job.to
+  return [
+    "A Twilio outbound phone voice call was answered.",
+    "This is the first audible turn in a call I chose to place.",
+    `Call reason/context: ${job.reason.trim() || "No additional reason was recorded."}`,
+    to ? `Callee phone: ${to}.` : "Twilio did not provide the callee phone.",
+    from ? `Ouro phone line: ${from}.` : "Twilio did not provide the Ouro phone line.",
+    "Respond through the voice channel as yourself. Briefly greet them and state why you called. Keep this first turn short and conversational.",
   ].join("\n")
 }
 
@@ -587,11 +674,18 @@ class TwilioMediaStreamSession {
   private async handleStart(start: TwilioMediaStreamStart | undefined): Promise<void> {
     this.streamSid = stringField(start?.streamSid)
     this.callSid = stringField(start?.callSid) || this.callSid
-    this.from = customParameter(start, "From")
-    this.to = customParameter(start, "To")
-    this.friendId = voiceFriendId(this.options, this.from, this.callSid)
+    const direction = customParameter(start, "Direction")
+    const explicitFriendId = customParameter(start, "FriendId")
+    if (direction === "outbound") {
+      this.from = customParameter(start, "Remote") || customParameter(start, "To")
+      this.to = customParameter(start, "Line") || customParameter(start, "From")
+    } else {
+      this.from = customParameter(start, "From")
+      this.to = customParameter(start, "To")
+    }
+    this.friendId = explicitFriendId || voiceFriendId(this.options, this.from, this.callSid)
     this.sessionKey = twilioPhoneVoiceSessionKey({
-      defaultFriendId: this.options.defaultFriendId,
+      defaultFriendId: explicitFriendId || this.options.defaultFriendId,
       from: this.from,
       to: this.to,
       callSid: this.callSid,
@@ -1293,6 +1387,132 @@ export async function defaultTwilioRecordingDownloader(request: TwilioRecordingD
   return Buffer.from(await response.arrayBuffer())
 }
 
+function twilioOutboundCallJobDir(outputDir: string): string {
+  return path.join(outputDir, "outbound")
+}
+
+export function twilioOutboundCallJobPath(outputDir: string, outboundId: string): string {
+  return path.join(twilioOutboundCallJobDir(outputDir), `${safeSegment(outboundId)}.json`)
+}
+
+export async function writeTwilioOutboundCallJob(outputDir: string, job: TwilioOutboundCallJob): Promise<void> {
+  await fs.mkdir(twilioOutboundCallJobDir(outputDir), { recursive: true })
+  await fs.writeFile(twilioOutboundCallJobPath(outputDir, job.outboundId), `${JSON.stringify(job, null, 2)}\n`, "utf8")
+}
+
+async function readTwilioOutboundCallJob(outputDir: string, outboundId: string): Promise<TwilioOutboundCallJob | null> {
+  try {
+    const raw = await fs.readFile(twilioOutboundCallJobPath(outputDir, outboundId), "utf8")
+    const parsed = JSON.parse(raw) as TwilioOutboundCallJob
+    return parsed && typeof parsed === "object" && parsed.schemaVersion === 1 ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export async function updateTwilioOutboundCallJob(
+  outputDir: string,
+  outboundId: string,
+  update: Partial<TwilioOutboundCallJob>,
+): Promise<TwilioOutboundCallJob | null> {
+  const existing = await readTwilioOutboundCallJob(outputDir, outboundId)
+  if (!existing) return null
+  const next: TwilioOutboundCallJob = {
+    ...existing,
+    ...update,
+    outboundId: existing.outboundId,
+    schemaVersion: 1,
+    updatedAt: update.updatedAt ?? new Date().toISOString(),
+  }
+  await writeTwilioOutboundCallJob(outputDir, next)
+  return next
+}
+
+export async function readRecentTwilioOutboundCallJobs(options: {
+  outputDir: string
+  to?: string
+  friendId?: string
+  sinceMs: number
+  now?: number
+}): Promise<TwilioOutboundCallJob[]> {
+  const now = options.now ?? Date.now()
+  let files: string[]
+  try {
+    files = await fs.readdir(twilioOutboundCallJobDir(options.outputDir))
+  } catch {
+    return []
+  }
+  const jobs: TwilioOutboundCallJob[] = []
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue
+    const outboundId = file.slice(0, -".json".length)
+    const job = await readTwilioOutboundCallJob(options.outputDir, outboundId)
+    if (!job) continue
+    const createdAtMs = Date.parse(job.createdAt)
+    if (!Number.isFinite(createdAtMs) || now - createdAtMs > options.sinceMs) continue
+    if (options.to && normalizeTwilioE164PhoneNumber(job.to) !== normalizeTwilioE164PhoneNumber(options.to)) continue
+    if (options.friendId && job.friendId !== options.friendId) continue
+    jobs.push(job)
+  }
+  return jobs
+}
+
+export async function createTwilioOutboundCall(
+  request: TwilioOutboundCallCreateRequest,
+  fetchImpl: TwilioOutboundCallFetch = fetch,
+): Promise<TwilioOutboundCallCreateResult> {
+  const accountSid = request.accountSid.trim()
+  const authToken = request.authToken.trim()
+  const to = normalizeTwilioE164PhoneNumber(request.to)
+  const from = normalizeTwilioE164PhoneNumber(request.from)
+  if (!accountSid) throw new Error("missing Twilio account SID for outbound voice call")
+  if (!authToken) throw new Error("missing Twilio auth token for outbound voice call")
+  if (!to) throw new Error("outbound voice call target must be an E.164 phone number")
+  if (!from) throw new Error("outbound voice call caller ID must be an E.164 phone number")
+  const body = new URLSearchParams()
+  body.set("To", to)
+  body.set("From", from)
+  body.set("Url", request.twimlUrl)
+  body.set("Method", "POST")
+  if (request.statusCallbackUrl) {
+    body.set("StatusCallback", request.statusCallbackUrl)
+    body.set("StatusCallbackMethod", "POST")
+    for (const event of ["initiated", "ringing", "answered", "completed"]) {
+      body.append("StatusCallbackEvent", event)
+    }
+  }
+
+  const response = await fetchImpl(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls.json`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body,
+    },
+  )
+  const responseText = await response.text()
+  let parsed: Record<string, unknown> = {}
+  if (responseText.trim()) {
+    try {
+      parsed = JSON.parse(responseText) as Record<string, unknown>
+    } catch {
+      parsed = {}
+    }
+  }
+  if (!response.ok) {
+    const message = typeof parsed.message === "string" ? parsed.message : responseText
+    throw new Error(`Twilio outbound voice call failed: ${response.status} ${message}`.trim())
+  }
+  return {
+    callSid: typeof parsed.sid === "string" ? parsed.sid : undefined,
+    status: typeof parsed.status === "string" ? parsed.status : undefined,
+    queueTime: typeof parsed.queue_time === "string" ? parsed.queue_time : undefined,
+  }
+}
+
 function verifyRequest(options: TwilioPhoneBridgeOptions, request: TwilioPhoneBridgeRequest, params: Record<string, string>): boolean {
   const authToken = options.twilioAuthToken?.trim()
   if (!authToken) return true
@@ -1459,6 +1679,168 @@ async function handleIncoming(
       maxLengthSeconds: options.recordMaxLengthSeconds ?? DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS,
     }))
   }
+}
+
+async function handleOutgoing(
+  options: TwilioPhoneBridgeOptions,
+  basePath: string,
+  outboundId: string,
+  params: Record<string, string>,
+  jobs: TwilioAudioStreamJobStore,
+): Promise<TwilioPhoneBridgeResponse> {
+  const job = await readTwilioOutboundCallJob(options.outputDir, outboundId)
+  if (!job) return textResponse(404, "outbound voice call not found")
+
+  const callSid = params.CallSid?.trim() || job.transportCallSid || `outbound-${job.outboundId}`
+  const safeCallSid = safeSegment(callSid)
+  const callDir = path.join(options.outputDir, safeCallSid)
+  const utteranceId = `twilio-${safeCallSid}-outbound-connected`
+  const friendId = job.friendId?.trim() || voiceFriendId(options, job.to, callSid)
+  const from = normalizeTwilioE164PhoneNumber(params.From) ?? normalizeTwilioE164PhoneNumber(job.from) ?? job.from
+  const to = normalizeTwilioE164PhoneNumber(params.To) ?? normalizeTwilioE164PhoneNumber(job.to) ?? job.to
+  const sessionKey = twilioPhoneVoiceSessionKey({
+    defaultFriendId: friendId,
+    from: to,
+    to: from,
+    callSid,
+  })
+  await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
+    status: "answered",
+    transportCallSid: callSid,
+    events: [
+      ...(job.events ?? []),
+      { at: new Date().toISOString(), status: "answered", callSid },
+    ],
+  })
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.voice_twilio_outgoing_answered",
+    message: "Twilio outbound voice call answered",
+    meta: { agentName: options.agentName, callSid: safeCallSid, outboundId: safeSegment(job.outboundId), sessionKey },
+  })
+
+  if (normalizeTwilioPhoneTransportMode(options.transportMode) === "media-stream") {
+    try {
+      await fs.mkdir(callDir, { recursive: true })
+      const transcript = buildVoiceTranscript({
+        utteranceId,
+        text: outboundCallAnsweredPrompt(job, { From: from, To: to }),
+        source: "loopback",
+      })
+      const greetingJobId = safeSegment(utteranceId)
+      const streamParams = {
+        Direction: "outbound",
+        Remote: to,
+        Line: from,
+        FriendId: friendId,
+        OutboundId: job.outboundId,
+      }
+      const streamJob = startTwilioPlaybackStreamJob({
+        jobs,
+        bridgeOptions: options,
+        basePath,
+        callDir,
+        safeCallSid,
+        jobId: greetingJobId,
+        baseUtteranceId: utteranceId,
+        runTurn: (onAudioChunk) => runVoiceLoopbackTurn({
+          agentName: options.agentName,
+          friendId,
+          sessionKey,
+          transcript,
+          tts: options.tts,
+          runSenseTurn: options.runSenseTurn,
+          onAudioChunk,
+        }),
+        meta: { agentName: options.agentName, callSid: safeCallSid, utteranceId, transportMode: "media-stream", outboundId: safeSegment(job.outboundId) },
+      })
+      const prebufferState = await streamJob.waitForFirstChunk(options.greetingPrebufferMs ?? DEFAULT_TWILIO_GREETING_PREBUFFER_MS)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_greeting_prebuffer",
+        message: "Twilio Media Stream greeting prebuffer completed",
+        meta: { agentName: options.agentName, callSid: safeCallSid, utteranceId, state: prebufferState, transportMode: "media-stream" },
+      })
+      return xmlResponse(mediaStreamTwiml(
+        options,
+        basePath,
+        { From: from, To: to },
+        prebufferState === "failed" ? undefined : greetingJobId,
+        streamParams,
+      ))
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_incoming_error",
+        message: "Twilio outbound media-stream greeting turn failed",
+        meta: { agentName: options.agentName, callSid: safeCallSid, outboundId: safeSegment(job.outboundId), error: errorMessage(error), transportMode: "media-stream" },
+      })
+      return xmlResponse(mediaStreamTwiml(options, basePath, { From: from, To: to }, undefined, {
+        Direction: "outbound",
+        Remote: to,
+        Line: from,
+        FriendId: friendId,
+        OutboundId: job.outboundId,
+      }))
+    }
+  }
+
+  try {
+    await fs.mkdir(callDir, { recursive: true })
+    return await runPhonePromptTurn({
+      bridgeOptions: options,
+      basePath,
+      callDir,
+      safeCallSid,
+      utteranceId,
+      friendId,
+      sessionKey,
+      promptText: outboundCallAnsweredPrompt(job, { From: from, To: to }),
+      afterPlayback: "record",
+    })
+  } catch (error) {
+    emitNervesEvent({
+      level: "error",
+      component: "senses",
+      event: "senses.voice_twilio_incoming_error",
+      message: "Twilio outbound voice greeting turn failed",
+      meta: { agentName: options.agentName, callSid: safeCallSid, outboundId: safeSegment(job.outboundId), error: errorMessage(error) },
+    })
+    return xmlResponse(recordTwiml({
+      publicBaseUrl: options.publicBaseUrl,
+      basePath,
+      timeoutSeconds: options.recordTimeoutSeconds ?? DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS,
+      maxLengthSeconds: options.recordMaxLengthSeconds ?? DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS,
+    }))
+  }
+}
+
+async function handleOutgoingStatus(
+  options: TwilioPhoneBridgeOptions,
+  outboundId: string,
+  params: Record<string, string>,
+): Promise<TwilioPhoneBridgeResponse> {
+  const job = await readTwilioOutboundCallJob(options.outputDir, outboundId)
+  if (!job) return textResponse(404, "outbound voice call not found")
+  const status = params.CallStatus?.trim() || params.CallStatusCallbackEvent?.trim() || "unknown"
+  const callSid = params.CallSid?.trim() || job.transportCallSid
+  const answeredBy = params.AnsweredBy?.trim() || undefined
+  await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
+    status,
+    transportCallSid: callSid,
+    events: [
+      ...(job.events ?? []),
+      { at: new Date().toISOString(), status, ...(callSid ? { callSid } : {}), ...(answeredBy ? { answeredBy } : {}) },
+    ],
+  })
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.voice_twilio_outgoing_status",
+    message: "Twilio outbound voice call status changed",
+    meta: { agentName: options.agentName, callSid: safeSegment(callSid ?? "unknown"), outboundId: safeSegment(job.outboundId), status },
+  })
+  return textResponse(200, "ok")
 }
 
 async function handleListen(options: TwilioPhoneBridgeOptions, basePath: string): Promise<TwilioPhoneBridgeResponse> {
@@ -1721,6 +2103,14 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
       }
 
       if (routePath === `${basePath}/incoming`) return handleIncoming(options, basePath, params, jobs)
+      if (routePath.startsWith(`${basePath}/outgoing/`)) {
+        const outgoingRest = routePath.slice(`${basePath}/outgoing/`.length)
+        const [outboundIdPart, suffix] = outgoingRest.split("/")
+        const outboundId = outboundIdPart ? decodeSafeSegment(outboundIdPart) : null
+        if (!outboundId) return textResponse(404, "not found")
+        if (suffix === "status") return handleOutgoingStatus(options, outboundId, params)
+        if (suffix === undefined) return handleOutgoing(options, basePath, outboundId, params, jobs)
+      }
       if (routePath === `${basePath}/listen`) return handleListen(options, basePath)
       if (routePath === `${basePath}/recording`) return handleRecording(options, basePath, params, jobs)
       return textResponse(404, "not found")

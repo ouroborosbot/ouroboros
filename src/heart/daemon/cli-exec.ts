@@ -5110,6 +5110,7 @@ async function executeConnectVoice(agent: string, deps: OuroCliDeps): Promise<st
     "Optional managed Twilio phone transport setup:",
     `  ouro vault config set --agent ${agent} --key voice.twilioAccountSid`,
     `  ouro vault config set --agent ${agent} --key voice.twilioAuthToken`,
+    `  ouro vault config set --agent ${agent} --key voice.twilioFromNumber --value <your Twilio phone number>`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPublicUrl`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioBasePath --value /voice/agents/${agentPathSegment}/twilio`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPort --value 18910`,

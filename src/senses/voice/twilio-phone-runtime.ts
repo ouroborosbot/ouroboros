@@ -1,4 +1,5 @@
 import * as path from "path"
+import * as crypto from "node:crypto"
 import type { Server } from "http"
 import { getAgentRoot, loadAgentConfig, type AgentConfig, type AgentProvider } from "../../heart/identity"
 import { loadOrCreateMachineIdentity, type MachineIdentity } from "../../heart/machine-identity"
@@ -25,12 +26,21 @@ import {
   normalizeTwilioPhoneBasePath,
   normalizeTwilioPhonePlaybackMode,
   normalizeTwilioPhoneTransportMode,
+  normalizeTwilioE164PhoneNumber,
   startTwilioPhoneBridgeServer,
+  createTwilioOutboundCall,
+  readRecentTwilioOutboundCallJobs,
+  twilioOutboundCallStatusCallbackUrl,
+  twilioOutboundCallWebhookUrl,
   twilioPhoneWebhookUrl,
+  updateTwilioOutboundCallJob,
+  writeTwilioOutboundCallJob,
   type StartTwilioPhoneBridgeServerOptions,
   type TwilioPhonePlaybackMode,
   type TwilioPhoneTransportMode,
   type TwilioPhoneBridgeServer,
+  type TwilioOutboundCallCreateRequest,
+  type TwilioOutboundCallCreateResult,
 } from "./twilio-phone"
 import { createWhisperCppTranscriber } from "./whisper"
 
@@ -50,6 +60,7 @@ export interface TwilioPhoneTransportRuntimeOverrides {
   greetingPrebufferMs?: number
   playbackMode?: TwilioPhonePlaybackMode
   transportMode?: TwilioPhoneTransportMode
+  twilioFromNumber?: string
 }
 
 export interface TwilioPhoneTransportRuntimeSettings {
@@ -66,6 +77,7 @@ export interface TwilioPhoneTransportRuntimeSettings {
   whisperModelPath: string
   twilioAccountSid?: string
   twilioAuthToken?: string
+  twilioFromNumber?: string
   defaultFriendId?: string
   recordTimeoutSeconds: number
   recordMaxLengthSeconds: number
@@ -113,6 +125,34 @@ export interface TwilioPhoneTransportRuntimeDeps {
   createTranscriber: typeof createWhisperCppTranscriber
   createTts: typeof createElevenLabsTtsClient
   startBridgeServer: (options: StartTwilioPhoneBridgeServerOptions) => Promise<TwilioPhoneBridgeServer>
+}
+
+export interface PlaceConfiguredTwilioPhoneCallOptions {
+  agentName: string
+  friendId?: string
+  to: string
+  reason: string
+  outboundId?: string
+  now?: Date
+  redialGuardMs?: number
+}
+
+export interface PlaceConfiguredTwilioPhoneCallResult {
+  outboundId: string
+  callSid?: string
+  status?: string
+  webhookUrl: string
+  statusCallbackUrl: string
+}
+
+export interface TwilioPhoneOutboundCallRuntimeDeps {
+  waitForRuntimeCredentialBootstrap: typeof waitForRuntimeCredentialBootstrap
+  loadMachineIdentity: () => MachineIdentity
+  refreshRuntimeConfig: typeof refreshRuntimeCredentialConfig
+  refreshMachineRuntimeConfig: typeof refreshMachineRuntimeCredentialConfig
+  readRuntimeConfig: typeof readRuntimeCredentialConfig
+  readMachineRuntimeConfig: typeof readMachineRuntimeCredentialConfig
+  createOutboundCall: (request: TwilioOutboundCallCreateRequest) => Promise<TwilioOutboundCallCreateResult>
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -200,6 +240,10 @@ function trimOptional(value: string | undefined): string | undefined {
   return value?.trim() || undefined
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 export function agentScopedTwilioPhoneBasePath(agentName: string): string {
   return `/voice/agents/${agentPathSegment(agentName)}/twilio`
 }
@@ -274,6 +318,9 @@ export function resolveTwilioPhoneTransportRuntime(
     whisperModelPath,
     twilioAccountSid: configString(options.runtimeConfig, "voice.twilioAccountSid"),
     twilioAuthToken: configString(options.runtimeConfig, "voice.twilioAuthToken"),
+    twilioFromNumber: trimOptional(overrides.twilioFromNumber)
+      ?? configString(options.runtimeConfig, "voice.twilioFromNumber")
+      ?? configString(options.machineConfig, "voice.twilioFromNumber"),
     defaultFriendId: trimOptional(overrides.defaultFriendId)
       ?? configString(options.machineConfig, "voice.twilioDefaultFriendId"),
     recordTimeoutSeconds: overrides.recordTimeoutSeconds
@@ -306,43 +353,76 @@ const defaultTwilioPhoneTransportRuntimeDeps: TwilioPhoneTransportRuntimeDeps = 
   startBridgeServer: startTwilioPhoneBridgeServer,
 }
 
+const defaultTwilioPhoneOutboundCallRuntimeDeps: TwilioPhoneOutboundCallRuntimeDeps = {
+  waitForRuntimeCredentialBootstrap,
+  loadMachineIdentity: loadOrCreateMachineIdentity,
+  refreshRuntimeConfig: refreshRuntimeCredentialConfig,
+  refreshMachineRuntimeConfig: refreshMachineRuntimeCredentialConfig,
+  readRuntimeConfig: readRuntimeCredentialConfig,
+  readMachineRuntimeConfig: readMachineRuntimeCredentialConfig,
+  createOutboundCall: createTwilioOutboundCall,
+}
+
+async function readFreshRuntimeSettings(
+  agentName: string,
+  overrides: TwilioPhoneTransportRuntimeOverrides | undefined,
+  defaultBasePath: string | undefined,
+  requirePublicUrl: boolean | undefined,
+  deps: Pick<TwilioPhoneOutboundCallRuntimeDeps, "waitForRuntimeCredentialBootstrap" | "loadMachineIdentity" | "refreshRuntimeConfig" | "refreshMachineRuntimeConfig" | "readRuntimeConfig" | "readMachineRuntimeConfig">,
+): Promise<TwilioPhoneTransportRuntimeSettings> {
+  const bootstrapped = await deps.waitForRuntimeCredentialBootstrap(agentName)
+  const hasBootstrappedConfig = bootstrapped
+    && deps.readRuntimeConfig(agentName).ok
+    && deps.readMachineRuntimeConfig(agentName).ok
+  if (!hasBootstrappedConfig) {
+    const machine = deps.loadMachineIdentity()
+    await Promise.all([
+      deps.refreshRuntimeConfig(agentName, { preserveCachedOnFailure: true }).catch(() => undefined),
+      deps.refreshMachineRuntimeConfig(agentName, machine.machineId, { preserveCachedOnFailure: true }).catch(() => undefined),
+    ])
+  }
+  const runtimeConfig = requireConfig(deps.readRuntimeConfig(agentName), "portable runtime/config")
+  const machineConfig = requireConfig(deps.readMachineRuntimeConfig(agentName), "machine runtime config")
+  const resolution = resolveTwilioPhoneTransportRuntime({
+    agentName,
+    runtimeConfig,
+    machineConfig,
+    overrides,
+    defaultBasePath,
+    requirePublicUrl,
+  })
+  if (resolution.status === "disabled") {
+    throw new Error(`Twilio phone voice transport is disabled: ${resolution.reason}`)
+  }
+  return resolution.settings
+}
+
 export async function startConfiguredTwilioPhoneTransport(
   options: StartConfiguredTwilioPhoneTransportOptions,
   deps: TwilioPhoneTransportRuntimeDeps = defaultTwilioPhoneTransportRuntimeDeps,
 ): Promise<TwilioPhoneTransportRuntimeState> {
-  const bootstrapped = await deps.waitForRuntimeCredentialBootstrap(options.agentName)
-  const hasBootstrappedConfig = bootstrapped
-    && deps.readRuntimeConfig(options.agentName).ok
-    && deps.readMachineRuntimeConfig(options.agentName).ok
-  if (!hasBootstrappedConfig) {
-    const machine = deps.loadMachineIdentity()
-    await Promise.all([
-      deps.refreshRuntimeConfig(options.agentName, { preserveCachedOnFailure: true }).catch(() => undefined),
-      deps.refreshMachineRuntimeConfig(options.agentName, machine.machineId, { preserveCachedOnFailure: true }).catch(() => undefined),
-    ])
-  }
-  const runtimeConfig = requireConfig(deps.readRuntimeConfig(options.agentName), "portable runtime/config")
-  const machineConfig = requireConfig(deps.readMachineRuntimeConfig(options.agentName), "machine runtime config")
-  const resolution = resolveTwilioPhoneTransportRuntime({
-    agentName: options.agentName,
-    runtimeConfig,
-    machineConfig,
-    overrides: options.overrides,
-    defaultBasePath: options.defaultBasePath,
-    requirePublicUrl: options.requirePublicUrl,
-  })
-  if (resolution.status === "disabled") {
+  let settings: TwilioPhoneTransportRuntimeSettings
+  try {
+    settings = await readFreshRuntimeSettings(
+      options.agentName,
+      options.overrides,
+      options.defaultBasePath,
+      options.requirePublicUrl,
+      deps,
+    )
+  } catch (error) {
+    if (!errorMessage(error).startsWith("Twilio phone voice transport is disabled:")) throw error
+    const reason = errorMessage(error).replace(/^Twilio phone voice transport is disabled: /, "")
     emitNervesEvent({
       component: "senses",
       event: "senses.voice_twilio_transport_disabled",
       message: "Twilio phone voice transport is not attached on this machine",
-      meta: { agentName: options.agentName, reason: resolution.reason },
+      meta: { agentName: options.agentName, reason },
     })
-    return resolution
+    return { status: "disabled", reason }
   }
 
   await deps.cacheSelectedProviderCredentials(options.agentName)
-  const settings = resolution.settings
   const transcriber = deps.createTranscriber({
     whisperCliPath: settings.whisperCliPath,
     modelPath: settings.whisperModelPath,
@@ -363,6 +443,7 @@ export async function startConfiguredTwilioPhoneTransport(
     host: settings.host,
     twilioAccountSid: settings.twilioAccountSid,
     twilioAuthToken: settings.twilioAuthToken,
+    twilioFromNumber: settings.twilioFromNumber,
     defaultFriendId: settings.defaultFriendId,
     recordTimeoutSeconds: settings.recordTimeoutSeconds,
     recordMaxLengthSeconds: settings.recordMaxLengthSeconds,
@@ -386,6 +467,108 @@ export async function startConfiguredTwilioPhoneTransport(
   })
 
   return { status: "started", settings, bridge }
+}
+
+function createOutboundId(now: Date): string {
+  const timestamp = now.toISOString().replace(/[^0-9A-Za-z]+/g, "").slice(0, 15)
+  return `outbound-${timestamp}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+function terminalOutboundStatus(status: string | undefined): boolean {
+  const normalized = status?.trim().toLowerCase()
+  return normalized === "completed"
+    || normalized === "busy"
+    || normalized === "no-answer"
+    || normalized === "failed"
+    || normalized === "canceled"
+}
+
+export async function placeConfiguredTwilioPhoneCall(
+  options: PlaceConfiguredTwilioPhoneCallOptions,
+  deps: TwilioPhoneOutboundCallRuntimeDeps = defaultTwilioPhoneOutboundCallRuntimeDeps,
+): Promise<PlaceConfiguredTwilioPhoneCallResult> {
+  const settings = await readFreshRuntimeSettings(
+    options.agentName,
+    undefined,
+    agentScopedTwilioPhoneBasePath(options.agentName),
+    true,
+    deps,
+  )
+  const to = normalizeTwilioE164PhoneNumber(options.to)
+  const from = normalizeTwilioE164PhoneNumber(settings.twilioFromNumber)
+  if (!to) throw new Error("outbound voice call target must be an E.164 phone number")
+  if (!from) throw new Error("missing voice.twilioFromNumber; save the Twilio caller number before outbound phone calls")
+  if (!settings.twilioAccountSid?.trim()) throw new Error("missing voice.twilioAccountSid; save Twilio credentials before outbound phone calls")
+  if (!settings.twilioAuthToken?.trim()) throw new Error("missing voice.twilioAuthToken; save Twilio credentials before outbound phone calls")
+  const accountSid = settings.twilioAccountSid.trim()
+  const authToken = settings.twilioAuthToken.trim()
+  const now = options.now ?? new Date()
+  const recent = await readRecentTwilioOutboundCallJobs({
+    outputDir: settings.outputDir,
+    to,
+    friendId: options.friendId,
+    sinceMs: options.redialGuardMs ?? 120_000,
+    now: now.getTime(),
+  })
+  const activeRecent = recent.find((job) => !terminalOutboundStatus(job.status))
+  if (activeRecent) {
+    throw new Error("outbound voice call suppressed: a recent call to this friend/number is still active")
+  }
+
+  const outboundId = options.outboundId?.trim() || createOutboundId(now)
+  const webhookUrl = twilioOutboundCallWebhookUrl(settings.publicBaseUrl, settings.basePath, outboundId)
+  const statusCallbackUrl = twilioOutboundCallStatusCallbackUrl(settings.publicBaseUrl, settings.basePath, outboundId)
+  await writeTwilioOutboundCallJob(settings.outputDir, {
+    schemaVersion: 1,
+    outboundId,
+    agentName: options.agentName,
+    ...(options.friendId?.trim() ? { friendId: options.friendId.trim() } : {}),
+    to,
+    from,
+    reason: options.reason.trim(),
+    createdAt: now.toISOString(),
+    status: "requested",
+  })
+
+  try {
+    const call = await deps.createOutboundCall({
+      accountSid,
+      authToken,
+      to,
+      from,
+      twimlUrl: webhookUrl,
+      statusCallbackUrl,
+    })
+    await updateTwilioOutboundCallJob(settings.outputDir, outboundId, {
+      transportCallSid: call.callSid,
+      status: call.status ?? "queued",
+      events: [{ at: new Date().toISOString(), status: call.status ?? "queued", ...(call.callSid ? { callSid: call.callSid } : {}) }],
+    })
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_outbound_call_requested",
+      message: "Twilio outbound voice call requested",
+      meta: {
+        agentName: options.agentName,
+        outboundId: outboundId.replace(/[^A-Za-z0-9._-]+/g, "-"),
+        callSid: call.callSid?.replace(/[^A-Za-z0-9._-]+/g, "-") ?? "unknown",
+        status: call.status ?? "queued",
+      },
+    })
+    return {
+      outboundId,
+      callSid: call.callSid,
+      status: call.status,
+      webhookUrl,
+      statusCallbackUrl,
+    }
+  } catch (error) {
+    await updateTwilioOutboundCallJob(settings.outputDir, outboundId, {
+      status: "failed",
+      error: errorMessage(error),
+    })
+    throw error
+  }
 }
 
 export function closeTwilioPhoneBridgeServer(server: TwilioPhoneBridgeServer): Promise<void> {

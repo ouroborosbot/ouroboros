@@ -1,10 +1,15 @@
 import type { Server } from "http"
+import * as fs from "fs/promises"
+import * as os from "os"
+import * as path from "path"
 import { describe, expect, it, vi } from "vitest"
 import {
   agentScopedTwilioPhoneBasePath,
   closeTwilioPhoneBridgeServer,
+  placeConfiguredTwilioPhoneCall,
   resolveTwilioPhoneTransportRuntime,
   startConfiguredTwilioPhoneTransport,
+  type TwilioPhoneOutboundCallRuntimeDeps,
   type TwilioPhoneTransportRuntimeDeps,
 } from "../../../senses/voice"
 import type { VoiceTtsService, VoiceTranscriber } from "../../../senses/voice"
@@ -50,6 +55,24 @@ function fakeDeps(runtimeConfig: Record<string, unknown>, machineConfig: Record<
   }
 }
 
+function fakeOutboundDeps(runtimeConfig: Record<string, unknown>, machineConfig: Record<string, unknown>): TwilioPhoneOutboundCallRuntimeDeps {
+  return {
+    waitForRuntimeCredentialBootstrap: vi.fn(async () => undefined),
+    loadMachineIdentity: vi.fn(() => ({
+      schemaVersion: 1,
+      machineId: "machine_voice",
+      createdAt: "2026-05-07T08:00:00.000Z",
+      updatedAt: "2026-05-07T08:00:00.000Z",
+      hostnameAliases: [],
+    })),
+    refreshRuntimeConfig: vi.fn(async () => runtimeReadResult(runtimeConfig)),
+    refreshMachineRuntimeConfig: vi.fn(async () => runtimeReadResult(machineConfig)),
+    readRuntimeConfig: vi.fn(() => runtimeReadResult(runtimeConfig)),
+    readMachineRuntimeConfig: vi.fn(() => runtimeReadResult(machineConfig)),
+    createOutboundCall: vi.fn(async () => ({ callSid: "CAOUT", status: "queued" })),
+  }
+}
+
 describe("Twilio phone transport runtime", () => {
   const configuredRuntime = {
     integrations: {
@@ -59,6 +82,7 @@ describe("Twilio phone transport runtime", () => {
     voice: {
       twilioAccountSid: "AC123",
       twilioAuthToken: "twilio-secret",
+      twilioFromNumber: "+15557654321",
     },
   }
   const configuredMachine = {
@@ -113,6 +137,7 @@ describe("Twilio phone transport runtime", () => {
         port: 2222,
         host: "127.0.0.1",
         defaultFriendId: "ari",
+        twilioFromNumber: "+15557654321",
         recordTimeoutSeconds: 3,
         recordMaxLengthSeconds: 30,
         greetingPrebufferMs: 4200,
@@ -120,6 +145,51 @@ describe("Twilio phone transport runtime", () => {
         transportMode: "media-stream",
       },
     })
+  })
+
+  it("places configured outbound phone calls through the Twilio transport", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-"))
+    try {
+      const machineConfig = {
+        voice: {
+          ...configuredMachine.voice,
+          twilioOutputDir: outputDir,
+        },
+      }
+      const deps = fakeOutboundDeps(configuredRuntime, machineConfig)
+      const result = await placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+1 (555) 123-4567",
+        reason: "check in about the phone alpha",
+        outboundId: "outbound-test",
+        now: new Date("2026-05-08T12:00:00.000Z"),
+      }, deps)
+
+      expect(result).toMatchObject({
+        outboundId: "outbound-test",
+        callSid: "CAOUT",
+        status: "queued",
+        webhookUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test",
+        statusCallbackUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test/status",
+      })
+      expect(deps.createOutboundCall).toHaveBeenCalledWith({
+        accountSid: "AC123",
+        authToken: "twilio-secret",
+        to: "+15551234567",
+        from: "+15557654321",
+        twimlUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test",
+        statusCallbackUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test/status",
+      })
+      const saved = JSON.parse(await fs.readFile(path.join(outputDir, "outbound", "outbound-test.json"), "utf8")) as { status?: string; transportCallSid?: string; reason?: string }
+      expect(saved).toMatchObject({
+        status: "queued",
+        transportCallSid: "CAOUT",
+        reason: "check in about the phone alpha",
+      })
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
   })
 
   it("throws when phone transport is explicitly required without a public URL", () => {

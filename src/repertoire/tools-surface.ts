@@ -8,7 +8,69 @@ import { containsInternalMetaMarkers } from "../senses/bluebubbles-meta-guard";
 import { emitNervesEvent } from "../nerves/runtime";
 import * as path from "path";
 import type { AttentionItem } from "../arc/attention-types";
+import { isTrustedLevel, type FriendRecord } from "../mind/friends/types";
+import { normalizeTwilioE164PhoneNumber } from "../senses/voice/twilio-phone";
 import type { ToolDefinition } from "./tools-base";
+
+type SurfaceDeliveryChannel = "auto" | "voice"
+
+interface SurfaceDeliveryHint {
+  channel?: SurfaceDeliveryChannel
+  phoneNumber?: string
+}
+
+function normalizeSurfaceDeliveryChannel(value: unknown): SurfaceDeliveryChannel {
+  if (typeof value !== "string") return "auto"
+  const normalized = value.trim().toLowerCase()
+  return normalized === "voice" ? "voice" : "auto"
+}
+
+function readFriendRecordById(friendsDir: string, friendId: string): FriendRecord | null {
+  const recordPath = path.join(friendsDir, `${friendId}.json`)
+  if (!fs.existsSync(recordPath)) return null
+  try {
+    return JSON.parse(fs.readFileSync(recordPath, "utf-8")) as FriendRecord
+  } catch {
+    return null
+  }
+}
+
+function findFriendRecord(friendsDir: string, friendId: string): FriendRecord | null {
+  const byId = readFriendRecordById(friendsDir, friendId)
+  if (byId) return byId
+  const normalized = friendId.trim().toLowerCase()
+  if (!normalized) return null
+  try {
+    const records = fs.readdirSync(friendsDir)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => {
+        try {
+          return JSON.parse(fs.readFileSync(path.join(friendsDir, file), "utf-8")) as FriendRecord
+        } catch {
+          return null
+        }
+      })
+      .filter((record): record is FriendRecord => Boolean(record))
+    return records.find((record) =>
+      record.id === friendId
+      || record.name?.toLowerCase() === normalized
+      || record.externalIds?.some((externalId) => externalId.externalId.toLowerCase() === normalized)
+    ) ?? records.find((record) => record.name?.toLowerCase().startsWith(normalized)) ?? null
+  } catch {
+    return null
+  }
+}
+
+function phoneNumberForVoiceCall(friend: FriendRecord | null, explicitPhoneNumber?: string): string | undefined {
+  const explicit = normalizeTwilioE164PhoneNumber(explicitPhoneNumber)
+  if (explicit) return explicit
+  for (const externalId of friend?.externalIds ?? []) {
+    if (externalId.provider !== "imessage-handle") continue
+    const phoneNumber = normalizeTwilioE164PhoneNumber(externalId.externalId)
+    if (phoneNumber) return phoneNumber
+  }
+  return undefined
+}
 
 // Surface tool schema — canonical home. Handler lives in senses/surface-tool.ts.
 export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {
@@ -16,7 +78,7 @@ export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {
   function: {
     name: "surface",
     description:
-      "send a message to someone — write it the way you'd text a friend. pass delegationId to address a held thought (see your attention queue above), or friendId for spontaneous outreach. does not end your turn.",
+      "send a message to someone — write it the way you'd text a friend. pass delegationId to address a held thought (see your attention queue above), or friendId for spontaneous outreach. set channel=voice only when you intentionally want a live phone call; content becomes the call reason/opening context. does not end your turn.",
     parameters: {
       type: "object",
       properties: {
@@ -32,6 +94,15 @@ export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {
           type: "string",
           description: "friend to reach out to spontaneously (when not addressing a held thought)",
         },
+        channel: {
+          type: "string",
+          enum: ["auto", "voice"],
+          description: "optional delivery channel; use voice for a live phone call to a trusted friend, otherwise omit",
+        },
+        phoneNumber: {
+          type: "string",
+          description: "optional E.164 phone override for channel=voice when the trusted friend's record has no usable phone handle",
+        },
       },
       required: ["content"],
     },
@@ -44,6 +115,10 @@ export const surfaceToolDefinition: ToolDefinition = {
   tool: surfaceToolDef,
   handler: async (args, ctx) => {
     const rawContent = args.content ?? ""
+    const deliveryHint: SurfaceDeliveryHint = {
+      channel: normalizeSurfaceDeliveryChannel(args.channel),
+      phoneNumber: typeof args.phoneNumber === "string" ? args.phoneNumber : undefined,
+    }
     if (containsInternalMetaMarkers(rawContent)) {
       emitNervesEvent({
         level: "warn",
@@ -62,7 +137,7 @@ export const surfaceToolDefinition: ToolDefinition = {
     const queue = ctx?.delegatedOrigins ?? []
     const agentName = (() => { try { return getAgentName() } catch { return "unknown" } })()
 
-    const routeToFriend = async (friendId: string, content: string, queueItem?: AttentionItem): Promise<SurfaceRouteResult> => {
+    const routeToFriend = async (friendId: string, content: string, queueItem?: AttentionItem, hint?: SurfaceDeliveryHint): Promise<SurfaceRouteResult> => {
       /* v8 ignore start -- routing: integration path tested via inner-dialog routing tests @preserve */
       try {
         const agentRoot = getAgentRoot()
@@ -71,20 +146,44 @@ export const surfaceToolDefinition: ToolDefinition = {
 
         // Resolve friend name → UUID if needed (agents may pass name instead of UUID)
         let resolvedFriendId = friendId
+        let resolvedFriendRecord: FriendRecord | null = findFriendRecord(friendsDir, friendId)
         if (!fs.existsSync(path.join(sessionsDir, friendId))) {
           try {
             const friendFiles = fs.readdirSync(friendsDir).filter((f) => f.endsWith(".json"))
             for (const file of friendFiles) {
               const raw = fs.readFileSync(path.join(friendsDir, file), "utf-8")
-              const record = JSON.parse(raw) as { id?: string; name?: string }
+              const record = JSON.parse(raw) as FriendRecord
               if (record.name?.toLowerCase() === friendId.toLowerCase() && record.id) {
                 resolvedFriendId = record.id
+                resolvedFriendRecord = record
                 break
               }
             }
           } catch { /* friends dir unreadable — continue with original friendId */ }
         }
         friendId = resolvedFriendId
+        resolvedFriendRecord = resolvedFriendRecord ?? findFriendRecord(friendsDir, friendId)
+
+        if (hint?.channel === "voice") {
+          if (!resolvedFriendRecord) {
+            return { status: "failed", detail: "voice call requires a known friend record" }
+          }
+          if (!isTrustedLevel(resolvedFriendRecord.trustLevel)) {
+            return { status: "failed", detail: "voice calls are limited to trusted friends" }
+          }
+          const phoneNumber = phoneNumberForVoiceCall(resolvedFriendRecord, hint.phoneNumber)
+          if (!phoneNumber) {
+            return { status: "failed", detail: "no phone number is available for voice call" }
+          }
+          const { placeConfiguredTwilioPhoneCall } = await import("../senses/voice/twilio-phone-runtime")
+          const call = await placeConfiguredTwilioPhoneCall({
+            agentName,
+            friendId,
+            to: phoneNumber,
+            reason: content,
+          })
+          return { status: "delivered", detail: `voice call initiated${call.status ? ` (${call.status})` : ""}` }
+        }
 
         // Priority 1: Bridge-preferred session (if queue item has a bridgeId)
         if (queueItem?.bridgeId) {
@@ -193,6 +292,7 @@ export const surfaceToolDefinition: ToolDefinition = {
       content: args.content ?? "",
       delegationId: args.delegationId,
       friendId: args.friendId,
+      deliveryHint: deliveryHint.channel === "voice" || deliveryHint.phoneNumber ? deliveryHint : undefined,
       queue,
       routeToFriend,
       advanceObligation: (obligationId, update) => {
@@ -224,7 +324,6 @@ export const surfaceToolDefinition: ToolDefinition = {
       },
     })
   },
-  summaryKeys: ["content", "delegationId"],
+  summaryKeys: ["content", "delegationId", "friendId", "channel"],
 }
 /* v8 ignore stop */
-
