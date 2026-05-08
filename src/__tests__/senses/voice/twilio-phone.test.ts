@@ -104,7 +104,14 @@ describe("Twilio phone voice bridge", () => {
       from: "+1 (555) 123-4567",
       to: "+1 (555) 765-4321",
     })).toBe("twilio-phone-ari-via-15557654321")
+    expect(twilioPhoneVoiceSessionKey({
+      from: "+++",
+    })).toBe("twilio-phone-unknown")
+    expect(twilioPhoneVoiceSessionKey({
+      to: "+1 (555) 765-4321",
+    })).toBe("twilio-phone-line-15557654321")
     expect(twilioPhoneVoiceSessionKey({ callSid: "CA123" })).toBe("twilio-phone-CA123")
+    expect(twilioPhoneVoiceSessionKey({})).toBe("twilio-phone-incoming")
   })
 
   it("starts an agent voice turn when answering inbound calls", async () => {
@@ -577,6 +584,283 @@ describe("Twilio phone voice bridge", () => {
     }
   })
 
+  it("streams the inbound greeting through a Twilio Play URL", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/incoming",
+        headers: {},
+        body: formBody({ CallSid: "CA123", From: "+15551234567", To: "+15557654321" }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(String(response.body)).toContain("<Record")
+      const streamUrl = firstPlayUrl(response.body)
+      expect(streamUrl).toBe("https://voice.example.com/voice/twilio/audio-stream/CA123/twilio-CA123-connected.mp3")
+
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(streamUrl).pathname,
+        headers: {},
+      })
+
+      expect(streamResponse.statusCode).toBe(200)
+      expect(await collectBridgeBody(streamResponse.body)).toEqual(Buffer.from("mp3-response"))
+      expect(options.runSenseTurn).toHaveBeenCalledWith(expect.objectContaining({
+        userMessage: expect.stringContaining("A Twilio phone voice call just connected."),
+        sessionKey: "twilio-phone-15551234567-via-15557654321",
+      }))
+      expect(await fs.readFile(path.join(outputDir, "CA123", "twilio-ca123-connected.mp3"), "utf8")).toBe("mp3-response")
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("streams returned TTS audio when the provider does not expose early chunks", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/recording",
+        headers: {},
+        body: formBody({
+          CallSid: "CA111",
+          RecordingSid: "RE222",
+          RecordingUrl: "https://api.twilio.com/Recordings/RE222",
+          From: "+15551234567",
+          To: "+15557654321",
+        }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      const streamUrl = firstPlayUrl(response.body)
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(streamUrl).pathname,
+        headers: {},
+      })
+
+      expect(streamResponse.statusCode).toBe(200)
+      expect(await collectBridgeBody(streamResponse.body)).toEqual(Buffer.from("mp3-response"))
+      expect(await fs.readFile(path.join(outputDir, "CA111", "twilio-ca111-re222.mp3"), "utf8")).toBe("mp3-response")
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("surfaces streaming turn failures before any audio reaches Twilio", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      options.downloadRecording = vi.fn(async () => {
+        throw new Error("recording unavailable")
+      })
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/recording",
+        headers: {},
+        body: formBody({
+          CallSid: "CA111",
+          RecordingSid: "RE222",
+          RecordingUrl: "https://api.twilio.com/Recordings/RE222",
+          From: "+15551234567",
+          To: "+15557654321",
+        }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(firstPlayUrl(response.body)).pathname,
+        headers: {},
+      })
+
+      await expect(collectBridgeBody(streamResponse.body)).rejects.toThrow("recording unavailable")
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("surfaces streaming TTS failures before any audio reaches Twilio", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      options.tts.synthesize = vi.fn(async () => {
+        throw new Error("tts down")
+      })
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/recording",
+        headers: {},
+        body: formBody({
+          CallSid: "CA111",
+          RecordingSid: "RE222",
+          RecordingUrl: "https://api.twilio.com/Recordings/RE222",
+          From: "+15551234567",
+          To: "+15557654321",
+        }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(firstPlayUrl(response.body)).pathname,
+        headers: {},
+      })
+
+      await expect(collectBridgeBody(streamResponse.body)).rejects.toThrow("tts down")
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("ends a stream cleanly when TTS fails after audio already started", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      options.tts.synthesize = vi.fn(async (request) => {
+        request.onAudioChunk?.(Buffer.from("partial"))
+        throw new Error("late tts down")
+      })
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/incoming",
+        headers: {},
+        body: formBody({ CallSid: "CA123", From: "+15551234567", To: "+15557654321" }),
+      })
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(firstPlayUrl(response.body)).pathname,
+        headers: {},
+      })
+      const iterator = (streamResponse.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
+
+      await expect(iterator.next()).resolves.toMatchObject({
+        done: false,
+        value: Buffer.from("partial"),
+      })
+      await expect(iterator.next()).resolves.toMatchObject({ done: true })
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("routes blank STT output through the streaming reprompt path", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      options.transcriber.transcribe = vi.fn(async (request) => buildVoiceTranscript({
+        utteranceId: request.utteranceId,
+        text: "[NO_SPEECH]",
+        audioPath: request.audioPath,
+        source: "whisper.cpp",
+      }))
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/recording",
+        headers: {},
+        body: formBody({
+          CallSid: "CA111",
+          RecordingSid: "RE222",
+          RecordingUrl: "https://api.twilio.com/Recordings/RE222",
+          From: "+15551234567",
+        }),
+      })
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(firstPlayUrl(response.body)).pathname,
+        headers: {},
+      })
+
+      expect(await collectBridgeBody(streamResponse.body)).toEqual(Buffer.from("mp3-response"))
+      expect(options.runSenseTurn).toHaveBeenCalledWith(expect.objectContaining({
+        userMessage: expect.stringContaining("no intelligible speech"),
+        sessionKey: "twilio-phone-15551234567",
+      }))
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("keeps streamed audio alive when artifact persistence fails afterward", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    let releaseTts: (() => void) | undefined
+    try {
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        playbackMode: "stream" as const,
+      }
+      options.tts.synthesize = vi.fn(async (request) => {
+        request.onAudioChunk?.(Buffer.from("voice"))
+        await new Promise<void>((resolve) => {
+          releaseTts = resolve
+        })
+        return {
+          utteranceId: request.utteranceId,
+          audio: Buffer.from("voice"),
+          byteLength: 5,
+          chunkCount: 1,
+          modelId: "eleven_flash_v2_5",
+          voiceId: "voice_123",
+          mimeType: "audio/mpeg",
+        }
+      })
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/incoming",
+        headers: {},
+        body: formBody({ CallSid: "CA123", From: "+15551234567", To: "+15557654321" }),
+      })
+      const streamResponse = await bridge.handle({
+        method: "GET",
+        path: new URL(firstPlayUrl(response.body)).pathname,
+        headers: {},
+      })
+      const iterator = (streamResponse.body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
+
+      await expect(iterator.next()).resolves.toMatchObject({
+        done: false,
+        value: Buffer.from("voice"),
+      })
+      await fs.rm(path.join(outputDir, "CA123"), { recursive: true, force: true })
+      await fs.writeFile(path.join(outputDir, "CA123"), "not a directory")
+      releaseTts?.()
+
+      await expect(iterator.next()).resolves.toMatchObject({ done: true })
+    } finally {
+      releaseTts?.()
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
   it("routes blank STT output into an agent reprompt instead of speaking the blank token", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
     try {
@@ -894,6 +1178,21 @@ describe("Twilio phone voice bridge", () => {
         path: "/voice/twilio/audio/CA111/missing.mp3",
         headers: {},
       })
+      const shortStream = await bridge.handle({
+        method: "GET",
+        path: "/voice/twilio/audio-stream/CA111",
+        headers: {},
+      })
+      const invalidStreamSegment = await bridge.handle({
+        method: "GET",
+        path: "/voice/twilio/audio-stream/%2e/reply.mp3",
+        headers: {},
+      })
+      const missingStreamJob = await bridge.handle({
+        method: "GET",
+        path: "/voice/twilio/audio-stream/CA111/missing.mp3",
+        headers: {},
+      })
 
       expect(ok.statusCode).toBe(200)
       expect(ok.headers["content-type"]).toBe("audio/mpeg")
@@ -906,6 +1205,9 @@ describe("Twilio phone voice bridge", () => {
       expect(malformedEncoding.statusCode).toBe(404)
       expect(dotSegment.statusCode).toBe(404)
       expect(missing.statusCode).toBe(404)
+      expect(shortStream.statusCode).toBe(404)
+      expect(invalidStreamSegment.statusCode).toBe(404)
+      expect(missingStreamJob.statusCode).toBe(404)
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true })
     }
@@ -947,6 +1249,42 @@ describe("Twilio phone voice bridge", () => {
       await new Promise<void>((resolve, reject) => {
         server.server.close((error) => error ? reject(error) : resolve())
       })
+    }
+  })
+
+  it("serves streaming audio Play URLs through the local HTTP server", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    const server = await startTwilioPhoneBridgeServer({
+      ...baseBridgeOptions(outputDir),
+      playbackMode: "stream",
+      port: 0,
+      host: "127.0.0.1",
+    })
+    try {
+      const twimlResponse = await fetch(`${server.localUrl}/voice/twilio/recording`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody({
+          CallSid: "CA111",
+          RecordingSid: "RE222",
+          RecordingUrl: "https://api.twilio.com/Recordings/RE222",
+          From: "+15551234567",
+          To: "+15557654321",
+        }),
+      })
+
+      expect(twimlResponse.status).toBe(200)
+      const streamUrl = firstPlayUrl(await twimlResponse.text())
+      const audioResponse = await fetch(`${server.localUrl}${new URL(streamUrl).pathname}`)
+
+      expect(audioResponse.status).toBe(200)
+      expect(audioResponse.headers.get("content-type")).toBe("audio/mpeg")
+      expect(await audioResponse.text()).toBe("mp3-response")
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.server.close((error) => error ? reject(error) : resolve())
+      })
+      await fs.rm(outputDir, { recursive: true, force: true })
     }
   })
 

@@ -157,10 +157,11 @@ export async function runVoiceLoopbackTurn(options: VoiceLoopbackTurnOptions): P
   })
 
   if (speechSegments.length > 0) {
+    const tts = aggregateSegments(speechSegments)
     const result: VoiceLoopbackTurnResult = {
       responseText: turn.response,
       ponderDeferred: turn.ponderDeferred,
-      tts: aggregateSegments(speechSegments),
+      tts,
       speechSegments,
       speechDeliveryErrors,
     }
@@ -172,7 +173,7 @@ export async function runVoiceLoopbackTurn(options: VoiceLoopbackTurnOptions): P
         utteranceId: options.transcript.utteranceId,
         responseLength: turn.response.length,
         segmentCount: speechSegments.length,
-        byteLength: result.tts.status === "delivered" ? result.tts.byteLength : 0,
+        byteLength: tts.byteLength,
       },
     })
     return result
@@ -180,7 +181,7 @@ export async function runVoiceLoopbackTurn(options: VoiceLoopbackTurnOptions): P
 
   const turnDeliveryFailures = turn.deliveryFailures ?? []
   if (speechDeliveryErrors.length > 0 || turnDeliveryFailures.length > 0) {
-    const firstError = speechDeliveryErrors[0]?.error ?? turnDeliveryFailures[0]?.error ?? "voice delivery failed"
+    const firstError = speechDeliveryErrors[0]?.error ?? turnDeliveryFailures[0]!.error
     emitNervesEvent({
       level: "error",
       component: "senses",

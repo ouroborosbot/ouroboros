@@ -573,6 +573,73 @@ describe("runSenseTurn", () => {
     expect(result.response).toBe("quick voice update\nfinal voice answer")
   })
 
+  it("records final outward delivery failures without losing settled text", async () => {
+    mockHandleInboundTurn.mockImplementation(async (input: any) => {
+      input.callbacks.onToolEnd("settle", "final answer", true)
+      input.callbacks.onTextChunk("final voice answer")
+      return {
+        resolvedContext: makeResolvedContext(),
+        gateResult: { allowed: true },
+        turnOutcome: "settled",
+        sessionPath: "/tmp/session.json",
+        messages: [],
+      }
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "voice",
+      sessionKey: "session-123",
+      friendId: "friend-1",
+      userMessage: "hello",
+      deliverySink: {
+        onDelivery: async () => {
+          throw "speaker down"
+        },
+      },
+    })
+
+    expect(result.response).toBe("final voice answer")
+    expect(result.deliveries).toEqual([])
+    expect(result.deliveryFailures).toEqual([
+      { kind: "settle", text: "final voice answer", error: "speaker down" },
+    ])
+  })
+
+  it("propagates speak delivery failures during mid-turn flushes", async () => {
+    mockHandleInboundTurn.mockImplementation(async (input: any) => {
+      input.callbacks.onTextChunk("quick voice update")
+      await expect(input.callbacks.flushNow()).rejects.toThrow("speaker down")
+      input.callbacks.onTextChunk("final voice answer")
+      return {
+        resolvedContext: makeResolvedContext(),
+        gateResult: { allowed: true },
+        turnOutcome: "settled",
+        sessionPath: "/tmp/session.json",
+        messages: [],
+      }
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "voice",
+      sessionKey: "session-123",
+      friendId: "friend-1",
+      userMessage: "hello",
+      deliverySink: {
+        onDelivery: async () => {
+          throw new Error("speaker down")
+        },
+      },
+    })
+
+    expect(result.response).toBe("final voice answer")
+    expect(result.deliveryFailures).toEqual([
+      { kind: "speak", text: "quick voice update", error: "speaker down" },
+      { kind: "text", text: "final voice answer", error: "speaker down" },
+    ])
+  })
+
   it("resolves UUID friendId with existing friend record", async () => {
     mockStoreInstance.get.mockResolvedValue({
       id: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",

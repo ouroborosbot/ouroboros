@@ -272,6 +272,7 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
 
   const commitResponseText = (text: string): void => {
     const cleaned = stripThinkBlocks(text)
+    /* v8 ignore next -- deliverPending strips first; this is a defensive direct-call guard @preserve */
     if (!cleaned) return
     committedResponseText = committedResponseText
       ? `${committedResponseText}\n${cleaned}`

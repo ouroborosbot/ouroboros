@@ -179,6 +179,50 @@ describe("ElevenLabs streaming TTS client", () => {
     await expect(resultPromise).rejects.toThrow("ElevenLabs TTS failed: websocket failed")
   })
 
+  it("surfaces synchronous audio chunk delivery failures", async () => {
+    const socket = new FakeSocket()
+    const client = createElevenLabsTtsClient({
+      apiKey: "eleven-secret",
+      voiceId: "voice_123",
+      socketFactory: () => socket,
+    })
+
+    const resultPromise = client.synthesize({
+      utteranceId: "utt_sync_chunk_fail",
+      text: "Hello",
+      onAudioChunk: () => {
+        throw new Error("chunk sink down")
+      },
+    })
+
+    socket.emit("open")
+    socket.emit("message", JSON.stringify({ audio: Buffer.from("abc").toString("base64") }))
+
+    await expect(resultPromise).rejects.toThrow("ElevenLabs TTS failed: chunk sink down")
+  })
+
+  it("surfaces asynchronous audio chunk delivery failures", async () => {
+    const socket = new FakeSocket()
+    const client = createElevenLabsTtsClient({
+      apiKey: "eleven-secret",
+      voiceId: "voice_123",
+      socketFactory: () => socket,
+    })
+
+    const resultPromise = client.synthesize({
+      utteranceId: "utt_async_chunk_fail",
+      text: "Hello",
+      onAudioChunk: async () => {
+        throw new Error("async chunk sink down")
+      },
+    })
+
+    socket.emit("open")
+    socket.emit("message", JSON.stringify({ audio: Buffer.from("abc").toString("base64") }))
+
+    await expect(resultPromise).rejects.toThrow("ElevenLabs TTS failed: async chunk sink down")
+  })
+
   it("supports custom MPEG output and Buffer message payloads", async () => {
     const socket = new FakeSocket()
     const urls: string[] = []
