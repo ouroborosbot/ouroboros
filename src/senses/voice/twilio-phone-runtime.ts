@@ -16,6 +16,7 @@ import { emitNervesEvent } from "../../nerves/runtime"
 import { createElevenLabsTtsClient } from "./elevenlabs"
 import {
   DEFAULT_TWILIO_PHONE_PORT,
+  DEFAULT_TWILIO_GREETING_PREBUFFER_MS,
   DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS,
   DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS,
   TWILIO_PHONE_WEBHOOK_BASE_PATH,
@@ -43,6 +44,7 @@ export interface TwilioPhoneTransportRuntimeOverrides {
   whisperModelPath?: string
   recordTimeoutSeconds?: number
   recordMaxLengthSeconds?: number
+  greetingPrebufferMs?: number
   playbackMode?: TwilioPhonePlaybackMode
 }
 
@@ -63,6 +65,7 @@ export interface TwilioPhoneTransportRuntimeSettings {
   defaultFriendId?: string
   recordTimeoutSeconds: number
   recordMaxLengthSeconds: number
+  greetingPrebufferMs: number
   playbackMode: TwilioPhonePlaybackMode
 }
 
@@ -272,6 +275,9 @@ export function resolveTwilioPhoneTransportRuntime(
     recordMaxLengthSeconds: overrides.recordMaxLengthSeconds
       ?? configNumber(options.machineConfig, "voice.twilioRecordMaxLengthSeconds")
       ?? DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS,
+    greetingPrebufferMs: overrides.greetingPrebufferMs
+      ?? configNumber(options.machineConfig, "voice.twilioGreetingPrebufferMs")
+      ?? DEFAULT_TWILIO_GREETING_PREBUFFER_MS,
     playbackMode: overrides.playbackMode
       ?? normalizeTwilioPhonePlaybackMode(configString(options.machineConfig, "voice.twilioPlaybackMode") ?? DEFAULT_TWILIO_PHONE_PLAYBACK_MODE),
   }
@@ -346,6 +352,7 @@ export async function startConfiguredTwilioPhoneTransport(
     defaultFriendId: settings.defaultFriendId,
     recordTimeoutSeconds: settings.recordTimeoutSeconds,
     recordMaxLengthSeconds: settings.recordMaxLengthSeconds,
+    greetingPrebufferMs: settings.greetingPrebufferMs,
     playbackMode: settings.playbackMode,
   })
 

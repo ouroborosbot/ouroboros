@@ -157,7 +157,7 @@ ouro connect voice --agent <agent>
 
 ### Voice
 
-Voice is a single transcript-first sense with multiple transports. The Twilio phone transport is the current end-to-end phone smoke path: Twilio records the caller, Ouro downloads the recording, Whisper.cpp transcribes it, the normal stable `voice` session turn runs, ElevenLabs generates MP3 audio from tool-delivered `speak`/`settle` text, and Twilio plays that response before listening again. Managed Twilio playback defaults to a streaming Play URL so ElevenLabs chunks can reach Twilio as they arrive.
+Voice is a single transcript-first sense with multiple transports. The Twilio phone transport is the current end-to-end phone smoke path: Twilio records the caller, Ouro downloads the recording, Whisper.cpp transcribes it, the normal stable `voice` session turn runs, ElevenLabs generates MP3 audio from tool-delivered `speak`/`settle` text, and Twilio plays that response before listening again. Managed Twilio playback defaults to a streaming Play URL so ElevenLabs chunks can reach Twilio as they arrive. This Record/Play transport is half-duplex; true barge-in and continuous transcription belong in a Twilio Media Streams transport that shares the same voice session/STT/TTS code.
 
 For implementation work, keep the sense/transport boundary in [Sense Development Contract](sense-development.md) in view. In particular, outward sense turns run in tool-required mode: transports that need replayable text must recover `settle.answer` only after `(delivered)` and `speak.message` only after `(spoken)`, not by reading `assistant.content` directly.
 

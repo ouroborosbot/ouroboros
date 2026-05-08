@@ -9,10 +9,16 @@ import { runVoiceLoopbackTurn, type VoiceLoopbackTurnResult, type VoiceRunSenseT
 import type { VoiceTranscript, VoiceTranscriber, VoiceTtsService } from "./types"
 
 export const DEFAULT_TWILIO_PHONE_PORT = 18910
-export const DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS = 2
+export const DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS = 1
 export const DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS = 30
+export const DEFAULT_TWILIO_GREETING_PREBUFFER_MS = 3_500
 export const TWILIO_PHONE_WEBHOOK_BASE_PATH = "/voice/twilio"
 export const DEFAULT_TWILIO_PHONE_PLAYBACK_MODE = "stream"
+
+const TWILIO_STREAM_FAILURE_SILENCE_MP3 = Buffer.from(
+  "SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYyLjMuMTAwAAAAAAAAAAAAAAD/+0DAAAAAAAAAAAAAAAAAAAAAAABJbmZvAAAADwAAAAsAAAUuADc3Nzc3Nzc3N0tLS0tLS0tLS19fX19fX19fX3Nzc3Nzc3Nzc4eHh4eHh4eHh5ubm5ubm5ubm6+vr6+vr6+vr8PDw8PDw8PDw9fX19fX19fX1+vr6+vr6+vr6////////////wAAAABMYXZjNjIuMTEAAAAAAAAAAAAAAAAkBC8AAAAAAAAFLpJQTFMAAAAAAP/7EMQAA8AAAaQAAAAgAAA0gAAABExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVV//sQxCmDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVX/+xDEUwPAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVf/7EMR8g8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVV//sQxKYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVX/+xDEz4PAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EMTWA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQxNYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xDE1gPAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EMTWA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQxNYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=",
+  "base64",
+)
 
 export type TwilioPhonePlaybackMode = "stream" | "buffered"
 
@@ -56,6 +62,7 @@ export interface TwilioPhoneBridgeOptions {
   defaultFriendId?: string
   recordTimeoutSeconds?: number
   recordMaxLengthSeconds?: number
+  greetingPrebufferMs?: number
   downloadRecording?: TwilioRecordingDownloader
   playbackMode?: TwilioPhonePlaybackMode
 }
@@ -408,9 +415,43 @@ class TwilioAudioStreamJob {
   fail(error: unknown): void {
     /* v8 ignore next -- failure is single-shot inside startTwilioPlaybackStreamJob @preserve */
     if (this.status !== "pending") return
+    if (this.byteLength === 0) {
+      this.append(TWILIO_STREAM_FAILURE_SILENCE_MP3)
+    }
     this.status = "failed"
     this.failure = errorMessage(error)
     this.notify()
+  }
+
+  waitForFirstChunk(timeoutMs: number): Promise<"ready" | "completed" | "failed" | "timeout"> {
+    if (this.byteLength > 0) return Promise.resolve("ready")
+    if (this.status === "completed") return Promise.resolve("completed")
+    if (this.status === "failed") return Promise.resolve("failed")
+    if (timeoutMs <= 0) return Promise.resolve("timeout")
+
+    return new Promise((resolve) => {
+      let settled = false
+      let timeout: ReturnType<typeof setTimeout> | undefined
+      const finish = (state: "ready" | "completed" | "failed" | "timeout"): void => {
+        if (settled) return
+        settled = true
+        if (timeout) clearTimeout(timeout)
+        this.waiters.delete(waiter)
+        resolve(state)
+      }
+      const waiter = (): void => {
+        if (this.byteLength > 0) {
+          finish("ready")
+        } else if (this.status === "completed") {
+          finish("completed")
+        } else if (this.status === "failed") {
+          finish("failed")
+        }
+      }
+      this.waiters.add(waiter)
+      timeout = setTimeout(() => finish("timeout"), timeoutMs)
+      timeout.unref?.()
+    })
   }
 
   async *stream(): AsyncIterable<Uint8Array> {
@@ -707,7 +748,7 @@ async function handleIncoming(
         source: "loopback",
       })
       const jobId = safeSegment(utteranceId)
-      startTwilioPlaybackStreamJob({
+      const job = startTwilioPlaybackStreamJob({
         jobs,
         bridgeOptions: options,
         basePath,
@@ -726,6 +767,21 @@ async function handleIncoming(
         }),
         meta: { agentName: options.agentName, callSid: safeCallSid, utteranceId },
       })
+      const prebufferState = await job.waitForFirstChunk(options.greetingPrebufferMs ?? DEFAULT_TWILIO_GREETING_PREBUFFER_MS)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_greeting_prebuffer",
+        message: "Twilio greeting prebuffer completed",
+        meta: { agentName: options.agentName, callSid: safeCallSid, utteranceId, state: prebufferState },
+      })
+      if (prebufferState === "failed") {
+        return xmlResponse(recordTwiml({
+          publicBaseUrl: options.publicBaseUrl,
+          basePath,
+          timeoutSeconds: options.recordTimeoutSeconds ?? DEFAULT_TWILIO_RECORD_TIMEOUT_SECONDS,
+          maxLengthSeconds: options.recordMaxLengthSeconds ?? DEFAULT_TWILIO_RECORD_MAX_LENGTH_SECONDS,
+        }))
+      }
       return xmlResponse(`${playTwiml(streamAudioUrl(options, basePath, safeCallSid, jobId))}${nextInputTwiml(options, basePath, "record")}`)
     }
 
@@ -1039,19 +1095,47 @@ function readRequestBody(req: http.IncomingMessage, limitBytes = 1_000_000): Pro
 /* v8 ignore start -- HTTP backpressure is platform-dependent in unit tests @preserve */
 function waitForDrain(res: http.ServerResponse): Promise<void> {
   return new Promise((resolve, reject) => {
-    const onDrain = (): void => {
+    const cleanup = (): void => {
+      res.off("drain", onDrain)
       res.off("error", onError)
+      res.off("close", onClose)
+    }
+    const onDrain = (): void => {
+      cleanup()
       resolve()
     }
     const onError = (error: Error): void => {
-      res.off("drain", onDrain)
+      cleanup()
+      reject(error)
+    }
+    const onClose = (): void => {
+      cleanup()
+      const error = new Error("response closed before drain")
+      ;(error as Error & { code?: string }).code = "ERR_STREAM_PREMATURE_CLOSE"
       reject(error)
     }
     res.once("drain", onDrain)
     res.once("error", onError)
+    res.once("close", onClose)
   })
 }
 /* v8 ignore stop */
+
+function isClientDisconnectError(error: unknown): boolean {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : ""
+  if (code === "ECONNRESET" || code === "EPIPE" || code === "ERR_STREAM_DESTROYED" || code === "ERR_STREAM_PREMATURE_CLOSE") {
+    return true
+  }
+  const message = errorMessage(error).toLowerCase()
+  return message.includes("aborted")
+    || message.includes("socket hang up")
+    || message.includes("premature close")
+    || message.includes("stream destroyed")
+    || message.includes("write after end")
+    || message.includes("response closed before drain")
+}
 
 async function writeResponseBody(res: http.ServerResponse, body: TwilioPhoneBridgeResponse["body"]): Promise<void> {
   if (!isAsyncIterableBody(body)) {
@@ -1059,13 +1143,21 @@ async function writeResponseBody(res: http.ServerResponse, body: TwilioPhoneBrid
     return
   }
 
-  for await (const chunk of body) {
-    /* v8 ignore next -- exercised only when Node reports socket backpressure @preserve */
-    if (!res.write(chunk)) {
-      await waitForDrain(res)
+  try {
+    for await (const chunk of body) {
+      if (res.destroyed || res.writableEnded) return
+      /* v8 ignore next -- exercised only when Node reports socket backpressure @preserve */
+      if (!res.write(chunk)) {
+        await waitForDrain(res)
+      }
     }
+  } catch (error) {
+    if (isClientDisconnectError(error)) return
+    throw error
   }
-  res.end()
+  if (!res.destroyed && !res.writableEnded) {
+    res.end()
+  }
 }
 
 export async function startTwilioPhoneBridgeServer(

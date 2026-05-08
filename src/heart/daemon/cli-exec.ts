@@ -5114,6 +5114,7 @@ async function executeConnectVoice(agent: string, deps: OuroCliDeps): Promise<st
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioBasePath --value /voice/agents/${agentPathSegment}/twilio`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPort --value 18910`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioPlaybackMode --value stream`,
+    `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioGreetingPrebufferMs --value 3500`,
     `  ouro vault config set --agent ${agent} --scope machine --key voice.twilioDefaultFriendId --value ari`,
     "Then enable agent.json: senses.voice.enabled = true and restart with `ouro up`.",
     `The managed Voice entrypoint will listen at POST <public-url>/voice/agents/${agentPathSegment}/twilio/incoming.`,

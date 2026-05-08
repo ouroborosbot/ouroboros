@@ -68,6 +68,7 @@ describe("Twilio phone transport runtime", () => {
       twilioPort: "2222",
       twilioDefaultFriendId: "ari",
       twilioRecordTimeoutSeconds: "3",
+      twilioGreetingPrebufferMs: "4200",
       whisperCliPath: "/opt/whisper.cpp/main",
       whisperModelPath: "/models/ggml-base.en.bin",
     },
@@ -113,6 +114,7 @@ describe("Twilio phone transport runtime", () => {
         defaultFriendId: "ari",
         recordTimeoutSeconds: 3,
         recordMaxLengthSeconds: 30,
+        greetingPrebufferMs: 4200,
         playbackMode: "stream",
       },
     })
@@ -266,6 +268,7 @@ describe("Twilio phone transport runtime", () => {
         defaultFriendId: "bea",
         elevenLabsVoiceId: "voice_override",
         recordTimeoutSeconds: 4,
+        greetingPrebufferMs: 750,
         playbackMode: "buffered",
       },
     })
@@ -283,6 +286,7 @@ describe("Twilio phone transport runtime", () => {
         elevenLabsVoiceId: "voice_override",
         recordTimeoutSeconds: 4,
         recordMaxLengthSeconds: 12,
+        greetingPrebufferMs: 750,
         playbackMode: "buffered",
       },
     })
@@ -306,8 +310,9 @@ describe("Twilio phone transport runtime", () => {
       settings: {
         port: 18910,
         host: "127.0.0.1",
-        recordTimeoutSeconds: 2,
+        recordTimeoutSeconds: 1,
         recordMaxLengthSeconds: 30,
+        greetingPrebufferMs: 3500,
         playbackMode: "stream",
       },
     })
@@ -432,8 +437,9 @@ describe("Twilio phone transport runtime", () => {
       basePath: "/voice/agents/slugger/twilio",
       port: 2222,
       defaultFriendId: "ari",
-      recordTimeoutSeconds: 2,
+      recordTimeoutSeconds: 1,
       recordMaxLengthSeconds: 30,
+      greetingPrebufferMs: 3500,
       playbackMode: "stream",
     }))
   })
