@@ -101,6 +101,7 @@ describe("ElevenLabs streaming TTS client", () => {
   it("opens the low-latency stream URL, sends text chunks, and collects audio bytes", async () => {
     const socket = new FakeSocket()
     const urls: string[] = []
+    const streamedChunks: string[] = []
     const client = createElevenLabsTtsClient({
       apiKey: "eleven-secret",
       voiceId: "voice_123",
@@ -113,6 +114,9 @@ describe("ElevenLabs streaming TTS client", () => {
     const resultPromise = client.synthesize({
       utteranceId: "utt_tts",
       text: "Hello there. General Kenobi.",
+      onAudioChunk: (chunk) => {
+        streamedChunks.push(Buffer.from(chunk).toString("utf8"))
+      },
     })
 
     socket.emit("open")
@@ -140,6 +144,7 @@ describe("ElevenLabs streaming TTS client", () => {
       mimeType: "audio/pcm;rate=16000",
     })
     expect(Buffer.from(result.audio).toString()).toBe("abcdef")
+    expect(streamedChunks).toEqual(["abc", "def"])
   })
 
   it("rejects empty text before opening a socket", async () => {

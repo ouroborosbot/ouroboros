@@ -35,13 +35,13 @@ describe("voice loopback turn", () => {
       tts,
     })
 
-    expect(runSenseTurn).toHaveBeenCalledWith({
+    expect(runSenseTurn).toHaveBeenCalledWith(expect.objectContaining({
       agentName: "slugger",
       channel: "voice",
       friendId: "ari",
       sessionKey: "riverside",
       userMessage: "Can you hear me?",
-    })
+    }))
     expect(tts.synthesize).toHaveBeenCalledWith({
       utteranceId: "utt_turn_001",
       text: "Yes, loud and clear.",

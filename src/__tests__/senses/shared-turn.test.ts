@@ -535,6 +535,44 @@ describe("runSenseTurn", () => {
     expect(result.response).toBe("hello world")
   })
 
+  it("delivers speak and settle segments through the outward delivery sink", async () => {
+    const delivered: Array<{ kind: string; text: string }> = []
+    mockHandleInboundTurn.mockImplementation(async (input: any) => {
+      input.callbacks.onTextChunk("quick voice update")
+      await input.callbacks.flushNow()
+      input.callbacks.onToolEnd("settle", "final answer", true)
+      input.callbacks.onClearText()
+      input.callbacks.onTextChunk("final voice answer")
+      return {
+        resolvedContext: makeResolvedContext(),
+        gateResult: { allowed: true },
+        turnOutcome: "settled",
+        sessionPath: "/tmp/session.json",
+        messages: [],
+      }
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "voice",
+      sessionKey: "session-123",
+      friendId: "friend-1",
+      userMessage: "hello",
+      deliverySink: {
+        onDelivery: async (delivery) => {
+          delivered.push(delivery)
+        },
+      },
+    })
+
+    expect(delivered).toEqual([
+      { kind: "speak", text: "quick voice update" },
+      { kind: "settle", text: "final voice answer" },
+    ])
+    expect(result.deliveries).toEqual(delivered)
+    expect(result.response).toBe("quick voice update\nfinal voice answer")
+  })
+
   it("resolves UUID friendId with existing friend record", async () => {
     mockStoreInstance.get.mockResolvedValue({
       id: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
