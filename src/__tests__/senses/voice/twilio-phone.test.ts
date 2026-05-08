@@ -209,7 +209,25 @@ describe("Twilio phone voice bridge", () => {
     expect(requests[0]!.body.get("Method")).toBe("POST")
     expect(requests[0]!.body.get("StatusCallback")).toBe("https://voice.example.com/voice/twilio/outgoing/out-1/status")
     expect(requests[0]!.body.getAll("StatusCallbackEvent")).toEqual(["initiated", "ringing", "answered", "completed"])
+    expect(requests[0]!.body.get("MachineDetection")).toBeNull()
     expect(requests[0]!.auth).toBe(`Basic ${Buffer.from("AC123:token-secret").toString("base64")}`)
+  })
+
+  it("can request Twilio answering machine detection for outbound calls", async () => {
+    const requests: Array<{ body: URLSearchParams }> = []
+    await createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+      machineDetection: "Enable",
+    }, async (_input, init) => {
+      requests.push({ body: new URLSearchParams(String(init.body)) })
+      return new Response(JSON.stringify({ sid: "CAOUT", status: "queued" }), { status: 201 })
+    })
+
+    expect(requests[0]!.body.get("MachineDetection")).toBe("Enable")
   })
 
   it("starts an agent voice turn when answering inbound calls", async () => {
@@ -410,6 +428,44 @@ describe("Twilio phone voice bridge", () => {
     }
   })
 
+  it("hangs up outbound calls answered by voicemail before starting an agent voice turn", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-machine",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "check in about the voice alpha",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        transportMode: "media-stream" as const,
+      }
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-machine",
+        headers: {},
+        body: formBody({ CallSid: "CAOUT", From: "+15557654321", To: "+15551234567", AnsweredBy: "machine_start" }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(String(response.body)).toContain("<Hangup />")
+      expect(options.runSenseTurn).not.toHaveBeenCalled()
+      const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-machine"), "utf8")) as { status?: string; answeredBy?: string; events?: Array<{ status: string; answeredBy?: string }> }
+      expect(saved.status).toBe("voicemail")
+      expect(saved.answeredBy).toBe("machine_start")
+      expect(saved.events?.at(-1)).toMatchObject({ status: "voicemail", answeredBy: "machine_start" })
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
   it("streams prebuffered outbound greetings over the Media Stream socket", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
     const options = {
@@ -503,6 +559,37 @@ describe("Twilio phone voice bridge", () => {
       const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-status"), "utf8")) as { status?: string; events?: Array<{ status: string; answeredBy?: string }> }
       expect(saved.status).toBe("completed")
       expect(saved.events?.at(-1)).toMatchObject({ status: "completed", answeredBy: "human" })
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("records voicemail status callbacks as terminal non-human answers", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-machine-status",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "status test",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      const bridge = createTwilioPhoneBridge(baseBridgeOptions(outputDir))
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-machine-status/status",
+        headers: {},
+        body: formBody({ CallSid: "CAOUT", CallStatus: "in-progress", AnsweredBy: "machine_end_beep" }),
+      })
+      expect(response.statusCode).toBe(200)
+      const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-machine-status"), "utf8")) as { status?: string; answeredBy?: string; events?: Array<{ status: string; answeredBy?: string }> }
+      expect(saved.status).toBe("voicemail")
+      expect(saved.answeredBy).toBe("machine_end_beep")
+      expect(saved.events?.at(-1)).toMatchObject({ status: "voicemail", answeredBy: "machine_end_beep" })
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true })
     }

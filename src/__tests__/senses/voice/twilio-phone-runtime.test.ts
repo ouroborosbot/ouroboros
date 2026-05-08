@@ -180,6 +180,7 @@ describe("Twilio phone transport runtime", () => {
         from: "+15557654321",
         twimlUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test",
         statusCallbackUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test/status",
+        machineDetection: "Enable",
       })
       const saved = JSON.parse(await fs.readFile(path.join(outputDir, "outbound", "outbound-test.json"), "utf8")) as { status?: string; transportCallSid?: string; reason?: string }
       expect(saved).toMatchObject({

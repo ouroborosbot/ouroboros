@@ -481,6 +481,8 @@ function terminalOutboundStatus(status: string | undefined): boolean {
     || normalized === "no-answer"
     || normalized === "failed"
     || normalized === "canceled"
+    || normalized === "voicemail"
+    || normalized === "fax"
 }
 
 export async function placeConfiguredTwilioPhoneCall(
@@ -538,6 +540,7 @@ export async function placeConfiguredTwilioPhoneCall(
       from,
       twimlUrl: webhookUrl,
       statusCallbackUrl,
+      machineDetection: "Enable",
     })
     await updateTwilioOutboundCallJob(settings.outputDir, outboundId, {
       transportCallSid: call.callSid,

@@ -78,6 +78,7 @@ export interface TwilioOutboundCallJob {
   createdAt: string
   transportCallSid?: string
   status?: string
+  answeredBy?: string
   updatedAt?: string
   events?: TwilioOutboundCallJobEvent[]
   error?: string
@@ -90,6 +91,7 @@ export interface TwilioOutboundCallCreateRequest {
   from: string
   twimlUrl: string
   statusCallbackUrl?: string
+  machineDetection?: "Enable" | "DetectMessageEnd"
 }
 
 export interface TwilioOutboundCallCreateResult {
@@ -344,6 +346,14 @@ function mediaStreamTwiml(
 function safeSegment(input: string): string {
   const cleaned = input.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
   return cleaned || "unknown"
+}
+
+function nonHumanAnsweredStatus(answeredBy: string | undefined): "voicemail" | "fax" | undefined {
+  const normalized = answeredBy?.trim().toLowerCase()
+  if (!normalized) return undefined
+  if (normalized === "fax") return "fax"
+  if (normalized.startsWith("machine")) return "voicemail"
+  return undefined
 }
 
 function decodeSafeSegment(input: string): string | null {
@@ -1465,6 +1475,9 @@ export async function createTwilioOutboundCall(
   body.set("From", from)
   body.set("Url", request.twimlUrl)
   body.set("Method", "POST")
+  if (request.machineDetection) {
+    body.set("MachineDetection", request.machineDetection)
+  }
   if (request.statusCallbackUrl) {
     body.set("StatusCallback", request.statusCallbackUrl)
     body.set("StatusCallbackMethod", "POST")
@@ -1684,6 +1697,33 @@ async function handleOutgoing(
 
   const callSid = params.CallSid?.trim() || job.transportCallSid || `outbound-${job.outboundId}`
   const safeCallSid = safeSegment(callSid)
+  const answeredBy = params.AnsweredBy?.trim() || undefined
+  const nonHumanStatus = nonHumanAnsweredStatus(answeredBy)
+  if (nonHumanStatus) {
+    await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
+      status: nonHumanStatus,
+      answeredBy,
+      transportCallSid: callSid,
+      events: [
+        ...(job.events ?? []),
+        { at: new Date().toISOString(), status: nonHumanStatus, callSid, ...(answeredBy ? { answeredBy } : {}) },
+      ],
+    })
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_outgoing_nonhuman_answer",
+      message: "Twilio outbound voice call reached voicemail or fax",
+      meta: {
+        agentName: options.agentName,
+        callSid: safeCallSid,
+        outboundId: safeSegment(job.outboundId),
+        status: nonHumanStatus,
+        answeredBy: answeredBy ?? "unknown",
+      },
+    })
+    return xmlResponse("<Hangup />")
+  }
+
   const callDir = path.join(options.outputDir, safeCallSid)
   const utteranceId = `twilio-${safeCallSid}-outbound-connected`
   const friendId = job.friendId?.trim() || voiceFriendId(options, job.to, callSid)
@@ -1697,10 +1737,11 @@ async function handleOutgoing(
   })
   await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
     status: "answered",
+    ...(answeredBy ? { answeredBy } : {}),
     transportCallSid: callSid,
     events: [
       ...(job.events ?? []),
-      { at: new Date().toISOString(), status: "answered", callSid },
+      { at: new Date().toISOString(), status: "answered", callSid, ...(answeredBy ? { answeredBy } : {}) },
     ],
   })
   emitNervesEvent({
@@ -1814,11 +1855,13 @@ async function handleOutgoingStatus(
 ): Promise<TwilioPhoneBridgeResponse> {
   const job = await readTwilioOutboundCallJob(options.outputDir, outboundId)
   if (!job) return textResponse(404, "outbound voice call not found")
-  const status = params.CallStatus?.trim() || params.CallStatusCallbackEvent?.trim() || "unknown"
+  const rawStatus = params.CallStatus?.trim() || params.CallStatusCallbackEvent?.trim() || "unknown"
   const callSid = params.CallSid?.trim() || job.transportCallSid
   const answeredBy = params.AnsweredBy?.trim() || undefined
+  const status = nonHumanAnsweredStatus(answeredBy) ?? rawStatus
   await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
     status,
+    ...(answeredBy ? { answeredBy } : {}),
     transportCallSid: callSid,
     events: [
       ...(job.events ?? []),

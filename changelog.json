@@ -2,6 +2,14 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.574",
+      "changes": [
+        "Outbound Twilio phone calls now request Answering Machine Detection so the Voice sense can distinguish a human answer from voicemail or fax.",
+        "Outbound call webhooks now hang up before starting an agent voice turn when Twilio reports a non-human answer such as `machine_start` or `machine_end_beep`, preventing agents from talking to voicemail as if it were the caller.",
+        "Voicemail and fax outcomes are recorded as terminal outbound call statuses so the redial guard does not treat a missed call as an active live conversation."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.573",
       "changes": [
         "`send_message` with `channel=voice` now places a first-class Voice outbound phone call to trusted friends instead of falling through to the generic pending-message queue.",
