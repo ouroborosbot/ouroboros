@@ -109,9 +109,13 @@ Current implementation:
   signature, accepts the call, opens the Realtime control WebSocket, sends the
   first voice turn, records transcripts, runs voice tools, and maps
   `voice_end_call` to OpenAI's call hangup endpoint.
-- Arbitrary non-speech call audio is not yet implemented for SIP. Until that
-  has a real media primitive, `voice_play_audio` is exposed only on the Twilio
-  Media Stream Realtime lane.
+- Direct SIP can render short `voice_play_audio source=tone` cues through the
+  Realtime model. Arbitrary URL/file clip bytes still need a real mixer or media
+  bridge, most likely a Twilio Conference/SIP mixer using conference
+  announcements, before they can be injected without dropping the Realtime leg.
+- Pending voice messages are treated as synchronous call residue, not a durable
+  inbox. Shared voice turns archive pending older than fifteen minutes under
+  `state/pending-expired/...` before model injection.
 
 Decision: if a transport can use SIP for a live phone-number style audio leg,
 prefer SIP. Keep Media Streams as fallback and as the current raw-audio

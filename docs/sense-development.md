@@ -83,6 +83,10 @@ See [Voice Architecture](voice-architecture.md) for the fuller transport model.
   produce short model-rendered tone cues, while arbitrary URL/file clip bytes
   must report the media-bridge limitation instead of pretending playback
   happened.
+- Voice pending is synchronous by default. Pending voice messages older than
+  fifteen minutes are archived under `state/pending-expired/...` before model
+  injection, so stale call scripts or superseded identity notes cannot surprise
+  the friend during a fresh live conversation.
 - Meeting/browser: meeting URL intake and audio routing should feed the same
   Voice session contract. Browser automation joins the room; it should not
   become a separate conversational sense unless it has a distinct durable

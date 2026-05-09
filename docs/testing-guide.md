@@ -163,6 +163,8 @@ Spoken voice is part of the agent's identity. For native OpenAI Realtime phone t
 
 Live voice tools should be exercised as media controls. `voice_end_call` must end the active call after a natural goodbye. `voice_play_audio` must inject a short tone or clip into the phone media stream on Media Stream transports. On direct OpenAI SIP, `source=tone` should produce a short model-rendered audio cue through Realtime; URL/file clips should return the media-bridge limitation instead of claiming playback succeeded.
 
+Pending voice delivery is intentionally short-lived. Voice pending older than fifteen minutes should be archived to `state/pending-expired/...` before it reaches `pendingMessages`, preserving evidence without letting stale phone scripts or obsolete voice-identity notes appear in a later live call.
+
 For implementation work, keep the sense/transport boundary in [Sense Development Contract](sense-development.md) in view. In particular, outward sense turns run in tool-required mode: transports that need replayable text must recover `settle.answer` only after `(delivered)` and `speak.message` only after `(spoken)`, not by reading `assistant.content` directly.
 
 For a managed phone smoke, attach the transport to this machine and expose the Voice entrypoint through Cloudflare Tunnel:

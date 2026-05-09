@@ -50,6 +50,106 @@ export interface FailoverState {
   pending: FailoverContext | null
 }
 
+const VOICE_PENDING_MAX_AGE_MS = 15 * 60 * 1_000
+
+function pendingExpirationReason(channel: Channel, message: PendingMessage, now: number): string | null {
+  if (Number.isFinite(message.expiresAt) && Number(message.expiresAt) <= now) return "explicit_expiry"
+  if (channel !== "voice") return null
+  if (!Number.isFinite(message.timestamp)) return null
+  return now - message.timestamp > VOICE_PENDING_MAX_AGE_MS ? "voice_freshness_window" : null
+}
+
+function archiveExpiredPendingMessages(input: {
+  agentRoot: string
+  pendingDir: string
+  channel: Channel
+  expired: Array<{ message: PendingMessage; reason: string }>
+  now: number
+}): void {
+  if (input.expired.length === 0) return
+  const pendingRoot = path.join(input.agentRoot, "state", "pending")
+  const relativePendingDir = path.relative(pendingRoot, input.pendingDir)
+  const archiveDir = relativePendingDir && !relativePendingDir.startsWith("..") && !path.isAbsolute(relativePendingDir)
+    ? path.join(input.agentRoot, "state", "pending-expired", relativePendingDir)
+    : path.join(input.agentRoot, "state", "pending-expired", input.channel)
+  try {
+    fs.mkdirSync(archiveDir, { recursive: true })
+    input.expired.forEach(({ message, reason }, index) => {
+      const stamp = Number.isFinite(message.timestamp) ? message.timestamp : input.now
+      const filePath = path.join(archiveDir, `${stamp}-${index}.json`)
+      fs.writeFileSync(filePath, `${JSON.stringify({
+        ...message,
+        expiredAt: input.now,
+        expirationReason: reason,
+        originalPendingDir: input.pendingDir,
+      }, null, 2)}\n`, "utf-8")
+    })
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.pending_expired",
+      message: "expired stale pending sense messages before model injection",
+      meta: {
+        channel: input.channel,
+        pendingDir: input.pendingDir,
+        archiveDir,
+        count: String(input.expired.length),
+      },
+    })
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      component: "senses",
+      event: "senses.pending_expire_archive_error",
+      message: "failed to archive expired pending sense messages",
+      meta: {
+        channel: input.channel,
+        pendingDir: input.pendingDir,
+        count: String(input.expired.length),
+        error: error instanceof Error ? error.message : String(error),
+      },
+    })
+  }
+}
+
+function filterDeliverablePendingMessages(input: {
+  pendingDir: string
+  channel: Channel
+  messages: PendingMessage[]
+  now?: number
+}): PendingMessage[] {
+  if (input.messages.length === 0) return input.messages
+  const now = input.now ?? Date.now()
+  const deliverable: PendingMessage[] = []
+  const expired: Array<{ message: PendingMessage; reason: string }> = []
+  for (const message of input.messages) {
+    const reason = pendingExpirationReason(input.channel, message, now)
+    if (reason) {
+      expired.push({ message, reason })
+    } else {
+      deliverable.push(message)
+    }
+  }
+  if (expired.length > 0) {
+    try {
+      archiveExpiredPendingMessages({ ...input, agentRoot: getAgentRoot(), expired, now })
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "senses",
+        event: "senses.pending_expire_archive_error",
+        message: "failed to resolve agent root for expired pending sense message archive",
+        meta: {
+          channel: input.channel,
+          pendingDir: input.pendingDir,
+          count: String(expired.length),
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+  }
+  return deliverable
+}
+
 /**
  * Emit episodes for obligation state transitions detected during a turn.
  * Exported for direct testability (avoids v8 coverage merge issues in multi-file test suites).
@@ -559,7 +659,11 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     ? []
     : (input.drainDeferredReturns?.(resolvedContext.friend.id) ?? [])
   const sessionPending = input.drainPending(input.pendingDir)
-  const pending = [...deferredReturns, ...sessionPending]
+  const pending = filterDeliverablePendingMessages({
+    pendingDir: input.pendingDir,
+    channel: input.channel,
+    messages: [...deferredReturns, ...sessionPending],
+  })
 
   // Assemble messages: session messages + pending + inbound user messages
   // NOTE: live world-state checkpoint and pending messages are rendered via buildSystem (system prompt sections)
