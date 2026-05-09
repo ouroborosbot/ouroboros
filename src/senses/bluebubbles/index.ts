@@ -1510,22 +1510,7 @@ export async function handleBlueBubblesEvent(
   let preclaimedInFlight = false
   let handedPreclaimToTurn = false
   if (normalized.kind === "message") {
-    if (!beginBlueBubblesMessageInFlight(normalized.chat.sessionKey, normalized.messageGuid)) {
-      emitNervesEvent({
-        level: "warn",
-        component: "senses",
-        event: "senses.bluebubbles_repair_skipped_duplicate",
-        message: "skipped repair+hydrate for already-in-flight bluebubbles messageGuid",
-        meta: {
-          messageGuid: normalized.messageGuid,
-          sessionKey: normalized.chat.sessionKey,
-          eventType: normalized.eventType,
-          normalizedKind: normalized.kind,
-          dedupeReason: "in_flight",
-        },
-      })
-      return handleBlueBubblesNormalizedEvent(normalized, resolvedDeps, "webhook")
-    }
+    beginBlueBubblesMessageInFlight(normalized.chat.sessionKey, normalized.messageGuid)
     preclaimedInFlight = true
   }
 

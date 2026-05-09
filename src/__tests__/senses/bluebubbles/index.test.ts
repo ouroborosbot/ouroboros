@@ -4620,6 +4620,37 @@ describe("BlueBubbles sense runtime", () => {
     expect(duplicateEvents.some((call: unknown[]) => (call[0] as { meta?: { dedupeReason?: string } })?.meta?.dedupeReason === "in_flight")).toBe(true)
   })
 
+  it("releases a webhook preclaim when repair discovers the message was already processed", async () => {
+    const tempAgentRoot = makeTempDir()
+    const { getAgentRoot } = await import("../../../heart/identity")
+    vi.mocked(getAgentRoot).mockReturnValue(tempAgentRoot)
+
+    const { normalizeBlueBubblesEvent } = await import("../../../senses/bluebubbles/model")
+    const normalized = normalizeBlueBubblesEvent(dmTopLevelPayload)
+    const { recordProcessedBlueBubblesMessage } = await import("../../../senses/bluebubbles/processed-log")
+
+    mocks.repairEvent.mockImplementationOnce(async (event: unknown) => {
+      recordProcessedBlueBubblesMessage("testagent", normalized, "webhook", "turn-complete")
+      return event
+    })
+
+    const bluebubbles = await import("../../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(result).toEqual({
+      handled: true,
+      notifiedAgent: false,
+      kind: "message",
+      reason: "already_processed",
+    })
+    expect(mocks.handleInboundTurn).not.toHaveBeenCalled()
+    const processedSkips = mocks.emitNervesEvent.mock.calls.filter(
+      (call: unknown[]) => (call[0] as { event?: string; meta?: { dedupeReason?: string } })?.event === "senses.bluebubbles_recovery_skip"
+        && (call[0] as { meta?: { dedupeReason?: string } })?.meta?.dedupeReason === "processed",
+    )
+    expect(processedSkips.length).toBe(1)
+  })
+
   it("recovers captured-but-unprocessed inbound sidecars from the audit log itself", async () => {
     const tempAgentRoot = makeTempDir()
     const { getAgentRoot } = await import("../../../heart/identity")
