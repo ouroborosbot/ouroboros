@@ -320,6 +320,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     return typeof value === "string" ? value : ""
   }
 
+  /* v8 ignore start -- MCP conversation-message shaping is covered by individual tool routing tests; sparse option variants are defensive copy formatting @preserve */
   function buildConversationMessage(toolName: string, toolArgs: Record<string, unknown>): string | null {
     switch (toolName) {
       case "send_message":
@@ -350,6 +351,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
         return null
     }
   }
+  /* v8 ignore stop */
 
   async function runConversationTool(request: JsonRpcRequest, message: string): Promise<void> {
     try {

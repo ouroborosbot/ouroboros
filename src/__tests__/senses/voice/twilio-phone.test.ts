@@ -19,6 +19,8 @@ import {
   normalizeTwilioPhoneTransportMode,
   openAISipWebhookPath,
   openAISipWebhookUrl,
+  outboundCallAnsweredPrompt,
+  readRecentTwilioOutboundCallJobs,
   twilioOutboundCallAmdCallbackUrl,
   twilioOutboundCallJobPath,
   twilioOutboundCallStatusCallbackUrl,
@@ -27,6 +29,7 @@ import {
   twilioPhoneWebhookUrl,
   twilioPhoneVoiceSessionKey,
   twilioRecordingMediaUrl,
+  updateTwilioOutboundCallJob,
   validateTwilioSignature,
   writeTwilioOutboundCallJob,
 } from "../../../senses/voice/twilio-phone"
@@ -269,6 +272,36 @@ describe("Twilio phone voice bridge", () => {
       .toBe("https://voice.example.com/voice/twilio/outgoing/call-one/amd")
   })
 
+  it("renders outbound answer prompts with Twilio params or job fallbacks", () => {
+    const job = {
+      schemaVersion: 1 as const,
+      outboundId: "out-1",
+      agentName: "slugger",
+      to: "",
+      from: "",
+      reason: "   ",
+      createdAt: "2026-05-08T12:00:00.000Z",
+    }
+
+    const fallbackPrompt = outboundCallAnsweredPrompt(job, {})
+    expect(fallbackPrompt).toContain("No additional reason was recorded.")
+    expect(fallbackPrompt).toContain("Twilio did not provide the callee phone.")
+    expect(fallbackPrompt).toContain("Twilio did not provide the Ouro phone line.")
+
+    const paramsPrompt = outboundCallAnsweredPrompt({
+      ...job,
+      to: "+15551234567",
+      from: "+15557654321",
+      reason: "quick weather check",
+    }, {
+      To: "+15550001111",
+      From: "+15550002222",
+    })
+    expect(paramsPrompt).toContain("Call reason/context: quick weather check")
+    expect(paramsPrompt).toContain("Callee phone: +15550001111.")
+    expect(paramsPrompt).toContain("Ouro phone line: +15550002222.")
+  })
+
   it("creates Twilio outbound call API requests with TwiML and status callbacks", async () => {
     const requests: Array<{ input: string; body: URLSearchParams; auth: string | null }> = []
     const result = await createTwilioOutboundCall({
@@ -321,6 +354,166 @@ describe("Twilio phone voice bridge", () => {
     expect(requests[0]!.body.get("AsyncAmd")).toBe("true")
     expect(requests[0]!.body.get("AsyncAmdStatusCallback")).toBe("https://voice.example.com/voice/twilio/outgoing/out-1/amd")
     expect(requests[0]!.body.get("AsyncAmdStatusCallbackMethod")).toBe("POST")
+  })
+
+  it("fails outbound Twilio API requests with actionable validation and provider errors", async () => {
+    await expect(createTwilioOutboundCall({
+      accountSid: "",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    })).rejects.toThrow("missing Twilio account SID")
+
+    await expect(createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    })).rejects.toThrow("missing Twilio auth token")
+
+    await expect(createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "not a phone",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    })).rejects.toThrow("target must be an E.164 phone number")
+
+    await expect(createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "not a phone",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    })).rejects.toThrow("caller ID must be an E.164 phone number")
+
+    await expect(createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    }, async () => new Response("twilio says no", { status: 400 }))).rejects.toThrow("Twilio outbound voice call failed: 400 twilio says no")
+
+    await expect(createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    }, async () => new Response(JSON.stringify({ message: "number blocked" }), { status: 403 }))).rejects.toThrow("Twilio outbound voice call failed: 403 number blocked")
+
+    await expect(createTwilioOutboundCall({
+      accountSid: "AC123",
+      authToken: "token-secret",
+      to: "+15551234567",
+      from: "+15557654321",
+      twimlUrl: "https://voice.example.com/voice/twilio/outgoing/out-1",
+    }, async () => new Response("", { status: 201 }))).resolves.toEqual({
+      callSid: undefined,
+      status: undefined,
+      queueTime: undefined,
+    })
+  })
+
+  it("updates and lists outbound call jobs while ignoring stale or malformed files", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-jobs-"))
+    try {
+      await expect(updateTwilioOutboundCallJob(outputDir, "missing", {
+        status: "completed",
+      })).resolves.toBeNull()
+
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "recent",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "recent",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "queued",
+      })
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "old",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "old",
+        createdAt: "2026-05-08T10:00:00.000Z",
+        status: "queued",
+      })
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "other-friend",
+        agentName: "slugger",
+        friendId: "bea",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "other friend",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "queued",
+      })
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "other-number",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15550000000",
+        from: "+15557654321",
+        reason: "other number",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "queued",
+      })
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "invalid-date",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "bad date",
+        createdAt: "not a date",
+        status: "queued",
+      })
+      await fs.writeFile(path.join(outputDir, "outbound", "malformed.json"), "{", "utf8")
+      await fs.writeFile(path.join(outputDir, "outbound", "wrong-schema.json"), JSON.stringify({
+        schemaVersion: 2,
+        outboundId: "wrong-schema",
+      }), "utf8")
+      await fs.writeFile(path.join(outputDir, "outbound", "ignored.txt"), "{}", "utf8")
+
+      await expect(updateTwilioOutboundCallJob(outputDir, "recent", {
+        status: "completed",
+        updatedAt: "2026-05-08T12:00:10.000Z",
+      })).resolves.toMatchObject({
+        outboundId: "recent",
+        status: "completed",
+        updatedAt: "2026-05-08T12:00:10.000Z",
+      })
+
+      const recent = await readRecentTwilioOutboundCallJobs({
+        outputDir,
+        to: "+1 (555) 123-4567",
+        friendId: "ari",
+        sinceMs: 60_000,
+        now: Date.parse("2026-05-08T12:00:30.000Z"),
+      })
+
+      expect(recent.map((job) => job.outboundId)).toEqual(["recent"])
+      await expect(readRecentTwilioOutboundCallJobs({
+        outputDir,
+        sinceMs: Number.POSITIVE_INFINITY,
+      })).resolves.toEqual(expect.arrayContaining([
+        expect.objectContaining({ outboundId: "recent" }),
+      ]))
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
   })
 
   it("starts an agent voice turn when answering inbound calls", async () => {
@@ -437,6 +630,82 @@ describe("Twilio phone voice bridge", () => {
     expect(String(response.body)).toContain("X-Ouro-To=%2B15557654321")
     expect(String(response.body)).not.toContain("<Connect><Stream")
     expect(String(response.body)).not.toContain("<Record")
+  })
+
+  it("fails OpenAI SIP webhooks closed on unsigned, invalid, or incomplete payloads", async () => {
+    const bridgeWithoutSigningConfig = createTwilioPhoneBridge({
+      ...baseBridgeOptions("/tmp/ouro-twilio-phone"),
+      conversationEngine: "openai-sip",
+      openaiRealtime: { apiKey: "openai-secret", model: "gpt-realtime-2", voice: "cedar" },
+      openaiSip: { projectId: "proj_test" },
+    })
+
+    const unsigned = await bridgeWithoutSigningConfig.handle({
+      method: "POST",
+      path: "/voice/agents/slugger/sip/openai",
+      headers: {},
+      body: JSON.stringify({ type: "realtime.call.incoming" }),
+    })
+    expect(unsigned).toMatchObject({
+      statusCode: 401,
+      body: "OpenAI SIP webhook signing secret is not configured",
+    })
+
+    const webhookSecret = `whsec_${Buffer.from("sip-webhook-secret").toString("base64")}`
+    const bridgeWithSecret = createTwilioPhoneBridge({
+      ...baseBridgeOptions("/tmp/ouro-twilio-phone"),
+      conversationEngine: "openai-sip",
+      openaiRealtime: { apiKey: "openai-secret", model: "gpt-realtime-2", voice: "cedar" },
+      openaiSip: { projectId: "proj_test", webhookSecret },
+    })
+    const invalidSignature = await bridgeWithSecret.handle({
+      method: "POST",
+      path: "/voice/agents/slugger/sip/openai",
+      headers: {
+        "webhook-id": "evt_bad",
+        "webhook-timestamp": String(Math.floor(Date.now() / 1_000)),
+        "webhook-signature": "v1,bad",
+      },
+      body: JSON.stringify({ type: "realtime.call.incoming" }),
+    })
+    expect(invalidSignature).toMatchObject({
+      statusCode: 400,
+      body: "invalid OpenAI webhook signature",
+    })
+
+    const bridge = createTwilioPhoneBridge({
+      ...baseBridgeOptions("/tmp/ouro-twilio-phone"),
+      conversationEngine: "openai-sip",
+      openaiRealtime: { apiKey: "openai-secret", model: "gpt-realtime-2", voice: "cedar" },
+      openaiSip: { projectId: "proj_test", allowUnsignedWebhooks: true },
+    })
+    await expect(bridge.handle({
+      method: "POST",
+      path: "/voice/agents/slugger/sip/openai",
+      headers: {},
+      body: "{",
+    })).resolves.toMatchObject({
+      statusCode: 400,
+      body: "invalid OpenAI webhook payload",
+    })
+    await expect(bridge.handle({
+      method: "POST",
+      path: "/voice/agents/slugger/sip/openai",
+      headers: {},
+      body: JSON.stringify({ type: "realtime.call.ended" }),
+    })).resolves.toMatchObject({
+      statusCode: 200,
+      body: "ok",
+    })
+    await expect(bridge.handle({
+      method: "POST",
+      path: "/voice/agents/slugger/sip/openai",
+      headers: {},
+      body: JSON.stringify({ type: "realtime.call.incoming", data: { sip_headers: [] } }),
+    })).resolves.toMatchObject({
+      statusCode: 400,
+      body: "missing OpenAI SIP call metadata",
+    })
   })
 
   it("accepts OpenAI SIP webhooks and controls the realtime call", async () => {
@@ -1282,6 +1551,43 @@ describe("Twilio phone voice bridge", () => {
       expect(saved.status).toBe("voicemail")
       expect(saved.answeredBy).toBe("machine_start")
       expect(saved.events?.at(-1)).toMatchObject({ status: "voicemail", answeredBy: "machine_start" })
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("hangs up outbound calls answered by fax before starting an agent voice turn", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-fax",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "check in about the voice alpha",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      const options = {
+        ...baseBridgeOptions(outputDir),
+        transportMode: "media-stream" as const,
+      }
+      const bridge = createTwilioPhoneBridge(options)
+      const response = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-fax",
+        headers: {},
+        body: formBody({ CallSid: "CAFAX", From: "+15557654321", To: "+15551234567", AnsweredBy: "fax" }),
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(String(response.body)).toContain("<Hangup />")
+      expect(options.runSenseTurn).not.toHaveBeenCalled()
+      const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-fax"), "utf8")) as { status?: string; answeredBy?: string }
+      expect(saved.status).toBe("fax")
+      expect(saved.answeredBy).toBe("fax")
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true })
     }

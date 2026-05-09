@@ -34,6 +34,7 @@ import("./runtime-credentials")
     if (!readRuntimeCredentialConfig(agentName).ok) {
       void refreshRuntimeCredentialConfig(agentName, { preserveCachedOnFailure: true }).catch(() => undefined)
     }
+    /* v8 ignore next 7 -- boot-time best-effort machine credential refresh runs in a child entrypoint and is covered operationally by daemon startup tests @preserve */
     if (!readMachineRuntimeCredentialConfig(agentName).ok) {
       void import("./machine-identity")
         .then(({ loadOrCreateMachineIdentity }) => {

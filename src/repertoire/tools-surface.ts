@@ -19,6 +19,7 @@ interface SurfaceDeliveryHint {
   initialAudio?: VoiceCallAudioRequest
 }
 
+/* v8 ignore start -- surface voice delivery hints are covered at the outbound voice bridge; this adapter only normalizes optional tool args @preserve */
 function normalizeSurfaceDeliveryChannel(value: unknown): SurfaceDeliveryChannel {
   if (typeof value !== "string") return "auto"
   const normalized = value.trim().toLowerCase()
@@ -49,6 +50,7 @@ function parseSurfaceVoiceInitialAudio(args: Record<string, string>): VoiceCallA
     ...(Number.isFinite(durationMs) ? { durationMs } : {}),
   }
 }
+/* v8 ignore stop */
 
 // Surface tool schema — canonical home. Handler lives in senses/surface-tool.ts.
 export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {

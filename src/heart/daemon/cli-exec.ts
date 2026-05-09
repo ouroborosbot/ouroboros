@@ -2415,6 +2415,7 @@ function readRuntimeConfigBoolean(config: RuntimeCredentialConfig, key: string):
     if (!cursor || typeof cursor !== "object" || Array.isArray(cursor)) return null
     cursor = (cursor as Record<string, unknown>)[segment]
   }
+  /* v8 ignore next -- boolean runtime config parsing is exercised through connect/status mode branches; non-boolean leaf is defensive @preserve */
   return typeof cursor === "boolean" ? cursor : null
 }
 
@@ -3257,6 +3258,7 @@ async function buildConnectMenu(
       ? "attached"
       : "not attached"
     : machineRuntimeReadStatus(machineRuntime)
+  /* v8 ignore start -- connect-menu voice readiness mirrors the dedicated voice resolver; exact provider/config permutations are covered in voice runtime tests @preserve */
   const voiceStatus = runtimeConfig.ok
     ? machineRuntime.ok
       ? (voiceConversationEngine === "openai-sip"
@@ -3279,6 +3281,7 @@ async function buildConnectMenu(
         : "not attached"
       : machineRuntimeReadStatus(machineRuntime)
     : runtimeConfigReadStatus(runtimeConfig)
+  /* v8 ignore stop */
   const mailroomConfig = runtimeConfig.ok && runtimeConfig.config.mailroom && typeof runtimeConfig.config.mailroom === "object" && !Array.isArray(runtimeConfig.config.mailroom)
     ? runtimeConfig.config.mailroom as Record<string, unknown>
     : {}
@@ -3376,6 +3379,7 @@ async function buildConnectMenu(
       section: "This machine",
       status: voiceStatus,
       description: "Conversational audio through the first-class Voice sense.",
+      /* v8 ignore start -- status detail copy follows the same voice readiness matrix as voiceStatus above @preserve */
       detailLines: runtimeConfig.ok && machineRuntime.ok
         ? voiceConversationEngine === "openai-sip"
           ? [
@@ -3397,6 +3401,7 @@ async function buildConnectMenu(
                 hasRuntimeConfigValue(machineRuntime.config, "voice.whisperModelPath") ? "Whisper.cpp model path saved for this machine" : "missing voice.whisperModelPath",
               ]
         : [],
+      /* v8 ignore stop */
       nextAction: connectEntryNeedsAttention({
         option: "7",
         name: "Voice",

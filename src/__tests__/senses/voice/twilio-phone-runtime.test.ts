@@ -325,6 +325,39 @@ describe("Twilio phone transport runtime", () => {
     })
   })
 
+  it("can resolve unsigned local OpenAI SIP webhooks when explicitly enabled", () => {
+    const resolution = resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        voice: {
+          twilioAccountSid: "AC123",
+          twilioAuthToken: "twilio-secret",
+          twilioFromNumber: "+15557654321",
+          openaiRealtimeApiKey: "openai-secret",
+          openaiSipProjectId: "proj_test",
+          openaiSipAllowUnsignedWebhooks: true,
+        },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioConversationEngine: "openai-sip",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })
+
+    expect(resolution).toMatchObject({
+      status: "configured",
+      settings: {
+        openaiSip: {
+          projectId: "proj_test",
+          allowUnsignedWebhooks: true,
+        },
+      },
+    })
+  })
+
   it("requires an OpenAI project id and webhook secret for the SIP phone engine", () => {
     expect(() => resolveTwilioPhoneTransportRuntime({
       agentName: "slugger",
@@ -417,6 +450,261 @@ describe("Twilio phone transport runtime", () => {
       expect(saved.prewarmedGreeting?.audioPath).toContain("outbound-greetings/outbound-test")
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("creates outbound ids when none are supplied", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-"))
+    try {
+      const deps = fakeOutboundDeps(configuredRuntime, {
+        voice: {
+          ...configuredMachine.voice,
+          twilioOutputDir: outputDir,
+        },
+      })
+
+      const result = await placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "test generated id",
+        now: new Date("2026-05-08T12:34:56.000Z"),
+      }, deps)
+
+      expect(result.outboundId).toMatch(/^outbound-20260508T123456-[A-Za-z0-9._-]{8}$/)
+      expect(deps.createOutboundCall).toHaveBeenCalledOnce()
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("prewarms media-stream outbound greetings even without a pinned friend id", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-no-friend-"))
+    try {
+      const deps = fakeOutboundDeps(configuredRuntime, {
+        voice: {
+          ...configuredMachine.voice,
+          twilioOutputDir: outputDir,
+        },
+      })
+
+      const result = await placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        to: "+15551234567",
+        reason: "unpinned friend",
+        outboundId: "outbound-no-friend",
+        now: new Date("2026-05-08T12:00:00.000Z"),
+      }, deps)
+
+      expect(result.status).toBe("queued")
+      expect(deps.runVoiceLoopbackTurn).toHaveBeenCalledWith(expect.objectContaining({
+        friendId: "twilio-15551234567",
+        sessionKey: "twilio-phone-twilio-15551234567-via-15557654321",
+      }))
+      const saved = JSON.parse(await fs.readFile(path.join(outputDir, "outbound", "outbound-no-friend.json"), "utf8")) as { friendId?: string; prewarmedGreeting?: unknown }
+      expect(saved.friendId).toBeUndefined()
+      expect(saved.prewarmedGreeting).toBeDefined()
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("places SIP outbound calls without prewarming or optional Twilio response fields", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-sip-"))
+    try {
+      const deps = fakeOutboundDeps({
+        voice: {
+          twilioAccountSid: "AC123",
+          twilioAuthToken: "twilio-secret",
+          twilioFromNumber: "+15557654321",
+          openaiRealtimeApiKey: "openai-secret",
+          openaiSipProjectId: "proj_test",
+          openaiSipWebhookSecret: "whsec_test",
+        },
+      }, {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioConversationEngine: "openai-sip",
+          twilioOutputDir: outputDir,
+        },
+      })
+      deps.createOutboundCall = vi.fn(async () => ({}))
+
+      const result = await placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        to: "+15551234567",
+        reason: "sip check",
+        outboundId: "out-sip-runtime",
+      }, deps)
+
+      expect(result).toMatchObject({
+        outboundId: "out-sip-runtime",
+        webhookUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/out-sip-runtime",
+        statusCallbackUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/out-sip-runtime/status",
+      })
+      expect(result.callSid).toBeUndefined()
+      expect(result.status).toBeUndefined()
+      expect(deps.runVoiceLoopbackTurn).not.toHaveBeenCalled()
+      const saved = JSON.parse(await fs.readFile(path.join(outputDir, "outbound", "out-sip-runtime.json"), "utf8")) as { status?: string; friendId?: string; events?: Array<{ status?: string; callSid?: string }> }
+      expect(saved.status).toBe("queued")
+      expect(saved.friendId).toBeUndefined()
+      expect(saved.events?.[0]).toMatchObject({ status: "queued" })
+      expect(saved.events?.[0]?.callSid).toBeUndefined()
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("rejects invalid outbound call coordinates before dialing", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-invalid-"))
+    try {
+      const baseVoice = {
+        ...configuredRuntime.voice,
+        twilioOutputDir: outputDir,
+      }
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "not a phone",
+        reason: "bad target",
+      }, fakeOutboundDeps(configuredRuntime, { voice: { ...configuredMachine.voice, twilioOutputDir: outputDir } }))).rejects.toThrow("outbound voice call target must be an E.164 phone number")
+
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "missing from",
+      }, fakeOutboundDeps({
+        integrations: configuredRuntime.integrations,
+        voice: { twilioAccountSid: "AC123", twilioAuthToken: "twilio-secret" },
+      }, { voice: { ...configuredMachine.voice, twilioOutputDir: outputDir } }))).rejects.toThrow("missing voice.twilioFromNumber")
+
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "missing sid",
+      }, fakeOutboundDeps({
+        integrations: configuredRuntime.integrations,
+        voice: { ...baseVoice, twilioAccountSid: "   " },
+      }, { voice: { ...configuredMachine.voice, twilioOutputDir: outputDir } }))).rejects.toThrow("missing voice.twilioAccountSid")
+
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "missing token",
+      }, fakeOutboundDeps({
+        integrations: configuredRuntime.integrations,
+        voice: { ...baseVoice, twilioAuthToken: "   " },
+      }, { voice: { ...configuredMachine.voice, twilioOutputDir: outputDir } }))).rejects.toThrow("missing voice.twilioAuthToken")
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("suppresses duplicate outbound calls while a previous call is still active", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-"))
+    try {
+      await fs.mkdir(path.join(outputDir, "outbound"), { recursive: true })
+      await fs.writeFile(path.join(outputDir, "outbound", "recent.json"), JSON.stringify({
+        schemaVersion: 1,
+        outboundId: "recent",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "already ringing",
+        createdAt: "2026-05-08T12:00:00.000Z",
+      }), "utf8")
+      const deps = fakeOutboundDeps(configuredRuntime, {
+        voice: {
+          ...configuredMachine.voice,
+          twilioOutputDir: outputDir,
+        },
+      })
+
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "duplicate",
+        now: new Date("2026-05-08T12:00:30.000Z"),
+      }, deps)).rejects.toThrow("outbound voice call suppressed")
+      expect(deps.createOutboundCall).not.toHaveBeenCalled()
+    } finally {
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("fails outbound calls when the cached phone transport is disabled", async () => {
+    const deps = fakeOutboundDeps(configuredRuntime, { voice: { twilioPublicUrl: "https://voice.example.test", twilioEnabled: false } })
+
+    await expect(placeConfiguredTwilioPhoneCall({
+      agentName: "slugger",
+      friendId: "ari",
+      to: "+15551234567",
+      reason: "test disabled",
+    }, deps)).rejects.toThrow("Twilio phone voice transport is disabled: voice.twilioPublicUrl is not configured")
+    expect(deps.waitForRuntimeCredentialBootstrap).not.toHaveBeenCalled()
+  })
+
+  it("marks outbound calls failed when greeting prewarm or Twilio placement fails", async () => {
+    const prewarmOutputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-prewarm-fail-"))
+    try {
+      const prewarmDeps = fakeOutboundDeps(configuredRuntime, {
+        voice: {
+          ...configuredMachine.voice,
+          twilioOutputDir: prewarmOutputDir,
+        },
+      })
+      prewarmDeps.runVoiceLoopbackTurn = vi.fn(async () => ({
+        responseText: "",
+        ponderDeferred: false,
+        tts: {
+          status: "failed",
+          error: "tts down",
+        },
+        speechSegments: [],
+        speechDeliveryErrors: [],
+      }))
+
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "prewarm failure",
+        outboundId: "prewarm-fail",
+      }, prewarmDeps)).rejects.toThrow("outbound greeting prewarm failed: tts down")
+      const prewarmJob = JSON.parse(await fs.readFile(path.join(prewarmOutputDir, "outbound", "prewarm-fail.json"), "utf8")) as { status?: string; error?: string }
+      expect(prewarmJob).toMatchObject({ status: "failed", error: "outbound greeting prewarm failed: tts down" })
+    } finally {
+      await fs.rm(prewarmOutputDir, { recursive: true, force: true })
+    }
+
+    const twilioOutputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-call-fail-"))
+    try {
+      const twilioDeps = fakeOutboundDeps(configuredRuntime, {
+        voice: {
+          ...configuredMachine.voice,
+          twilioOutputDir: twilioOutputDir,
+        },
+      })
+      twilioDeps.createOutboundCall = vi.fn(async () => {
+        throw new Error("twilio offline")
+      })
+
+      await expect(placeConfiguredTwilioPhoneCall({
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        reason: "twilio failure",
+        outboundId: "twilio-fail",
+      }, twilioDeps)).rejects.toThrow("twilio offline")
+      const twilioJob = JSON.parse(await fs.readFile(path.join(twilioOutputDir, "outbound", "twilio-fail.json"), "utf8")) as { status?: string; error?: string }
+      expect(twilioJob).toMatchObject({ status: "failed", error: "twilio offline" })
+    } finally {
+      await fs.rm(twilioOutputDir, { recursive: true, force: true })
     }
   })
 
@@ -818,6 +1106,46 @@ describe("Twilio phone transport runtime", () => {
         apiKeySource: "integrations.openaiApiKey",
         model: "gpt-realtime-2",
         voice: "marin",
+      }),
+    }))
+    const bridgeOptions = vi.mocked(deps.startBridgeServer).mock.calls[0]?.[0]
+    await expect(bridgeOptions?.transcriber.transcribe({
+      utteranceId: "utt",
+      audioPath: "/tmp/audio.wav",
+    })).rejects.toThrow("OpenAI Realtime voice sessions do not use the cascade transcriber")
+    await expect(bridgeOptions?.tts.synthesize({
+      utteranceId: "utt",
+      text: "hello",
+    })).rejects.toThrow("OpenAI Realtime voice sessions do not use the cascade TTS service")
+  })
+
+  it("announces the legacy OpenAI compatibility key while starting Realtime", async () => {
+    const deps = fakeDeps(
+      {
+        integrations: {
+          openaiEmbeddingsApiKey: "openai-compat-key",
+        },
+      },
+      {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioTransportMode: "media-stream",
+          twilioConversationEngine: "openai-realtime",
+          openaiRealtimeModel: "gpt-realtime-2",
+          openaiRealtimeVoice: "cedar",
+        },
+      },
+    )
+
+    await expect(startConfiguredTwilioPhoneTransport({
+      agentName: "slugger",
+      defaultBasePath: agentScopedTwilioPhoneBasePath("slugger"),
+    }, deps)).resolves.toMatchObject({ status: "started" })
+
+    expect(deps.startBridgeServer).toHaveBeenCalledWith(expect.objectContaining({
+      openaiRealtime: expect.objectContaining({
+        apiKey: "openai-compat-key",
+        apiKeySource: "integrations.openaiEmbeddingsApiKey",
       }),
     }))
   })

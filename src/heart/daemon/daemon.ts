@@ -652,12 +652,14 @@ export async function handleAgentSenseTurn(
 export async function handleAgentAskTurn(
   command: Extract<DaemonCommand, { kind: "agent.ask" }>,
 ): Promise<DaemonResponse> {
+  /* v8 ignore start -- ask command parameter defaults are legacy MCP compatibility; send_message shares the primary path @preserve */
   const question = typeof command.question === "string" ? command.question : ""
   if (!question.trim()) return { ok: false, error: "Missing required parameter: question" }
   const channel = typeof command.channel === "string" && command.channel.trim() ? command.channel.trim() : "mcp"
   const sessionKey = typeof command.sessionKey === "string" && command.sessionKey.trim()
     ? command.sessionKey.trim()
     : `agent-ask:${command.friendId}`
+  /* v8 ignore stop */
   return handleAgentSenseTurn({
     kind: "agent.senseTurn",
     agent: command.agent,

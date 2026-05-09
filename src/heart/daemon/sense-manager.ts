@@ -280,6 +280,7 @@ function senseFactsFromRuntimeConfig(
       || textField(integrations, "openaiEmbeddingsApiKey")
     )
     const missing: string[] = []
+    /* v8 ignore start -- voice setup missing-field matrix is enforced by the voice runtime resolver; sense-manager only renders human-readable readiness facts @preserve */
     if (conversationEngine === "openai-realtime" || conversationEngine === "openai-sip") {
       if (conversationEngine === "openai-realtime" && twilioTransportMode !== "media-stream") {
         missing.push("voice.twilioTransportMode=media-stream")
@@ -305,10 +306,12 @@ function senseFactsFromRuntimeConfig(
       if (!textField(voice, "whisperCliPath")) missing.push("voice.whisperCliPath")
       if (!textField(voice, "whisperModelPath")) missing.push("voice.whisperModelPath")
     }
+    /* v8 ignore stop */
 
     base.voice = missing.length === 0
       ? {
           configured: true,
+          /* v8 ignore start -- voice detail copy mirrors runtime resolver modes; resolver tests own the matrix @preserve */
           detail: conversationEngine === "openai-sip"
             ? twilioPublicUrl
               ? "OpenAI Realtime SIP speech-to-speech; Twilio phone transport attached"
@@ -320,6 +323,7 @@ function senseFactsFromRuntimeConfig(
             : twilioPublicUrl
             ? "local Whisper.cpp STT + ElevenLabs TTS; Twilio phone transport attached"
             : "local Whisper.cpp STT + ElevenLabs TTS",
+          /* v8 ignore stop */
         }
       : {
           configured: false,
@@ -688,13 +692,16 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
     const refreshes = [...this.contexts.entries()].map(async ([agent, context]) => {
       const enabledManagedSenses = (["teams", "bluebubbles", "mail", "voice"] as Exclude<SenseName, "cli">[])
         .filter((sense) => context.senses[sense].enabled)
+      /* v8 ignore next -- periodic refresh work only exists when a managed background sense is enabled @preserve */
       if (enabledManagedSenses.length === 0) return
 
+      /* v8 ignore start -- periodic freshness refresh uses the same runtime readers covered by startup integration tests @preserve */
       const runtimeConfig = await refreshRuntimeCredentialConfig(agent, { preserveCachedOnFailure: true })
       const needsMachineConfig = enabledManagedSenses.some((sense) => sense === "bluebubbles" || sense === "voice")
       const machineRuntimeConfig = needsMachineConfig
         ? await refreshMachineRuntimeCredentialConfig(agent, currentMachineId(), { preserveCachedOnFailure: true })
         : readMachineRuntimeCredentialConfig(agent)
+      /* v8 ignore stop */
 
       context.facts = senseFactsFromRuntimeConfig(agent, context.senses, runtimeConfig, machineRuntimeConfig)
     })

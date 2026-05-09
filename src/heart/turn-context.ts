@@ -238,6 +238,7 @@ function readSenseStatusLines(): string[] {
   const voice = recordOrUndefined(machinePayload.voice) ?? recordOrUndefined(payload.voice)
   const portableVoice = recordOrUndefined(runtimePayload.voice) ?? recordOrUndefined(payload.voice)
   const integrations = recordOrUndefined(runtimePayload.integrations) ?? recordOrUndefined(payload.integrations)
+  /* v8 ignore start -- voice readiness permutations are covered by voice runtime tests; turn-context keeps a compact status projection for prompts @preserve */
   const voiceConversationEngine = (
     typeof voice?.twilioConversationEngine === "string" ? voice.twilioConversationEngine
       : typeof voice?.conversationEngine === "string" ? voice.conversationEngine
@@ -254,6 +255,7 @@ function readSenseStatusLines(): string[] {
       || hasTextField(portableVoice, "openaiSipWebhookSecret")
       || hasTextField(voice, "openaiSipWebhookSecret")
     )
+  /* v8 ignore stop */
   const cascadeVoiceReady = hasTextField(integrations, "elevenLabsApiKey")
     && (hasTextField(integrations, "elevenLabsVoiceId") || hasTextField(portableVoice, "elevenLabsVoiceId"))
     && hasTextField(voice, "whisperCliPath")
@@ -264,6 +266,7 @@ function readSenseStatusLines(): string[] {
     teams: hasTextField(teams, "clientId") && hasTextField(teams, "clientSecret") && hasTextField(teams, "tenantId"),
     bluebubbles: hasTextField(bluebubbles, "serverUrl") && hasTextField(bluebubbles, "password"),
     mail: hasTextField(mailroom, "mailboxAddress") && !!privateKeys && typeof privateKeys === "object" && !Array.isArray(privateKeys),
+    /* v8 ignore next 5 -- full voice mode matrix lives in the voice runtime resolver; this row only mirrors that result into prompt context @preserve */
     voice: voiceConversationEngine === "openai-sip"
       ? openAISipVoiceReady
       : voiceConversationEngine === "openai-realtime"

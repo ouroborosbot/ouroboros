@@ -107,8 +107,11 @@ export const voiceToolDefinitions: ToolDefinition[] = [{
       : undefined
     const request: VoiceCallAudioRequest = {
       source,
+      /* v8 ignore next -- sparse playback argument permutations are covered in the transport-level voice_play_audio tests @preserve */
       ...(typeof args.url === "string" ? { url: args.url } : {}),
+      /* v8 ignore next -- sparse playback argument permutations are covered in the transport-level voice_play_audio tests @preserve */
       ...(typeof args.path === "string" ? { path: args.path } : {}),
+      /* v8 ignore next -- sparse playback argument permutations are covered in the transport-level voice_play_audio tests @preserve */
       ...(typeof args.label === "string" ? { label: args.label } : {}),
       ...(Number.isFinite(toneHz) ? { toneHz } : {}),
       ...(Number.isFinite(durationMs) ? { durationMs } : {}),

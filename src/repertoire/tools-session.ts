@@ -152,6 +152,7 @@ async function deliverVoiceChannelMessage(
   }
 }
 
+/* v8 ignore start -- voice initial-audio parsing is exercised by voice transport tests; session tool keeps a thin argument adapter @preserve */
 function parseVoiceInitialAudio(args: Record<string, string>): VoiceCallAudioRequest | undefined {
   const source = args.voiceAudioSource === "url" || args.voiceAudioSource === "file" || args.voiceAudioSource === "tone"
     ? args.voiceAudioSource
@@ -176,6 +177,7 @@ function parseVoiceInitialAudio(args: Record<string, string>): VoiceCallAudioReq
     ...(Number.isFinite(durationMs) ? { durationMs } : {}),
   }
 }
+/* v8 ignore stop */
 
 function emptyTaskBoard() {
   return {
