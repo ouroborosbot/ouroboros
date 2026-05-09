@@ -9,6 +9,26 @@
       ]
     },
     {
+      "version": "0.1.0-alpha.580",
+      "changes": [
+        "OpenAI Realtime phone voice now queues manual `response.create` requests while another response is active, preventing SIP calls from hitting `conversation_already_has_active_response` and losing conversational state during tool followups.",
+        "Voice Realtime bootstrap now exposes the native voice/base tool set immediately instead of only `voice_end_call`, so early phone turns can still use tools while the full friend/MCP tool refresh finishes.",
+        "BlueBubbles webhook handling now claims message GUIDs before repair/hydrate work starts and releases those claims if repair discovers an already-processed message, preventing duplicate webhook deliveries from racing into overlapping agent turns for the same message."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.579",
+      "changes": [
+        "Twilio phone voice now returns `404 not found` for unknown GET routes outside the configured voice webhook path, so stale health probes no longer look like unsupported methods while the active route remains healthy."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.578",
+      "changes": [
+        "Release preflight now requires releasable implementation changes to keep the current version as the top changelog entry and update `changelog.json` no earlier than the changed source, script, skill, or wrapper-code paths."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.577",
       "changes": [
         "Bitwarden vault access now reaps over-age `.ouro-bw.lock` files even when the recorded owner PID is still alive, preventing stale local locks from making provider and vault status look broken after the `bw` child process is gone."

@@ -805,6 +805,7 @@ describe("Twilio phone voice bridge", () => {
       expect(acceptBody.instructions).toContain("source=tone")
       expect(acceptBody.tools?.some((tool) => tool.name === "voice_end_call")).toBe(true)
       expect(acceptBody.tools?.some((tool) => tool.name === "voice_play_audio")).toBe(true)
+      expect(acceptBody.tools?.some((tool) => tool.name === "web_search")).toBe(true)
 
       await vi.waitFor(() => expect(openaiMessages.some((event) => event.type === "response.create")).toBe(true), { timeout: 10_000 })
       const greeting = openaiMessages.find((event) => event.type === "response.create") as { response?: { instructions?: string } }
@@ -825,6 +826,27 @@ describe("Twilio phone voice bridge", () => {
         expect(saved?.messages.some((message) => message.role === "user" && message.content === "hello there")).toBe(true)
         expect(saved?.messages.some((message) => message.role === "assistant" && message.content === "Hi, Ari.")).toBe(true)
       })
+
+      const greetingResponseCreateCount = openaiMessages.filter((event) => event.type === "response.create").length
+      openaiSockets[0]?.send(JSON.stringify({ type: "response.created", response: { id: "resp-greeting" } }))
+      openaiSockets[0]?.send(JSON.stringify({
+        type: "response.function_call_arguments.done",
+        call_id: "tool-queued-audio",
+        name: "voice_play_audio",
+        arguments: JSON.stringify({ source: "tone", label: "queued beep", toneHz: 660, durationMs: 80 }),
+      }))
+      await vi.waitFor(() => expect(openaiMessages.some((event) => {
+        if (event.type !== "conversation.item.create") return false
+        const item = event.item as { type?: string; call_id?: string; output?: string } | undefined
+        return item?.type === "function_call_output"
+          && item.call_id === "tool-queued-audio"
+          && item.output?.includes("Render the requested audio cue now")
+      })).toBe(true), { timeout: 10_000 })
+      expect(openaiMessages.filter((event) => event.type === "response.create")).toHaveLength(greetingResponseCreateCount)
+      openaiSockets[0]?.send(JSON.stringify({ type: "response.done", response: { id: "resp-greeting" } }))
+      await vi.waitFor(() => {
+        expect(openaiMessages.filter((event) => event.type === "response.create").length).toBeGreaterThan(greetingResponseCreateCount)
+      }, { timeout: 10_000 })
 
       openaiSockets[0]?.send(JSON.stringify({
         type: "response.function_call_arguments.done",
@@ -2439,6 +2461,33 @@ describe("Twilio phone voice bridge", () => {
     })
   })
 
+  it("returns not found for unknown GET routes outside the configured voice path", async () => {
+    const bridge = createTwilioPhoneBridge({
+      ...baseBridgeOptions("/tmp/ouro-twilio-phone"),
+      basePath: "/voice/agents/slugger/twilio",
+    })
+
+    const staleHealthProbe = await bridge.handle({
+      method: "GET",
+      path: "/voice/twilio/health",
+      headers: {},
+    })
+    const configuredHealthProbe = await bridge.handle({
+      method: "GET",
+      path: "/voice/agents/slugger/twilio/health",
+      headers: {},
+    })
+
+    expect(staleHealthProbe).toMatchObject({
+      statusCode: 404,
+      body: "not found",
+    })
+    expect(configuredHealthProbe).toMatchObject({
+      statusCode: 200,
+      body: "ok",
+    })
+  })
+
   it("fails closed when a Twilio auth token is configured and the request is unsigned", async () => {
     const bridge = createTwilioPhoneBridge({
       ...baseBridgeOptions("/tmp/ouro-twilio-phone"),
@@ -3537,11 +3586,11 @@ describe("Twilio phone voice bridge", () => {
     }
   })
 
-  it("rejects non-POST Twilio routes that are not health or audio", async () => {
+  it("rejects unsupported non-GET and non-POST Twilio routes", async () => {
     const bridge = createTwilioPhoneBridge(baseBridgeOptions("/tmp/ouro-twilio-phone"))
 
     const response = await bridge.handle({
-      method: "GET",
+      method: "PUT",
       path: "/voice/twilio/incoming",
       headers: {},
     })
