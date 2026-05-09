@@ -6,7 +6,7 @@
       "changes": [
         "OpenAI Realtime phone voice now queues manual `response.create` requests while another response is active, preventing SIP calls from hitting `conversation_already_has_active_response` and losing conversational state during tool followups.",
         "Voice Realtime bootstrap now exposes the native voice/base tool set immediately instead of only `voice_end_call`, so early phone turns can still use tools while the full friend/MCP tool refresh finishes.",
-        "BlueBubbles webhook handling now claims message GUIDs before repair/hydrate work starts, preventing duplicate webhook deliveries from racing into overlapping agent turns for the same message."
+        "BlueBubbles webhook handling now claims message GUIDs before repair/hydrate work starts and releases those claims if repair discovers an already-processed message, preventing duplicate webhook deliveries from racing into overlapping agent turns for the same message."
       ]
     },
     {
