@@ -2,6 +2,13 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.581",
+      "changes": [
+        "BlueBubbles now suppresses same-turn near-duplicate outward sends using token/Jaccard similarity, covering rewritten retry answers and repeated status messages without blocking short distinct replies.",
+        "BlueBubbles status sends now pass through the same duplicate guard as normal outward text, preserving inner/meta leak protections while reducing repeated iMessage status loops."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.577",
       "changes": [
         "Bitwarden vault access now reaps over-age `.ouro-bw.lock` files even when the recorded owner PID is still alive, preventing stale local locks from making provider and vault status look broken after the `bw` child process is gone."
