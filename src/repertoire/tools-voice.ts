@@ -137,6 +137,7 @@ export const voiceToolDefinitions: ToolDefinition[] = [{
       message: "voice play-audio request accepted",
       meta: { hasActiveCallAudio: "true", source, durationMs: String(result.durationMs) },
     })
+    if (result.toolResult?.trim()) return result.toolResult.trim()
     return `(played audio: ${result.label}, ${Math.round(result.durationMs)}ms)`
   },
 }]

@@ -161,7 +161,7 @@ Voice is a single transcript-first sense with multiple transports. The Twilio ph
 
 Spoken voice is part of the agent's identity. For native OpenAI Realtime phone testing, `voice.openaiRealtimeVoice` is the current phone voice and should be auditioned as a single coherent identity. `voice.openaiRealtimeVoiceStyle` must be audible in the first greeting as well as later turns, and `voice.openaiRealtimeVoiceSpeed` should stay close to `1.0` unless the live call remains too slow or too sleepy. ElevenLabs tests cover legacy cascade compatibility only unless a future design gives it a distinct non-redundant job.
 
-Live voice tools should be exercised as media controls. `voice_end_call` must end the active call after a natural goodbye. `voice_play_audio` must inject a short tone or clip into the phone media stream on Media Stream transports; SIP intentionally does not expose that tool yet because arbitrary non-speech audio needs a real SIP-compatible media primitive.
+Live voice tools should be exercised as media controls. `voice_end_call` must end the active call after a natural goodbye. `voice_play_audio` must inject a short tone or clip into the phone media stream on Media Stream transports. On direct OpenAI SIP, `source=tone` should produce a short model-rendered audio cue through Realtime; URL/file clips should return the media-bridge limitation instead of claiming playback succeeded.
 
 For implementation work, keep the sense/transport boundary in [Sense Development Contract](sense-development.md) in view. In particular, outward sense turns run in tool-required mode: transports that need replayable text must recover `settle.answer` only after `(delivered)` and `speak.message` only after `(spoken)`, not by reading `assistant.content` directly.
 

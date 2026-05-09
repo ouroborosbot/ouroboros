@@ -1396,7 +1396,7 @@ interface OpenAISipCallMetadata {
   friendId: string
 }
 
-const OPENAI_SIP_UNSUPPORTED_TOOL_NAMES = new Set(["voice_play_audio"])
+const OPENAI_SIP_UNSUPPORTED_TOOL_NAMES = new Set<string>()
 const OPENAI_SIP_DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
 const OPENAI_SIP_DEFAULT_WEBSOCKET_BASE_URL = "wss://api.openai.com/v1/realtime"
 
@@ -1676,7 +1676,7 @@ async function buildRealtimeVoiceInstructions(options: {
   realtimeVoiceStyle?: string
   realtimeVoiceSpeed?: number
   realtimeModel?: string
-  supportsAudioTools?: boolean
+  audioToolMode?: "media-stream" | "realtime-cue" | "none"
 }): Promise<string> {
   const psycheDir = path.join(options.agentRoot, "psyche")
   const [soul, identity, tacit] = await Promise.all([
@@ -1696,9 +1696,11 @@ async function buildRealtimeVoiceInstructions(options: {
     "If the caller interrupts, stop the older path and answer the newest thing first.",
     "If the caller says they are counting, measuring latency, testing lag, waiting, or wants you quiet, say at most 'got it' and then stay silent until they ask or say something that needs an answer.",
     "Use tools for outside facts or side effects. While a tool is running, give at most one tiny preamble, then summarize the result compactly when it returns.",
-    options.supportsAudioTools === false
-      ? "This SIP lane cannot yet inject arbitrary non-speech audio. If the caller asks for a tone, clip, or sample, answer transparently and offer a spoken alternative."
-      : "If the caller asks to hear audio, a tone, a sample, or a clip, use voice_play_audio; people on phone calls can do more than talk.",
+    options.audioToolMode === "none"
+      ? "This voice lane cannot inject non-speech audio. If the caller asks for a tone, clip, or sample, answer transparently and offer a spoken alternative."
+      : options.audioToolMode === "realtime-cue"
+        ? "If the caller asks for a beep or tone, use voice_play_audio with source=tone. This direct SIP lane can ask Realtime to render short audio cues, but arbitrary URL/file clip bytes still require a media bridge; if the tool reports that limitation, explain it briefly."
+        : "If the caller asks to hear audio, a tone, a sample, or a clip, use voice_play_audio; people on phone calls can do more than talk.",
     "If the caller is done, asks to hang up, or you need to end the call, say a brief natural goodbye first, then call voice_end_call. After voice_end_call, do not say anything else.",
     soul ? `# SOUL\n${soul}` : "",
     identity ? `# IDENTITY\n${identity}` : "",
@@ -2709,7 +2711,7 @@ class OpenAISipPhoneSession {
       realtimeVoiceStyle: this.options.openaiRealtime?.voiceStyle,
       realtimeVoiceSpeed: this.options.openaiRealtime ? realtimeVoiceSpeed(this.options.openaiRealtime) : undefined,
       realtimeModel: this.options.openaiRealtime?.model,
-      supportsAudioTools: false,
+      audioToolMode: "realtime-cue",
     })
     this.sessionMessages = existing?.messages && existing.messages.length > 0
       ? existing.messages
@@ -2725,6 +2727,7 @@ class OpenAISipPhoneSession {
       signin: async () => undefined,
       voiceCall: {
         requestEnd: () => this.requestHangupFromTool(),
+        playAudio: (request) => this.playRealtimeAudioCue(request),
       },
     }
   }
@@ -2746,6 +2749,7 @@ class OpenAISipPhoneSession {
       friendStore,
       voiceCall: {
         requestEnd: () => this.requestHangupFromTool(),
+        playAudio: (request) => this.playRealtimeAudioCue(request),
       },
     }
     void this.refreshRealtimeToolsWithMcp(resolved)
@@ -2756,6 +2760,50 @@ class OpenAISipPhoneSession {
       undefined,
       undefined,
     )
+  }
+
+  private playRealtimeAudioCue(request: VoiceCallAudioRequest): VoiceCallAudioResult {
+    const source = request.source ?? "tone"
+    const label = request.label?.trim() || (source === "tone" ? "tone cue" : "audio clip")
+    if (source !== "tone") {
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_audio_clip_unsupported",
+        message: "OpenAI SIP voice audio clip requested without byte-injection support",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), source, label },
+      })
+      return {
+        label,
+        durationMs: 0,
+        toolResult: [
+          "Direct OpenAI SIP cannot inject arbitrary external audio bytes yet.",
+          "Briefly tell the caller that this SIP path can do short generated cues, but URL/file clips need the media bridge work before they can be played into the call.",
+        ].join(" "),
+      }
+    }
+
+    const durationMs = boundedInteger(request.durationMs, 80, 4_000) ?? 700
+    const toneHz = boundedInteger(request.toneHz, 80, 3_000) ?? 660
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_openai_sip_audio_cue_requested",
+      message: "OpenAI SIP voice audio cue requested",
+      meta: {
+        agentName: this.options.agentName,
+        callId: safeSegment(this.metadata.callId),
+        label,
+        durationMs: String(durationMs),
+        toneHz: String(toneHz),
+      },
+    })
+    return {
+      label,
+      durationMs,
+      toolResult: [
+        `Render the requested audio cue now: a short, clear, nonverbal beep-like tone around ${toneHz} Hz for about ${durationMs} ms.`,
+        "Do not describe the tone first and do not add words unless the caller asks afterward.",
+      ].join(" "),
+    }
   }
 
   private async refreshRealtimeToolsWithMcp(resolved: Awaited<ReturnType<FriendResolver["resolve"]>>): Promise<void> {

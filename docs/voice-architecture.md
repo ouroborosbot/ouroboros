@@ -84,12 +84,13 @@ SIP does not remove Ouro from the loop. Ouro still owns acceptance policy,
 session keys, transcript persistence, voice tools, outbound intent, identity,
 and audit.
 
-Open questions before replacing Twilio Media Streams:
+Remaining media questions before replacing Twilio Media Streams:
 
-- How should arbitrary non-speech playback map to SIP calls? The current
-  Twilio transport can inject raw audio frames. The SIP transport may need
-  OpenAI Realtime audio-item support, provider-side media injection, or a
-  narrower first version of `voice_play_audio`.
+- Direct OpenAI SIP does not expose an output-audio append primitive. It can
+  ask Realtime to render short generated cues, so `voice_play_audio` is exposed
+  for `source=tone` on SIP as a model-rendered audio cue. URL/file clips still
+  need a media bridge, most likely a Twilio Conference/SIP mixer or another SIP
+  B2BUA that can inject raw audio while keeping the Realtime leg alive.
 - What is the cleanest outbound call flow? Inbound SIP is direct: trunk to
   OpenAI, webhook to Ouro. Outbound likely means the SIP provider originates a
   call to the human and bridges/refers it to the OpenAI SIP endpoint, while

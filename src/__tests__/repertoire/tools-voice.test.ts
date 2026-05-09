@@ -57,6 +57,25 @@ describe("voice lifecycle tools", () => {
     expect(result).toBe("(played audio: latency beep, 700ms)")
   })
 
+  it("allows transports to provide custom playback tool output", async () => {
+    const playAudio = vi.fn(async () => ({
+      label: "SIP tone cue",
+      durationMs: 500,
+      toolResult: "Render the SIP tone cue now.",
+    }))
+
+    const result = await execTool("voice_play_audio", {
+      source: "tone",
+      label: "SIP tone cue",
+    }, {
+      signin: async () => undefined,
+      voiceCall: { requestEnd: vi.fn(), playAudio },
+    })
+
+    expect(playAudio).toHaveBeenCalled()
+    expect(result).toBe("Render the SIP tone cue now.")
+  })
+
   it("reports missing voice audio path without throwing", async () => {
     const result = await execTool("voice_play_audio", {}, {
       signin: async () => undefined,

@@ -52,6 +52,7 @@ export interface VoiceCallAudioRequest {
 export interface VoiceCallAudioResult {
   label: string;
   durationMs: number;
+  toolResult?: string;
 }
 
 export interface VoiceCallControl {

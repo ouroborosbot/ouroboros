@@ -78,10 +78,11 @@ See [Voice Architecture](voice-architecture.md) for the fuller transport model.
   call.
 - Voice calls are not mouth-only. The voice tool surface includes call controls
   such as `voice_end_call` and `voice_play_audio`; active phone transports
-  should implement those controls through the call media path, not by asking the
-  model to describe what would have happened. Until SIP has a real arbitrary
-  audio-injection primitive, expose `voice_play_audio` only on transports that
-  can actually put raw audio into the call.
+  should implement those controls through the strongest media path available.
+  Twilio Media Streams can inject raw audio frames. Direct OpenAI SIP can
+  produce short model-rendered tone cues, while arbitrary URL/file clip bytes
+  must report the media-bridge limitation instead of pretending playback
+  happened.
 - Meeting/browser: meeting URL intake and audio routing should feed the same
   Voice session contract. Browser automation joins the room; it should not
   become a separate conversational sense unless it has a distinct durable
