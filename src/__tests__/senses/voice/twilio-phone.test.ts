@@ -1437,6 +1437,102 @@ describe("Twilio phone voice bridge", () => {
     }
   }, 15_000)
 
+  it("resolves Realtime media stream callers without phone metadata as local voice identities", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
+    const agentRoot = path.join(outputDir, "slugger.ouro")
+    const openaiMessages: Record<string, unknown>[] = []
+    const openaiSockets: WebSocket[] = []
+    const openaiServer = new WebSocketServer({ port: 0 })
+    const address = openaiServer.address()
+    if (!address || typeof address === "string") throw new Error("OpenAI test server did not bind to a TCP port")
+    const openaiUrl = `ws://127.0.0.1:${address.port}`
+    let server: Awaited<ReturnType<typeof startTwilioPhoneBridgeServer>> | undefined
+    const twilioSockets: WebSocket[] = []
+    try {
+      openaiServer.on("connection", (ws) => {
+        openaiSockets.push(ws as WebSocket)
+        ws.on("message", (raw) => {
+          const event = JSON.parse(Buffer.from(raw as Buffer).toString("utf8")) as Record<string, unknown>
+          openaiMessages.push(event)
+          if (event.type === "session.update") {
+            ws.send(JSON.stringify({ type: "session.updated", session: event.session ?? {} }))
+          }
+          if (event.type === "response.create") {
+            ws.send(JSON.stringify({ type: "response.done", response: { id: "resp-local", status: "completed" } }))
+          }
+        })
+      })
+
+      server = await startTwilioPhoneBridgeServer({
+        ...baseBridgeOptions(outputDir),
+        publicBaseUrl: "https://voice.example.com",
+        port: 0,
+        agentRoot,
+        defaultFriendId: "fallback-local",
+        transportMode: "media-stream" as const,
+        conversationEngine: "openai-realtime" as const,
+        openaiRealtime: {
+          apiKey: "openai-secret",
+          websocketUrl: openaiUrl,
+          model: "gpt-realtime-2",
+        },
+      })
+
+      const startRealtimeSocket = async (
+        callSid: string,
+        customParameters: Record<string, string>,
+        expectedSessionUpdates: number,
+      ): Promise<void> => {
+        const socket = new WebSocket(`${server!.localUrl.replace("http:", "ws:")}/voice/twilio/media-stream`)
+        twilioSockets.push(socket)
+        await waitForSocketOpen(socket)
+        sendSocketJson(socket, {
+          event: "start",
+          start: {
+            streamSid: `MZ${callSid}`,
+            callSid,
+            customParameters,
+          },
+        })
+        await vi.waitFor(() => {
+          expect(openaiMessages.filter((event) => event.type === "session.update")).toHaveLength(expectedSessionUpdates)
+        }, { timeout: 10_000 })
+        await closeSocket(socket)
+      }
+
+      await startRealtimeSocket("CALOCALFRIEND", { FriendId: "local-voice-friend" }, 1)
+      await startRealtimeSocket("CALOCALDEFAULT", {}, 2)
+
+      const sessionUpdates = openaiMessages.filter((event): event is { session: { instructions?: string } } =>
+        event.type === "session.update" && typeof (event as { session?: { instructions?: unknown } }).session?.instructions === "string",
+      )
+      expect(sessionUpdates.some((event) => event.session.instructions?.includes("Resolved voice friend: local-voice-friend"))).toBe(true)
+      expect(sessionUpdates.some((event) => event.session.instructions?.includes("Resolved voice friend: fallback-local"))).toBe(true)
+
+      const friendDir = path.join(agentRoot, "friends")
+      const friendRecords = await Promise.all((await fs.readdir(friendDir)).map(async (entry) => (
+        JSON.parse(await fs.readFile(path.join(friendDir, entry), "utf8")) as {
+          name?: string
+          externalIds?: Array<{ provider?: string; externalId?: string }>
+        }
+      )))
+      const localIds = friendRecords.flatMap((record) =>
+        record.externalIds?.filter((identity) => identity.provider === "local").map((identity) => identity.externalId) ?? [],
+      )
+      expect(localIds).toEqual(expect.arrayContaining(["local-voice-friend", "fallback-local"]))
+    } finally {
+      for (const socket of twilioSockets) {
+        if (socket.readyState === WebSocket.OPEN) await closeSocket(socket)
+      }
+      for (const openaiSocket of openaiSockets) {
+        if (openaiSocket.readyState === WebSocket.OPEN) await closeSocket(openaiSocket)
+      }
+      if (server) await closeTwilioPhoneBridgeServer(server)
+      await closeWebSocketServer(openaiServer)
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  }, 15_000)
+
   it("plays configured initial audio after an OpenAI Realtime greeting", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-phone-"))
     const realtimeGreetingPayload = Buffer.alloc(160, 0x7f).toString("base64")

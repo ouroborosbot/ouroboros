@@ -240,6 +240,41 @@ describe("Twilio phone transport runtime", () => {
     })
   })
 
+  it("infers OpenAI Realtime phone voice from a key on Media Stream transports", () => {
+    const resolution = resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        voice: {
+          twilioAccountSid: "AC123",
+          twilioAuthToken: "twilio-secret",
+          twilioFromNumber: "+15557654321",
+          openaiRealtimeApiKey: "openai-secret",
+        },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioTransportMode: "media-stream",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })
+
+    expect(resolution).toMatchObject({
+      status: "configured",
+      settings: {
+        conversationEngine: "openai-realtime",
+        outboundConversationEngine: "openai-realtime",
+        elevenLabsApiKey: "",
+        whisperCliPath: "",
+        openaiRealtime: {
+          apiKey: "openai-secret",
+          apiKeySource: "voice.openaiRealtimeApiKey",
+        },
+      },
+    })
+  })
+
   it("requires Media Streams and an OpenAI key for the Realtime phone engine", () => {
     expect(() => resolveTwilioPhoneTransportRuntime({
       agentName: "slugger",

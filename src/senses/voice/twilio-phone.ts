@@ -1988,7 +1988,7 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
     }
     const voiceContext = await resolveVoiceFriendContext(this.options, {
       friendId: explicitFriendId,
-      remotePhone: this.from,
+      remotePhone: this.from || undefined,
       callSid: this.callSid,
     })
     this.friendId = voiceContext.friendId
@@ -2192,7 +2192,7 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
     if (!this.resolvedContext || !this.friendStore) {
       const voiceContext = await resolveVoiceFriendContext(this.options, {
         friendId: this.friendId,
-        remotePhone: this.from,
+        remotePhone: this.from || undefined,
         callSid: this.callSid,
       })
       this.friendId = voiceContext.friendId
@@ -2849,7 +2849,7 @@ class OpenAISipPhoneSession {
 
       const voiceContext = await resolveVoiceFriendContext(this.options, {
         friendId: this.metadata.friendId || this.options.defaultFriendId?.trim(),
-        remotePhone: this.metadata.from,
+        remotePhone: this.metadata.from || undefined,
         callSid: this.metadata.callId,
       })
       this.friendId = voiceContext.friendId
@@ -3130,7 +3130,7 @@ class OpenAISipPhoneSession {
     if (!this.resolvedContext || !this.friendStore) {
       const voiceContext = await resolveVoiceFriendContext(this.options, {
         friendId: this.friendId,
-        remotePhone: this.metadata.from,
+        remotePhone: this.metadata.from || undefined,
         callSid: this.metadata.callId,
       })
       this.friendId = voiceContext.friendId
