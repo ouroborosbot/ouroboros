@@ -1092,6 +1092,20 @@ describe("handleInboundTurn", () => {
       )
     })
 
+    it("marks live-latency turns to skip pre-model kept-note judging", async () => {
+      const input = makeInput({
+        channel: "voice",
+        capabilities: makeCapabilities({ channel: "voice", senseType: "local" }),
+        latencyMode: "live",
+      })
+
+      await handleInboundTurn(input)
+
+      const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const options = runAgentCall[4] as RunAgentOptions
+      expect(options.skipKeptNotes).toBe(true)
+    })
+
     it("threads explicit cross-relationship target candidates into the active-work frame without inventing a shared-work suggestion from raw text alone", async () => {
       const targets = [
         {

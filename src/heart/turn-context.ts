@@ -198,6 +198,19 @@ function hasTextField(record: Record<string, unknown> | undefined, key: string):
   return typeof record?.[key] === "string" && (record[key] as string).trim().length > 0
 }
 
+function hasTrueField(record: Record<string, unknown> | undefined, key: string): boolean {
+  return record?.[key] === true
+}
+
+function hasOpenAIRealtimeVoiceConfig(options: {
+  integrations: Record<string, unknown> | undefined
+  portableVoice: Record<string, unknown> | undefined
+}): boolean {
+  return hasTextField(options.portableVoice, "openaiRealtimeApiKey")
+    || hasTextField(options.integrations, "openaiApiKey")
+    || hasTextField(options.integrations, "openaiEmbeddingsApiKey")
+}
+
 function recordOrUndefined(value: unknown): Record<string, unknown> | undefined {
   return !!value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 }
@@ -225,16 +238,37 @@ function readSenseStatusLines(): string[] {
   const voice = recordOrUndefined(machinePayload.voice) ?? recordOrUndefined(payload.voice)
   const portableVoice = recordOrUndefined(runtimePayload.voice) ?? recordOrUndefined(payload.voice)
   const integrations = recordOrUndefined(runtimePayload.integrations) ?? recordOrUndefined(payload.integrations)
+  const voiceConversationEngine = (
+    typeof voice?.twilioConversationEngine === "string" ? voice.twilioConversationEngine
+      : typeof voice?.conversationEngine === "string" ? voice.conversationEngine
+      : typeof portableVoice?.twilioConversationEngine === "string" ? portableVoice.twilioConversationEngine
+      : typeof portableVoice?.conversationEngine === "string" ? portableVoice.conversationEngine
+      : "cascade"
+  ).trim().toLowerCase()
+  const openAIRealtimeVoiceReady = hasOpenAIRealtimeVoiceConfig({ integrations, portableVoice })
+  const openAISipVoiceReady = openAIRealtimeVoiceReady
+    && (hasTextField(portableVoice, "openaiSipProjectId") || hasTextField(voice, "openaiSipProjectId"))
+    && (
+      hasTrueField(portableVoice, "openaiSipAllowUnsignedWebhooks")
+      || hasTrueField(voice, "openaiSipAllowUnsignedWebhooks")
+      || hasTextField(portableVoice, "openaiSipWebhookSecret")
+      || hasTextField(voice, "openaiSipWebhookSecret")
+    )
+  const cascadeVoiceReady = hasTextField(integrations, "elevenLabsApiKey")
+    && (hasTextField(integrations, "elevenLabsVoiceId") || hasTextField(portableVoice, "elevenLabsVoiceId"))
+    && hasTextField(voice, "whisperCliPath")
+    && hasTextField(voice, "whisperModelPath")
   const privateKeys = mailroom?.privateKeys
   const configured: Record<SenseName, boolean> = {
     cli: true,
     teams: hasTextField(teams, "clientId") && hasTextField(teams, "clientSecret") && hasTextField(teams, "tenantId"),
     bluebubbles: hasTextField(bluebubbles, "serverUrl") && hasTextField(bluebubbles, "password"),
     mail: hasTextField(mailroom, "mailboxAddress") && !!privateKeys && typeof privateKeys === "object" && !Array.isArray(privateKeys),
-    voice: hasTextField(integrations, "elevenLabsApiKey")
-      && (hasTextField(integrations, "elevenLabsVoiceId") || hasTextField(portableVoice, "elevenLabsVoiceId"))
-      && hasTextField(voice, "whisperCliPath")
-      && hasTextField(voice, "whisperModelPath"),
+    voice: voiceConversationEngine === "openai-sip"
+      ? openAISipVoiceReady
+      : voiceConversationEngine === "openai-realtime"
+        ? openAIRealtimeVoiceReady
+        : cascadeVoiceReady,
   }
 
   const rows: Array<{ label: string; status: string }> = [

@@ -46,7 +46,13 @@ These are not outward delivery:
 ## Voice
 
 Voice is one transcript-first sense with multiple speaking transports.
+See [Voice Architecture](voice-architecture.md) for the fuller transport model.
 
+- Spoken voice is part of agent identity. Keep one current spoken identity per
+  voice transport family instead of presenting multiple provider voices as
+  equally canonical. Native Realtime phone should use `voice.openaiRealtimeVoice`
+  as the current phone voice; ElevenLabs remains a legacy cascade compatibility
+  path unless it earns a distinct non-redundant role.
 - Twilio phone: `record-play` mode keeps the conservative call webhook ->
   record -> Whisper.cpp -> stable voice session -> tool-delivered text ->
   ElevenLabs -> Twilio Play smoke path. `media-stream` mode uses the same
@@ -56,6 +62,24 @@ Voice is one transcript-first sense with multiple speaking transports.
   ElevenLabs emits `ulaw_8000` chunks back to Twilio, and caller speech during
   playback sends Twilio `clear` before the utterance is queued as an
   interruption/follow-up.
+- Native Realtime phone is a `media-stream` conversation engine, not a separate
+  sense. Keep its prompt voice-native and low-latency: load the agent's core
+  identity/voice guidance, recent voice transcript, and tools, but do not send
+  the entire general-purpose prompt blob into every Realtime call.
+- OpenAI SIP is the preferred low-latency phone transport for any phone-number
+  lane that can route SIP. It still belongs under the same `voice` sense:
+  Twilio or another SIP provider owns the phone number/trunk, OpenAI owns the
+  live media leg, and Ouro owns session keys, transcripts, tools, routing, and
+  call-control policy. The current reversible path is
+  `voice.twilioConversationEngine=openai-sip`: Twilio returns `<Dial><Sip>`,
+  OpenAI posts `realtime.call.incoming` to Ouro, and Ouro accepts/controls the
+  call.
+- Voice calls are not mouth-only. The voice tool surface includes call controls
+  such as `voice_end_call` and `voice_play_audio`; active phone transports
+  should implement those controls through the call media path, not by asking the
+  model to describe what would have happened. Until SIP has a real arbitrary
+  audio-injection primitive, expose `voice_play_audio` only on transports that
+  can actually put raw audio into the call.
 - Meeting/browser: meeting URL intake and audio routing should feed the same
   Voice session contract. Browser automation joins the room; it should not
   become a separate conversational sense unless it has a distinct durable

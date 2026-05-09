@@ -15,6 +15,8 @@ import {
 } from "../../heart/runtime-credentials"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { createElevenLabsTtsClient } from "./elevenlabs"
+import { writeVoicePlaybackArtifact } from "./playback"
+import { buildVoiceTranscript } from "./transcript"
 import {
   DEFAULT_TWILIO_PHONE_PORT,
   DEFAULT_TWILIO_GREETING_PREBUFFER_MS,
@@ -24,25 +26,38 @@ import {
   DEFAULT_TWILIO_PHONE_PLAYBACK_MODE,
   DEFAULT_TWILIO_PHONE_TRANSPORT_MODE,
   normalizeTwilioPhoneBasePath,
+  normalizeTwilioPhoneConversationEngine,
   normalizeTwilioPhonePlaybackMode,
   normalizeTwilioPhoneTransportMode,
   normalizeTwilioE164PhoneNumber,
+  openAISipWebhookPath,
+  openAISipWebhookUrl,
   startTwilioPhoneBridgeServer,
   createTwilioOutboundCall,
+  outboundCallAnsweredPrompt,
   readRecentTwilioOutboundCallJobs,
+  twilioOutboundCallAmdCallbackUrl,
   twilioOutboundCallStatusCallbackUrl,
   twilioOutboundCallWebhookUrl,
   twilioPhoneWebhookUrl,
+  twilioPhoneVoiceSessionKey,
   updateTwilioOutboundCallJob,
   writeTwilioOutboundCallJob,
   type StartTwilioPhoneBridgeServerOptions,
+  type OpenAIRealtimeTwilioOptions,
+  type OpenAISipPhoneOptions,
+  type TwilioPhoneConversationEngine,
   type TwilioPhonePlaybackMode,
   type TwilioPhoneTransportMode,
   type TwilioPhoneBridgeServer,
   type TwilioOutboundCallCreateRequest,
   type TwilioOutboundCallCreateResult,
 } from "./twilio-phone"
+import type { VoiceCallAudioRequest } from "../../repertoire/tools-base"
+import { runVoiceLoopbackTurn } from "./turn"
 import { createWhisperCppTranscriber } from "./whisper"
+
+type OpenAIRealtimeTurnDetectionOptions = NonNullable<OpenAIRealtimeTwilioOptions["turnDetection"]>
 
 export interface TwilioPhoneTransportRuntimeOverrides {
   enabled?: boolean
@@ -60,6 +75,27 @@ export interface TwilioPhoneTransportRuntimeOverrides {
   greetingPrebufferMs?: number
   playbackMode?: TwilioPhonePlaybackMode
   transportMode?: TwilioPhoneTransportMode
+  conversationEngine?: TwilioPhoneConversationEngine
+  openaiRealtimeApiKey?: string
+  openaiRealtimeModel?: string
+  openaiRealtimeVoice?: string
+  openaiRealtimeWebsocketUrl?: string
+  openaiRealtimeReasoningEffort?: OpenAIRealtimeTwilioOptions["reasoningEffort"]
+  openaiRealtimeNoiseReduction?: OpenAIRealtimeTwilioOptions["noiseReduction"]
+  openaiRealtimeTurnDetectionMode?: OpenAIRealtimeTurnDetectionOptions["mode"]
+  openaiRealtimeVadThreshold?: number
+  openaiRealtimeVadPrefixPaddingMs?: number
+  openaiRealtimeVadSilenceDurationMs?: number
+  openaiRealtimeVadIdleTimeoutMs?: number
+  openaiRealtimeVadEagerness?: OpenAIRealtimeTurnDetectionOptions["eagerness"]
+  openaiRealtimeVadCreateResponse?: boolean
+  openaiRealtimeVadInterruptResponse?: boolean
+  openaiSipProjectId?: string
+  openaiSipWebhookPath?: string
+  openaiSipWebhookSecret?: string
+  openaiSipAllowUnsignedWebhooks?: boolean
+  openaiSipApiBaseUrl?: string
+  openaiSipWebsocketBaseUrl?: string
   twilioFromNumber?: string
 }
 
@@ -84,6 +120,10 @@ export interface TwilioPhoneTransportRuntimeSettings {
   greetingPrebufferMs: number
   playbackMode: TwilioPhonePlaybackMode
   transportMode: TwilioPhoneTransportMode
+  conversationEngine: TwilioPhoneConversationEngine
+  openaiRealtime?: OpenAIRealtimeTwilioOptions
+  openaiSip?: OpenAISipPhoneOptions
+  openaiSipWebhookUrl?: string
 }
 
 export type TwilioPhoneTransportRuntimeResolution =
@@ -135,6 +175,7 @@ export interface PlaceConfiguredTwilioPhoneCallOptions {
   outboundId?: string
   now?: Date
   redialGuardMs?: number
+  initialAudio?: VoiceCallAudioRequest
 }
 
 export interface PlaceConfiguredTwilioPhoneCallResult {
@@ -152,6 +193,9 @@ export interface TwilioPhoneOutboundCallRuntimeDeps {
   refreshMachineRuntimeConfig: typeof refreshMachineRuntimeCredentialConfig
   readRuntimeConfig: typeof readRuntimeCredentialConfig
   readMachineRuntimeConfig: typeof readMachineRuntimeCredentialConfig
+  createTts: typeof createElevenLabsTtsClient
+  runVoiceLoopbackTurn: typeof runVoiceLoopbackTurn
+  writeVoicePlaybackArtifact: typeof writeVoicePlaybackArtifact
   createOutboundCall: (request: TwilioOutboundCallCreateRequest) => Promise<TwilioOutboundCallCreateResult>
 }
 
@@ -240,6 +284,79 @@ function trimOptional(value: string | undefined): string | undefined {
   return value?.trim() || undefined
 }
 
+function resolveOpenAIRealtimeApiKey(options: {
+  runtimeConfig: RuntimeCredentialConfig
+  overrides?: TwilioPhoneTransportRuntimeOverrides
+}): { apiKey: string; source: string } | undefined {
+  const overrideKey = trimOptional(options.overrides?.openaiRealtimeApiKey)
+  if (overrideKey) return { apiKey: overrideKey, source: "override.openaiRealtimeApiKey" }
+
+  const voiceKey = configString(options.runtimeConfig, "voice.openaiRealtimeApiKey")
+  if (voiceKey) return { apiKey: voiceKey, source: "voice.openaiRealtimeApiKey" }
+
+  const integrationKey = configString(options.runtimeConfig, "integrations.openaiApiKey")
+  if (integrationKey) return { apiKey: integrationKey, source: "integrations.openaiApiKey" }
+
+  const compatKey = configString(options.runtimeConfig, "integrations.openaiEmbeddingsApiKey")
+  if (compatKey) return { apiKey: compatKey, source: "integrations.openaiEmbeddingsApiKey" }
+
+  return undefined
+}
+
+function configuredConversationEngine(
+  options: ResolveTwilioPhoneTransportRuntimeOptions,
+  overrides: TwilioPhoneTransportRuntimeOverrides,
+): TwilioPhoneConversationEngine {
+  return overrides.conversationEngine
+    ?? normalizeTwilioPhoneConversationEngine(
+      configString(options.machineConfig, "voice.twilioConversationEngine")
+      ?? configString(options.machineConfig, "voice.conversationEngine")
+      ?? configString(options.runtimeConfig, "voice.twilioConversationEngine")
+      ?? configString(options.runtimeConfig, "voice.conversationEngine")
+      ?? "cascade",
+    )
+}
+
+function normalizeOpenAIRealtimeReasoningEffort(
+  value: string | undefined,
+): OpenAIRealtimeTwilioOptions["reasoningEffort"] | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (
+    normalized === "minimal"
+    || normalized === "low"
+    || normalized === "medium"
+    || normalized === "high"
+    || normalized === "xhigh"
+  ) {
+    return normalized
+  }
+  return undefined
+}
+
+function normalizeOpenAIRealtimeNoiseReduction(
+  value: string | undefined,
+): OpenAIRealtimeTwilioOptions["noiseReduction"] | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "near_field" || normalized === "far_field" || normalized === "none") return normalized
+  return undefined
+}
+
+function normalizeOpenAIRealtimeTurnDetectionMode(
+  value: string | undefined,
+): OpenAIRealtimeTurnDetectionOptions["mode"] | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "server_vad" || normalized === "semantic_vad") return normalized
+  return undefined
+}
+
+function normalizeOpenAIRealtimeVadEagerness(
+  value: string | undefined,
+): OpenAIRealtimeTurnDetectionOptions["eagerness"] | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "low" || normalized === "medium" || normalized === "high" || normalized === "auto") return normalized
+  return undefined
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -277,26 +394,132 @@ export function resolveTwilioPhoneTransportRuntime(
       ?? options.defaultBasePath
       ?? TWILIO_PHONE_WEBHOOK_BASE_PATH,
   )
-  const elevenLabsApiKey = required(
-    configString(options.runtimeConfig, "integrations.elevenLabsApiKey"),
-    "missing integrations.elevenLabsApiKey; run 'ouro connect voice --agent <agent>' for setup guidance",
-  )
-  const elevenLabsVoiceId = required(
-    trimOptional(overrides.elevenLabsVoiceId)
-      ?? configString(options.runtimeConfig, "integrations.elevenLabsVoiceId")
-      ?? configString(options.runtimeConfig, "voice.elevenLabsVoiceId"),
-    "missing integrations.elevenLabsVoiceId; save the ElevenLabs voice ID before starting phone voice",
-  )
-  const whisperCliPath = required(
-    trimOptional(overrides.whisperCliPath)
-      ?? configString(options.machineConfig, "voice.whisperCliPath"),
-    "missing voice.whisperCliPath in this machine's runtime config",
-  )
-  const whisperModelPath = required(
-    trimOptional(overrides.whisperModelPath)
-      ?? configString(options.machineConfig, "voice.whisperModelPath"),
-    "missing voice.whisperModelPath in this machine's runtime config",
-  )
+  const transportMode = overrides.transportMode
+    ?? normalizeTwilioPhoneTransportMode(configString(options.machineConfig, "voice.twilioTransportMode") ?? DEFAULT_TWILIO_PHONE_TRANSPORT_MODE)
+  const conversationEngine = configuredConversationEngine(options, overrides)
+
+  let elevenLabsApiKey = configString(options.runtimeConfig, "integrations.elevenLabsApiKey") ?? ""
+  let elevenLabsVoiceId = trimOptional(overrides.elevenLabsVoiceId)
+    ?? configString(options.runtimeConfig, "integrations.elevenLabsVoiceId")
+    ?? configString(options.runtimeConfig, "voice.elevenLabsVoiceId")
+    ?? ""
+  let whisperCliPath = trimOptional(overrides.whisperCliPath)
+    ?? configString(options.machineConfig, "voice.whisperCliPath")
+    ?? ""
+  let whisperModelPath = trimOptional(overrides.whisperModelPath)
+    ?? configString(options.machineConfig, "voice.whisperModelPath")
+    ?? ""
+  let openaiRealtime: OpenAIRealtimeTwilioOptions | undefined
+  let openaiSip: OpenAISipPhoneOptions | undefined
+
+  if (conversationEngine === "openai-realtime" || conversationEngine === "openai-sip") {
+    if (conversationEngine === "openai-realtime" && transportMode !== "media-stream") {
+      throw new Error("voice.twilioConversationEngine=openai-realtime requires voice.twilioTransportMode=media-stream")
+    }
+    const key = resolveOpenAIRealtimeApiKey({ runtimeConfig: options.runtimeConfig, overrides })
+    if (!key) {
+      throw new Error("missing voice.openaiRealtimeApiKey; save an OpenAI Realtime-capable API key before starting phone voice")
+    }
+    const turnDetection: OpenAIRealtimeTurnDetectionOptions = {
+      mode: overrides.openaiRealtimeTurnDetectionMode
+        ?? normalizeOpenAIRealtimeTurnDetectionMode(configString(options.machineConfig, "voice.openaiRealtimeTurnDetectionMode"))
+        ?? normalizeOpenAIRealtimeTurnDetectionMode(configString(options.runtimeConfig, "voice.openaiRealtimeTurnDetectionMode")),
+      threshold: overrides.openaiRealtimeVadThreshold
+        ?? configNumber(options.machineConfig, "voice.openaiRealtimeVadThreshold")
+        ?? configNumber(options.runtimeConfig, "voice.openaiRealtimeVadThreshold"),
+      prefixPaddingMs: overrides.openaiRealtimeVadPrefixPaddingMs
+        ?? configNumber(options.machineConfig, "voice.openaiRealtimeVadPrefixPaddingMs")
+        ?? configNumber(options.runtimeConfig, "voice.openaiRealtimeVadPrefixPaddingMs"),
+      silenceDurationMs: overrides.openaiRealtimeVadSilenceDurationMs
+        ?? configNumber(options.machineConfig, "voice.openaiRealtimeVadSilenceDurationMs")
+        ?? configNumber(options.runtimeConfig, "voice.openaiRealtimeVadSilenceDurationMs"),
+      idleTimeoutMs: overrides.openaiRealtimeVadIdleTimeoutMs
+        ?? configNumber(options.machineConfig, "voice.openaiRealtimeVadIdleTimeoutMs")
+        ?? configNumber(options.runtimeConfig, "voice.openaiRealtimeVadIdleTimeoutMs"),
+      eagerness: overrides.openaiRealtimeVadEagerness
+        ?? normalizeOpenAIRealtimeVadEagerness(configString(options.machineConfig, "voice.openaiRealtimeVadEagerness"))
+        ?? normalizeOpenAIRealtimeVadEagerness(configString(options.runtimeConfig, "voice.openaiRealtimeVadEagerness")),
+      createResponse: overrides.openaiRealtimeVadCreateResponse
+        ?? configBoolean(options.machineConfig, "voice.openaiRealtimeVadCreateResponse")
+        ?? configBoolean(options.runtimeConfig, "voice.openaiRealtimeVadCreateResponse"),
+      interruptResponse: overrides.openaiRealtimeVadInterruptResponse
+        ?? configBoolean(options.machineConfig, "voice.openaiRealtimeVadInterruptResponse")
+        ?? configBoolean(options.runtimeConfig, "voice.openaiRealtimeVadInterruptResponse"),
+    }
+    openaiRealtime = {
+      apiKey: key.apiKey,
+      apiKeySource: key.source,
+      model: trimOptional(overrides.openaiRealtimeModel)
+        ?? configString(options.machineConfig, "voice.openaiRealtimeModel")
+        ?? configString(options.runtimeConfig, "voice.openaiRealtimeModel"),
+      voice: trimOptional(overrides.openaiRealtimeVoice)
+        ?? configString(options.runtimeConfig, "voice.openaiRealtimeVoice")
+        ?? configString(options.machineConfig, "voice.openaiRealtimeVoice"),
+      websocketUrl: trimOptional(overrides.openaiRealtimeWebsocketUrl)
+        ?? configString(options.machineConfig, "voice.openaiRealtimeWebsocketUrl")
+        ?? configString(options.runtimeConfig, "voice.openaiRealtimeWebsocketUrl"),
+      reasoningEffort: overrides.openaiRealtimeReasoningEffort
+        ?? normalizeOpenAIRealtimeReasoningEffort(configString(options.machineConfig, "voice.openaiRealtimeReasoningEffort"))
+        ?? normalizeOpenAIRealtimeReasoningEffort(configString(options.runtimeConfig, "voice.openaiRealtimeReasoningEffort")),
+      noiseReduction: overrides.openaiRealtimeNoiseReduction
+        ?? normalizeOpenAIRealtimeNoiseReduction(configString(options.machineConfig, "voice.openaiRealtimeNoiseReduction"))
+        ?? normalizeOpenAIRealtimeNoiseReduction(configString(options.runtimeConfig, "voice.openaiRealtimeNoiseReduction")),
+      turnDetection,
+    }
+
+    if (conversationEngine === "openai-sip") {
+      const projectId = trimOptional(overrides.openaiSipProjectId)
+        ?? configString(options.runtimeConfig, "voice.openaiSipProjectId")
+        ?? configString(options.machineConfig, "voice.openaiSipProjectId")
+      if (!projectId) {
+        throw new Error("missing voice.openaiSipProjectId; save the OpenAI project id before starting SIP phone voice")
+      }
+      const allowUnsignedWebhooks = overrides.openaiSipAllowUnsignedWebhooks
+        ?? configBoolean(options.machineConfig, "voice.openaiSipAllowUnsignedWebhooks")
+        ?? configBoolean(options.runtimeConfig, "voice.openaiSipAllowUnsignedWebhooks")
+      const webhookSecret = trimOptional(overrides.openaiSipWebhookSecret)
+        ?? configString(options.runtimeConfig, "voice.openaiSipWebhookSecret")
+        ?? configString(options.machineConfig, "voice.openaiSipWebhookSecret")
+      if (!webhookSecret && !allowUnsignedWebhooks) {
+        throw new Error("missing voice.openaiSipWebhookSecret; save the OpenAI webhook signing secret before starting SIP phone voice")
+      }
+      openaiSip = {
+        projectId,
+        webhookPath: normalizeTwilioPhoneBasePath(
+          trimOptional(overrides.openaiSipWebhookPath)
+            ?? configString(options.machineConfig, "voice.openaiSipWebhookPath")
+            ?? configString(options.runtimeConfig, "voice.openaiSipWebhookPath")
+            ?? openAISipWebhookPath(options.agentName),
+        ),
+        ...(webhookSecret ? { webhookSecret } : {}),
+        ...(allowUnsignedWebhooks !== undefined ? { allowUnsignedWebhooks } : {}),
+        apiBaseUrl: trimOptional(overrides.openaiSipApiBaseUrl)
+          ?? configString(options.machineConfig, "voice.openaiSipApiBaseUrl")
+          ?? configString(options.runtimeConfig, "voice.openaiSipApiBaseUrl"),
+        websocketBaseUrl: trimOptional(overrides.openaiSipWebsocketBaseUrl)
+          ?? configString(options.machineConfig, "voice.openaiSipWebsocketBaseUrl")
+          ?? configString(options.runtimeConfig, "voice.openaiSipWebsocketBaseUrl"),
+      }
+    }
+  } else {
+    elevenLabsApiKey = required(
+      elevenLabsApiKey || undefined,
+      "missing integrations.elevenLabsApiKey; run 'ouro connect voice --agent <agent>' for setup guidance",
+    )
+    elevenLabsVoiceId = required(
+      elevenLabsVoiceId || undefined,
+      "missing integrations.elevenLabsVoiceId; save the ElevenLabs voice ID before starting phone voice",
+    )
+    whisperCliPath = required(
+      whisperCliPath || undefined,
+      "missing voice.whisperCliPath in this machine's runtime config",
+    )
+    whisperModelPath = required(
+      whisperModelPath || undefined,
+      "missing voice.whisperModelPath in this machine's runtime config",
+    )
+  }
+
   const outputDir = trimOptional(overrides.outputDir)
     ?? configString(options.machineConfig, "voice.twilioOutputDir")
     ?? path.join(getAgentRoot(options.agentName), "state", "voice", "twilio-phone")
@@ -334,8 +557,11 @@ export function resolveTwilioPhoneTransportRuntime(
       ?? DEFAULT_TWILIO_GREETING_PREBUFFER_MS,
     playbackMode: overrides.playbackMode
       ?? normalizeTwilioPhonePlaybackMode(configString(options.machineConfig, "voice.twilioPlaybackMode") ?? DEFAULT_TWILIO_PHONE_PLAYBACK_MODE),
-    transportMode: overrides.transportMode
-      ?? normalizeTwilioPhoneTransportMode(configString(options.machineConfig, "voice.twilioTransportMode") ?? DEFAULT_TWILIO_PHONE_TRANSPORT_MODE),
+    transportMode,
+    conversationEngine,
+    openaiRealtime,
+    openaiSip,
+    openaiSipWebhookUrl: openaiSip?.webhookPath ? openAISipWebhookUrl(publicBaseUrl, openaiSip.webhookPath) : undefined,
   }
   return { status: "configured", settings }
 }
@@ -360,6 +586,9 @@ const defaultTwilioPhoneOutboundCallRuntimeDeps: TwilioPhoneOutboundCallRuntimeD
   refreshMachineRuntimeConfig: refreshMachineRuntimeCredentialConfig,
   readRuntimeConfig: readRuntimeCredentialConfig,
   readMachineRuntimeConfig: readMachineRuntimeCredentialConfig,
+  createTts: createElevenLabsTtsClient,
+  runVoiceLoopbackTurn,
+  writeVoicePlaybackArtifact,
   createOutboundCall: createTwilioOutboundCall,
 }
 
@@ -369,7 +598,26 @@ async function readFreshRuntimeSettings(
   defaultBasePath: string | undefined,
   requirePublicUrl: boolean | undefined,
   deps: Pick<TwilioPhoneOutboundCallRuntimeDeps, "waitForRuntimeCredentialBootstrap" | "loadMachineIdentity" | "refreshRuntimeConfig" | "refreshMachineRuntimeConfig" | "readRuntimeConfig" | "readMachineRuntimeConfig">,
+  options: { preferCached?: boolean } = {},
 ): Promise<TwilioPhoneTransportRuntimeSettings> {
+  if (options.preferCached) {
+    const cachedRuntimeConfig = deps.readRuntimeConfig(agentName)
+    const cachedMachineConfig = deps.readMachineRuntimeConfig(agentName)
+    if (cachedRuntimeConfig.ok && cachedMachineConfig.ok) {
+      const resolution = resolveTwilioPhoneTransportRuntime({
+        agentName,
+        runtimeConfig: cachedRuntimeConfig.config,
+        machineConfig: cachedMachineConfig.config,
+        overrides,
+        defaultBasePath,
+        requirePublicUrl,
+      })
+      if (resolution.status === "disabled") {
+        throw new Error(`Twilio phone voice transport is disabled: ${resolution.reason}`)
+      }
+      return resolution.settings
+    }
+  }
   const bootstrapped = await deps.waitForRuntimeCredentialBootstrap(agentName)
   const hasBootstrappedConfig = bootstrapped
     && deps.readRuntimeConfig(agentName).ok
@@ -423,15 +671,36 @@ export async function startConfiguredTwilioPhoneTransport(
   }
 
   await deps.cacheSelectedProviderCredentials(options.agentName)
-  const transcriber = deps.createTranscriber({
-    whisperCliPath: settings.whisperCliPath,
-    modelPath: settings.whisperModelPath,
-  })
-  const tts = deps.createTts({
-    apiKey: settings.elevenLabsApiKey,
-    voiceId: settings.elevenLabsVoiceId,
-    outputFormat: settings.transportMode === "media-stream" ? "ulaw_8000" : "mp3_44100_128",
-  })
+  if (settings.openaiRealtime?.apiKeySource === "integrations.openaiEmbeddingsApiKey") {
+    emitNervesEvent({
+      level: "warn",
+      component: "senses",
+      event: "senses.voice_openai_realtime_compat_key",
+      message: "OpenAI Realtime voice is temporarily using the legacy OpenAI embeddings API key",
+      meta: { agentName: settings.agentName, source: settings.openaiRealtime.apiKeySource },
+    })
+  }
+  const transcriber = settings.conversationEngine === "openai-realtime" || settings.conversationEngine === "openai-sip"
+    ? {
+        transcribe: async () => {
+          throw new Error("OpenAI Realtime voice sessions do not use the cascade transcriber")
+        },
+      }
+    : deps.createTranscriber({
+        whisperCliPath: settings.whisperCliPath,
+        modelPath: settings.whisperModelPath,
+      })
+  const tts = settings.conversationEngine === "openai-realtime" || settings.conversationEngine === "openai-sip"
+    ? {
+        synthesize: async () => {
+          throw new Error("OpenAI Realtime voice sessions do not use the cascade TTS service")
+        },
+      }
+    : deps.createTts({
+        apiKey: settings.elevenLabsApiKey,
+        voiceId: settings.elevenLabsVoiceId,
+        outputFormat: settings.transportMode === "media-stream" ? "ulaw_8000" : "mp3_44100_128",
+      })
   const bridge = await deps.startBridgeServer({
     agentName: settings.agentName,
     publicBaseUrl: settings.publicBaseUrl,
@@ -450,6 +719,9 @@ export async function startConfiguredTwilioPhoneTransport(
     greetingPrebufferMs: settings.greetingPrebufferMs,
     transportMode: settings.transportMode,
     playbackMode: settings.playbackMode,
+    conversationEngine: settings.conversationEngine,
+    openaiRealtime: settings.openaiRealtime,
+    openaiSip: settings.openaiSip,
   })
 
   emitNervesEvent({
@@ -462,7 +734,10 @@ export async function startConfiguredTwilioPhoneTransport(
       publicBaseUrl: settings.publicBaseUrl,
       basePath: settings.basePath,
       webhookUrl: settings.webhookUrl,
+      openaiSipWebhookUrl: settings.openaiSipWebhookUrl ?? "",
       transportMode: settings.transportMode,
+      conversationEngine: settings.conversationEngine,
+      openaiRealtimeModel: settings.openaiRealtime?.model ?? "",
     },
   })
 
@@ -485,6 +760,96 @@ function terminalOutboundStatus(status: string | undefined): boolean {
     || normalized === "fax"
 }
 
+function safeRuntimeSegment(input: string): string {
+  return input.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "unknown"
+}
+
+async function prewarmOutboundGreeting(options: {
+  settings: TwilioPhoneTransportRuntimeSettings
+  outboundId: string
+  friendId?: string
+  to: string
+  from: string
+  reason: string
+  createdAt: string
+}, deps: Pick<TwilioPhoneOutboundCallRuntimeDeps, "createTts" | "runVoiceLoopbackTurn" | "writeVoicePlaybackArtifact">): Promise<{
+  utteranceId: string
+  audioPath: string
+  mimeType: string
+  byteLength: number
+  preparedAt: string
+} | undefined> {
+  if (options.settings.transportMode !== "media-stream") return undefined
+  if (options.settings.conversationEngine === "openai-realtime" || options.settings.conversationEngine === "openai-sip") return undefined
+  const friendId = options.friendId?.trim() || `twilio-${safeRuntimeSegment(options.to)}`
+  const sessionKey = twilioPhoneVoiceSessionKey({
+    defaultFriendId: friendId,
+    from: options.to,
+    to: options.from,
+  })
+  const utteranceId = `twilio-${safeRuntimeSegment(options.outboundId)}-outbound-connected`
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.voice_twilio_outbound_greeting_prewarm_start",
+    message: "prewarming Twilio outbound voice greeting before dialing",
+    meta: { agentName: options.settings.agentName, outboundId: safeRuntimeSegment(options.outboundId), sessionKey },
+  })
+  const transcript = buildVoiceTranscript({
+    utteranceId,
+    text: outboundCallAnsweredPrompt({
+      schemaVersion: 1,
+      outboundId: options.outboundId,
+      agentName: options.settings.agentName,
+      ...(options.friendId?.trim() ? { friendId: options.friendId.trim() } : {}),
+      to: options.to,
+      from: options.from,
+      reason: options.reason,
+      createdAt: options.createdAt,
+      status: "prewarming",
+    }, { From: options.from, To: options.to }),
+    source: "loopback",
+  })
+  const tts = deps.createTts({
+    apiKey: options.settings.elevenLabsApiKey,
+    voiceId: options.settings.elevenLabsVoiceId,
+    outputFormat: "ulaw_8000",
+  })
+  const turn = await deps.runVoiceLoopbackTurn({
+    agentName: options.settings.agentName,
+    friendId,
+    sessionKey,
+    transcript,
+    tts,
+  })
+  if (turn.tts.status !== "delivered") {
+    throw new Error(`outbound greeting prewarm failed: ${turn.tts.error}`)
+  }
+  const playback = await deps.writeVoicePlaybackArtifact({
+    utteranceId,
+    delivery: turn.tts,
+    outputDir: path.join(options.settings.outputDir, "outbound-greetings", safeRuntimeSegment(options.outboundId)),
+  })
+  const preparedAt = new Date().toISOString()
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.voice_twilio_outbound_greeting_prewarm_end",
+    message: "prewarmed Twilio outbound voice greeting before dialing",
+    meta: {
+      agentName: options.settings.agentName,
+      outboundId: safeRuntimeSegment(options.outboundId),
+      sessionKey,
+      byteLength: String(playback.byteLength),
+    },
+  })
+  return {
+    utteranceId,
+    audioPath: playback.audioPath,
+    mimeType: playback.mimeType,
+    byteLength: playback.byteLength,
+    preparedAt,
+  }
+}
+
 export async function placeConfiguredTwilioPhoneCall(
   options: PlaceConfiguredTwilioPhoneCallOptions,
   deps: TwilioPhoneOutboundCallRuntimeDeps = defaultTwilioPhoneOutboundCallRuntimeDeps,
@@ -495,6 +860,7 @@ export async function placeConfiguredTwilioPhoneCall(
     agentScopedTwilioPhoneBasePath(options.agentName),
     true,
     deps,
+    { preferCached: true },
   )
   const to = normalizeTwilioE164PhoneNumber(options.to)
   const from = normalizeTwilioE164PhoneNumber(settings.twilioFromNumber)
@@ -518,8 +884,10 @@ export async function placeConfiguredTwilioPhoneCall(
   }
 
   const outboundId = options.outboundId?.trim() || createOutboundId(now)
+  const createdAt = now.toISOString()
   const webhookUrl = twilioOutboundCallWebhookUrl(settings.publicBaseUrl, settings.basePath, outboundId)
   const statusCallbackUrl = twilioOutboundCallStatusCallbackUrl(settings.publicBaseUrl, settings.basePath, outboundId)
+  const amdStatusCallbackUrl = twilioOutboundCallAmdCallbackUrl(settings.publicBaseUrl, settings.basePath, outboundId)
   await writeTwilioOutboundCallJob(settings.outputDir, {
     schemaVersion: 1,
     outboundId,
@@ -528,11 +896,30 @@ export async function placeConfiguredTwilioPhoneCall(
     to,
     from,
     reason: options.reason.trim(),
-    createdAt: now.toISOString(),
-    status: "requested",
+    ...(options.initialAudio ? { initialAudio: options.initialAudio } : {}),
+    createdAt,
+    status: settings.transportMode === "media-stream" && settings.conversationEngine !== "openai-realtime" && settings.conversationEngine !== "openai-sip"
+      ? "prewarming"
+      : "requested",
   })
 
   try {
+    const prewarmedGreeting = await prewarmOutboundGreeting({
+      settings,
+      outboundId,
+      friendId: options.friendId,
+      to,
+      from,
+      reason: options.reason.trim(),
+      createdAt,
+    }, deps)
+    if (prewarmedGreeting) {
+      await updateTwilioOutboundCallJob(settings.outputDir, outboundId, {
+        status: "requested",
+        prewarmedGreeting,
+        events: [{ at: prewarmedGreeting.preparedAt, status: "greeting-prewarmed" }],
+      })
+    }
     const call = await deps.createOutboundCall({
       accountSid,
       authToken,
@@ -541,11 +928,16 @@ export async function placeConfiguredTwilioPhoneCall(
       twimlUrl: webhookUrl,
       statusCallbackUrl,
       machineDetection: "Enable",
+      asyncAmd: true,
+      asyncAmdStatusCallbackUrl: amdStatusCallbackUrl,
     })
     await updateTwilioOutboundCallJob(settings.outputDir, outboundId, {
       transportCallSid: call.callSid,
       status: call.status ?? "queued",
-      events: [{ at: new Date().toISOString(), status: call.status ?? "queued", ...(call.callSid ? { callSid: call.callSid } : {}) }],
+      events: [
+        ...(prewarmedGreeting ? [{ at: prewarmedGreeting.preparedAt, status: "greeting-prewarmed" }] : []),
+        { at: new Date().toISOString(), status: call.status ?? "queued", ...(call.callSid ? { callSid: call.callSid } : {}) },
+      ],
     })
     emitNervesEvent({
       component: "senses",

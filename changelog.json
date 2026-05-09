@@ -2,6 +2,23 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.576",
+      "changes": [
+        "Voice loopback turns now run on a live latency profile that keeps the local transcript/session path intact while skipping pre-model kept-note judging for synchronous audio conversations.",
+        "Live voice turns no longer block audible responses on bundle git pull/push work, so phone TTS can begin as soon as the agent produces `speak` or `settle` text instead of waiting for remote sync.",
+        "Twilio Media Stream VAD now uses a tighter default end-of-speech window, shaving response delay while preserving barge-in and stable voice-session behavior."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.575",
+      "changes": [
+        "Outbound Twilio calls now prewarm the agent-authored first voice turn before dialing in Media Stream mode, so a human who answers is not left listening to silence while the model thinks.",
+        "Outbound Answering Machine Detection now runs asynchronously, allowing the call webhook and prepared greeting to start immediately while still recording and closing non-human answers when Twilio classifies voicemail or fax.",
+        "Outbound Twilio Media Stream calls now stop when Whisper.cpp hears a voicemail menu prompt after connection, giving the Voice sense a fallback when carrier or answering-machine detection initially reports a human answer.",
+        "Voicemail-menu fallbacks mark the outbound call job as terminal voicemail without starting another agent turn, so the stable voice session stays reserved for actual human conversation."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.574",
       "changes": [
         "Outbound Twilio phone calls now request Answering Machine Detection so the Voice sense can distinguish a human answer from voicemail or fax.",

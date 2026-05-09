@@ -3,13 +3,25 @@ import * as fs from "fs/promises"
 import * as http from "http"
 import * as path from "path"
 import type { Duplex } from "node:stream"
+import type OpenAI from "openai"
 import { WebSocket, WebSocketServer, type RawData } from "ws"
+import { saveSession, loadSession } from "../../mind/context"
+import { getChannelCapabilities } from "../../mind/friends/channel"
+import { FriendResolver } from "../../mind/friends/resolver"
+import { FileFriendStore } from "../../mind/friends/store-file"
+import { getAgentRoot, setAgentName } from "../../heart/identity"
+import { getSharedMcpManager } from "../../repertoire/mcp-manager"
+import { execTool, getToolsForChannel } from "../../repertoire/tools"
+import type { ToolContext } from "../../repertoire/tools-base"
+import { sanitizeKey } from "../../heart/config"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { writeVoicePlaybackArtifact } from "./playback"
 import { buildVoiceTranscript } from "./transcript"
 import { runVoiceLoopbackTurn, type VoiceLoopbackTurnResult, type VoiceRunSenseTurn } from "./turn"
 import type { VoiceTranscript, VoiceTranscriber, VoiceTtsService } from "./types"
 import { normalizeTwilioE164PhoneNumber } from "./phone"
+import { prepareVoiceCallAudio } from "./audio-playback"
+import type { VoiceCallAudioRequest, VoiceCallAudioResult } from "../../repertoire/tools-base"
 
 export { normalizeTwilioE164PhoneNumber } from "./phone"
 
@@ -21,9 +33,11 @@ export const TWILIO_PHONE_WEBHOOK_BASE_PATH = "/voice/twilio"
 export const DEFAULT_TWILIO_PHONE_PLAYBACK_MODE = "stream"
 export const DEFAULT_TWILIO_PHONE_TRANSPORT_MODE = "record-play"
 export const DEFAULT_TWILIO_MEDIA_SPEECH_RMS_THRESHOLD = 650
-export const DEFAULT_TWILIO_MEDIA_SILENCE_END_MS = 650
-export const DEFAULT_TWILIO_MEDIA_MIN_SPEECH_MS = 160
+export const DEFAULT_TWILIO_MEDIA_SILENCE_END_MS = 450
+export const DEFAULT_TWILIO_MEDIA_MIN_SPEECH_MS = 120
 export const DEFAULT_TWILIO_MEDIA_MAX_UTTERANCE_MS = 15_000
+
+const TWILIO_MEDIA_HANGUP_FALLBACK_MS = 10_000
 
 const TWILIO_STREAM_FAILURE_SILENCE_MP3 = Buffer.from(
   "SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYyLjMuMTAwAAAAAAAAAAAAAAD/+0DAAAAAAAAAAAAAAAAAAAAAAABJbmZvAAAADwAAAAsAAAUuADc3Nzc3Nzc3N0tLS0tLS0tLS19fX19fX19fX3Nzc3Nzc3Nzc4eHh4eHh4eHh5ubm5ubm5ubm6+vr6+vr6+vr8PDw8PDw8PDw9fX19fX19fX1+vr6+vr6+vr6////////////wAAAABMYXZjNjIuMTEAAAAAAAAAAAAAAAAkBC8AAAAAAAAFLpJQTFMAAAAAAP/7EMQAA8AAAaQAAAAgAAA0gAAABExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVV//sQxCmDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVX/+xDEUwPAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVf/7EMR8g8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVV//sQxKYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVX/+xDEz4PAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EMTWA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQxNYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xDE1gPAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EMTWA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQxNYDwAABpAAAACAAADSAAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=",
@@ -32,6 +46,7 @@ const TWILIO_STREAM_FAILURE_SILENCE_MP3 = Buffer.from(
 
 export type TwilioPhonePlaybackMode = "stream" | "buffered"
 export type TwilioPhoneTransportMode = "record-play" | "media-stream"
+export type TwilioPhoneConversationEngine = "cascade" | "openai-realtime" | "openai-sip"
 
 export interface TwilioSignatureInput {
   authToken: string
@@ -67,6 +82,14 @@ export interface TwilioOutboundCallJobEvent {
   answeredBy?: string
 }
 
+export interface TwilioOutboundPrewarmedGreeting {
+  utteranceId: string
+  audioPath: string
+  mimeType: string
+  byteLength: number
+  preparedAt: string
+}
+
 export interface TwilioOutboundCallJob {
   schemaVersion: 1
   outboundId: string
@@ -82,6 +105,8 @@ export interface TwilioOutboundCallJob {
   updatedAt?: string
   events?: TwilioOutboundCallJobEvent[]
   error?: string
+  prewarmedGreeting?: TwilioOutboundPrewarmedGreeting
+  initialAudio?: VoiceCallAudioRequest
 }
 
 export interface TwilioOutboundCallCreateRequest {
@@ -92,6 +117,8 @@ export interface TwilioOutboundCallCreateRequest {
   twimlUrl: string
   statusCallbackUrl?: string
   machineDetection?: "Enable" | "DetectMessageEnd"
+  asyncAmd?: boolean
+  asyncAmdStatusCallbackUrl?: string
 }
 
 export interface TwilioOutboundCallCreateResult {
@@ -104,6 +131,7 @@ export type TwilioOutboundCallFetch = (input: string, init: RequestInit) => Prom
 
 export interface TwilioPhoneBridgeOptions {
   agentName: string
+  agentRoot?: string
   publicBaseUrl: string
   outputDir: string
   basePath?: string
@@ -124,6 +152,39 @@ export interface TwilioPhoneBridgeOptions {
   mediaMaxUtteranceMs?: number
   downloadRecording?: TwilioRecordingDownloader
   playbackMode?: TwilioPhonePlaybackMode
+  conversationEngine?: TwilioPhoneConversationEngine
+  openaiRealtime?: OpenAIRealtimeTwilioOptions
+  openaiSip?: OpenAISipPhoneOptions
+}
+
+export interface OpenAIRealtimeTwilioOptions {
+  apiKey: string
+  apiKeySource?: string
+  model?: string
+  voice?: string
+  websocketUrl?: string
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh"
+  noiseReduction?: "near_field" | "far_field" | "none"
+  turnDetection?: {
+    mode?: "server_vad" | "semantic_vad"
+    threshold?: number
+    prefixPaddingMs?: number
+    silenceDurationMs?: number
+    idleTimeoutMs?: number
+    eagerness?: "low" | "medium" | "high" | "auto"
+    createResponse?: boolean
+    interruptResponse?: boolean
+  }
+}
+
+export interface OpenAISipPhoneOptions {
+  projectId?: string
+  webhookPath?: string
+  webhookSecret?: string
+  allowUnsignedWebhooks?: boolean
+  apiBaseUrl?: string
+  websocketBaseUrl?: string
+  fetch?: (input: string, init: RequestInit) => Promise<Response>
 }
 
 export interface TwilioPhoneBridge {
@@ -258,11 +319,36 @@ export function normalizeTwilioPhoneTransportMode(value: string | undefined): Tw
   throw new Error(`invalid Twilio phone transport mode: ${value}`)
 }
 
+export function normalizeTwilioPhoneConversationEngine(value: string | undefined): TwilioPhoneConversationEngine {
+  const normalized = (value ?? "cascade").trim().toLowerCase()
+  if (normalized === "cascade" || normalized === "openai-realtime" || normalized === "openai-sip") return normalized
+  throw new Error(`invalid Twilio phone conversation engine: ${value}`)
+}
+
+function usesOpenAIRealtimeConversationEngine(options: TwilioPhoneBridgeOptions): boolean {
+  return normalizeTwilioPhoneConversationEngine(options.conversationEngine) === "openai-realtime"
+}
+
+function usesOpenAISipConversationEngine(options: TwilioPhoneBridgeOptions): boolean {
+  return normalizeTwilioPhoneConversationEngine(options.conversationEngine) === "openai-sip"
+}
+
 export function twilioPhoneWebhookUrl(
   publicBaseUrl: string,
   basePath: string | undefined = TWILIO_PHONE_WEBHOOK_BASE_PATH,
 ): string {
   return routeUrl(publicBaseUrl, `${normalizeTwilioPhoneBasePath(basePath)}/incoming`)
+}
+
+export function openAISipWebhookPath(agentName: string): string {
+  return `/voice/agents/${safeSegment(agentName.toLowerCase())}/sip/openai`
+}
+
+export function openAISipWebhookUrl(
+  publicBaseUrl: string,
+  webhookPath: string,
+): string {
+  return routeUrl(publicBaseUrl, normalizeTwilioPhoneBasePath(webhookPath))
 }
 
 export function twilioOutboundCallWebhookUrl(
@@ -279,6 +365,14 @@ export function twilioOutboundCallStatusCallbackUrl(
   outboundId: string,
 ): string {
   return routeUrl(publicBaseUrl, `${normalizeTwilioPhoneBasePath(basePath)}/outgoing/${encodeURIComponent(safeSegment(outboundId))}/status`)
+}
+
+export function twilioOutboundCallAmdCallbackUrl(
+  publicBaseUrl: string,
+  basePath: string | undefined,
+  outboundId: string,
+): string {
+  return routeUrl(publicBaseUrl, `${normalizeTwilioPhoneBasePath(basePath)}/outgoing/${encodeURIComponent(safeSegment(outboundId))}/amd`)
 }
 
 function requestPublicUrl(publicBaseUrl: string, requestPath: string): string {
@@ -343,6 +437,31 @@ function mediaStreamTwiml(
   ].join("")
 }
 
+function openAISipUri(
+  options: TwilioPhoneBridgeOptions,
+  customHeaders: Record<string, string | undefined> = {},
+): string {
+  const projectId = options.openaiSip?.projectId?.trim()
+  if (!projectId) {
+    throw new Error("missing voice.openaiSipProjectId; configure the OpenAI project id before routing phone calls over SIP")
+  }
+  const headers = new URLSearchParams()
+  for (const [name, value] of Object.entries(customHeaders)) {
+    const trimmed = value?.trim()
+    if (!trimmed) continue
+    headers.set(name, trimmed)
+  }
+  const query = headers.toString()
+  return `sip:${projectId}@sip.api.openai.com;transport=tls${query ? `?${query}` : ""}`
+}
+
+function openAISipDialTwiml(
+  options: TwilioPhoneBridgeOptions,
+  customHeaders: Record<string, string | undefined> = {},
+): string {
+  return `<Dial answerOnBridge="true"><Sip>${escapeXml(openAISipUri(options, customHeaders))}</Sip></Dial>`
+}
+
 function safeSegment(input: string): string {
   const cleaned = input.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
   return cleaned || "unknown"
@@ -354,6 +473,19 @@ function nonHumanAnsweredStatus(answeredBy: string | undefined): "voicemail" | "
   if (normalized === "fax") return "fax"
   if (normalized.startsWith("machine")) return "voicemail"
   return undefined
+}
+
+function isVoicemailMenuTranscript(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  if (!normalized) return false
+  return normalized.includes("if you re satisfied with the message")
+    || normalized.includes("if you are satisfied with the message")
+    || (
+      normalized.includes("press 1")
+      && normalized.includes("listen to your message")
+      && normalized.includes("erase")
+      && normalized.includes("rerecord")
+    )
 }
 
 function decodeSafeSegment(input: string): string | null {
@@ -419,7 +551,7 @@ function callConnectedPrompt(params: Record<string, string>): string {
   ].join("\n")
 }
 
-function outboundCallAnsweredPrompt(job: TwilioOutboundCallJob, params: Record<string, string>): string {
+export function outboundCallAnsweredPrompt(job: TwilioOutboundCallJob, params: Record<string, string>): string {
   const from = params.From?.trim() || job.from
   const to = params.To?.trim() || job.to
   return [
@@ -508,6 +640,41 @@ function customParameter(start: TwilioMediaStreamStart | undefined, name: string
   return stringField((params as Record<string, unknown>)[name])
 }
 
+function encodeVoiceCallAudioCustomParameter(request: VoiceCallAudioRequest | undefined): string | undefined {
+  if (!request) return undefined
+  const value = JSON.stringify({
+    ...(request.source ? { source: request.source } : {}),
+    ...(request.url ? { url: request.url } : {}),
+    ...(request.path ? { path: request.path } : {}),
+    ...(request.label ? { label: request.label } : {}),
+    ...(Number.isFinite(request.toneHz) ? { toneHz: request.toneHz } : {}),
+    ...(Number.isFinite(request.durationMs) ? { durationMs: request.durationMs } : {}),
+  })
+  return value.length <= 1_500 ? value : undefined
+}
+
+function decodeVoiceCallAudioCustomParameter(value: string): VoiceCallAudioRequest | undefined {
+  if (!value.trim()) return undefined
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined
+    const record = parsed as Record<string, unknown>
+    const source = record.source === "tone" || record.source === "url" || record.source === "file"
+      ? record.source
+      : undefined
+    return {
+      ...(source ? { source } : {}),
+      ...(typeof record.url === "string" && record.url.trim() ? { url: record.url.trim() } : {}),
+      ...(typeof record.path === "string" && record.path.trim() ? { path: record.path.trim() } : {}),
+      ...(typeof record.label === "string" && record.label.trim() ? { label: record.label.trim() } : {}),
+      ...(typeof record.toneHz === "number" && Number.isFinite(record.toneHz) ? { toneHz: record.toneHz } : {}),
+      ...(typeof record.durationMs === "number" && Number.isFinite(record.durationMs) ? { durationMs: record.durationMs } : {}),
+    }
+  } catch {
+    return undefined
+  }
+}
+
 function mulawByteToPcm16(value: number): number {
   const decoded = (~value) & 0xff
   let sample = ((decoded & 0x0f) << 3) + 0x84
@@ -590,9 +757,16 @@ interface TwilioMediaStreamUtterance {
   wasBargeIn: boolean
 }
 
+interface TwilioMediaStreamLifecycleSession {
+  attach(): void
+  end(): void
+}
+
 class TwilioMediaStreamSession {
   private streamSid = ""
   private callSid = "media-stream"
+  private direction = ""
+  private outboundId = ""
   private from = ""
   private to = ""
   private friendId = ""
@@ -609,6 +783,9 @@ class TwilioMediaStreamSession {
   private currentSilenceFrames = 0
   private currentWasBargeIn = false
   private turnQueue: Promise<void> = Promise.resolve()
+  private hangupRequested = false
+  private hangupReason = ""
+  private hangupFallbackTimer: ReturnType<typeof setTimeout> | null = null
   private readonly playbackBytesByGeneration = new Map<number, number>()
   private readonly speechRmsThreshold: number
   private readonly preRollLimitFrames = frameLimitForMs(200)
@@ -620,6 +797,10 @@ class TwilioMediaStreamSession {
     private readonly ws: WebSocket,
     private readonly options: TwilioPhoneBridgeOptions,
     private readonly mediaGreetingJobs: TwilioAudioStreamJobStore,
+    private readonly lifecycle?: {
+      onIdentityChange?: (session: TwilioMediaStreamLifecycleSession, identity: { callSid: string; outboundId: string }) => void
+      onClose?: (session: TwilioMediaStreamLifecycleSession, identity: { callSid: string; outboundId: string }) => void
+    },
   ) {
     this.speechRmsThreshold = options.mediaSpeechRmsThreshold ?? DEFAULT_TWILIO_MEDIA_SPEECH_RMS_THRESHOLD
     this.silenceEndFrames = frameLimitForMs(options.mediaSilenceEndMs ?? DEFAULT_TWILIO_MEDIA_SILENCE_END_MS)
@@ -639,6 +820,13 @@ class TwilioMediaStreamSession {
         meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), error: errorMessage(error) },
       })
     })
+  }
+
+  end(): void {
+    if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+      this.ws.close()
+    }
+    this.close()
   }
 
   private handleRawMessage(raw: RawData): void {
@@ -676,6 +864,8 @@ class TwilioMediaStreamSession {
     this.streamSid = stringField(start?.streamSid)
     this.callSid = stringField(start?.callSid) || this.callSid
     const direction = customParameter(start, "Direction")
+    this.direction = direction
+    this.outboundId = customParameter(start, "OutboundId")
     const explicitFriendId = customParameter(start, "FriendId")
     if (direction === "outbound") {
       this.from = customParameter(start, "Remote") || customParameter(start, "To")
@@ -691,6 +881,7 @@ class TwilioMediaStreamSession {
       to: this.to,
       callSid: this.callSid,
     })
+    this.lifecycle?.onIdentityChange?.(this, { callSid: this.callSid, outboundId: this.outboundId })
     this.callDir = path.join(this.options.outputDir, safeSegment(this.callSid))
     await fs.mkdir(this.callDir, { recursive: true })
 
@@ -770,14 +961,17 @@ class TwilioMediaStreamSession {
       message: "Twilio Media Stream playback mark reached",
       meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), mark: name },
     })
+    this.completeHangupIfRequested("playback_mark")
   }
 
   private close(): void {
     if (this.closed) return
     this.closed = true
+    this.clearHangupFallback()
     if (this.inSpeech) this.finishCurrentUtterance()
     this.playbackGeneration += 1
     this.playbackActive = false
+    this.lifecycle?.onClose?.(this, { callSid: this.callSid, outboundId: this.outboundId })
     emitNervesEvent({
       component: "senses",
       event: "senses.voice_twilio_media_stop",
@@ -884,6 +1078,28 @@ class TwilioMediaStreamSession {
       utteranceId: utterance.utteranceId,
       inputPath,
     })
+    if (this.direction === "outbound" && isVoicemailMenuTranscript(transcript.text)) {
+      if (this.outboundId) {
+        await updateTwilioOutboundCallJob(this.options.outputDir, this.outboundId, {
+          status: "voicemail",
+          answeredBy: "voicemail_menu",
+          transportCallSid: this.callSid,
+        }).catch(() => null)
+      }
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_voicemail_menu_detected",
+        message: "Twilio outbound voice stream detected voicemail menu",
+        meta: {
+          agentName: this.options.agentName,
+          callSid: safeSegment(this.callSid),
+          outboundId: safeSegment(this.outboundId || "unknown"),
+        },
+      })
+      this.ws.close()
+      this.close()
+      return
+    }
     const turnTranscript = utterance.wasBargeIn
       ? buildVoiceTranscript({
           utteranceId: transcript.utteranceId,
@@ -916,6 +1132,10 @@ class TwilioMediaStreamSession {
       tts: this.options.tts,
       runSenseTurn: this.options.runSenseTurn,
       onAudioChunk: (chunk) => this.sendAudioChunk(chunk, generation),
+      voiceCall: {
+        requestEnd: (reason) => this.requestHangupAfterPlayback(reason),
+        playAudio: (request) => this.playPreparedAudio(request),
+      },
     })
 
     if (generation !== this.playbackGeneration || this.closed) return
@@ -927,9 +1147,11 @@ class TwilioMediaStreamSession {
     }
     if (deliveries.length === 0) {
       this.playbackActive = false
+      this.completeHangupIfRequested("no_playback")
       return
     }
     this.sendMark(generation, transcript.utteranceId)
+    if (this.hangupRequested) this.armHangupFallback()
     emitNervesEvent({
       component: "senses",
       event: "senses.voice_twilio_media_turn_end",
@@ -986,6 +1208,7 @@ class TwilioMediaStreamSession {
   private startPlayback(): number {
     this.playbackGeneration += 1
     this.playbackActive = true
+    this.clearHangupFallback()
     return this.playbackGeneration
   }
 
@@ -1011,8 +1234,36 @@ class TwilioMediaStreamSession {
     }))
   }
 
+  private async playPreparedAudio(request: VoiceCallAudioRequest): Promise<VoiceCallAudioResult> {
+    const prepared = await prepareVoiceCallAudio(request, {
+      agentRoot: this.options.agentRoot ?? getAgentRoot(this.options.agentName),
+    })
+    const generation = this.startPlayback()
+    for (let offset = 0; offset < prepared.audio.byteLength; offset += 160) {
+      if (this.closed || generation !== this.playbackGeneration) break
+      this.sendAudioChunk(prepared.audio.subarray(offset, offset + 160), generation)
+      await delay(20)
+    }
+    if (!this.closed && generation === this.playbackGeneration) {
+      this.sendMark(generation, `audio-${prepared.label}`)
+    }
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_tool_audio_played",
+      message: "played tool-requested audio into Twilio Media Stream call",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        label: prepared.label,
+        durationMs: String(prepared.durationMs),
+      },
+    })
+    return { label: prepared.label, durationMs: prepared.durationMs }
+  }
+
   private interruptPlayback(): boolean {
     if (!this.playbackActive || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return false
+    this.cancelPendingHangup("barge_in")
     this.playbackGeneration += 1
     this.playbackActive = false
     this.ws.send(JSON.stringify({ event: "clear", streamSid: this.streamSid }))
@@ -1024,6 +1275,1696 @@ class TwilioMediaStreamSession {
     })
     return true
   }
+
+  private requestHangupAfterPlayback(reason?: string): void {
+    if (this.closed) return
+    this.hangupRequested = true
+    this.hangupReason = typeof reason === "string" ? reason : ""
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_hangup_requested",
+      message: "agent requested Twilio Media Stream hangup",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        reasonLength: String(this.hangupReason.length),
+        playbackActive: String(this.playbackActive),
+      },
+    })
+    if (!this.playbackActive) this.armHangupFallback()
+  }
+
+  private completeHangupIfRequested(trigger: string): void {
+    if (!this.hangupRequested || this.closed) return
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_hangup_end",
+      message: "ending Twilio Media Stream after agent hangup request",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), trigger },
+    })
+    this.end()
+  }
+
+  private cancelPendingHangup(trigger: string): void {
+    if (!this.hangupRequested) return
+    this.hangupRequested = false
+    this.hangupReason = ""
+    this.clearHangupFallback()
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_media_hangup_cancelled",
+      message: "cancelled Twilio Media Stream hangup request",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), trigger },
+    })
+  }
+
+  private armHangupFallback(): void {
+    if (!this.hangupRequested || this.closed || this.hangupFallbackTimer) return
+    this.hangupFallbackTimer = setTimeout(() => {
+      this.hangupFallbackTimer = null
+      this.completeHangupIfRequested("fallback_timer")
+    }, TWILIO_MEDIA_HANGUP_FALLBACK_MS)
+    this.hangupFallbackTimer.unref?.()
+  }
+
+  private clearHangupFallback(): void {
+    if (!this.hangupFallbackTimer) return
+    clearTimeout(this.hangupFallbackTimer)
+    this.hangupFallbackTimer = null
+  }
+}
+
+const REALTIME_TOOL_FLOW_NAMES = new Set(["speak", "settle", "rest", "observe", "ponder"])
+const OPENAI_REALTIME_DEFAULT_MODEL = "gpt-realtime-2"
+const OPENAI_REALTIME_DEFAULT_VOICE = "cedar"
+const OPENAI_REALTIME_DEFAULT_TRANSCRIPTION_MODEL = "gpt-realtime-whisper"
+const OPENAI_REALTIME_BOOTSTRAP_TIMEOUT_MS = 250
+const OPENAI_REALTIME_PCMS_BYTES_PER_MS = 8
+const OPENAI_REALTIME_DEFAULT_NOISE_REDUCTION: NonNullable<OpenAIRealtimeTwilioOptions["noiseReduction"]> = "near_field"
+const OPENAI_REALTIME_DEFAULT_VAD_THRESHOLD = 0.68
+const OPENAI_REALTIME_DEFAULT_VAD_PREFIX_PADDING_MS = 220
+const OPENAI_REALTIME_DEFAULT_VAD_SILENCE_DURATION_MS = 320
+const OPENAI_REALTIME_DEFAULT_VAD_IDLE_TIMEOUT_MS = 15_000
+const OPENAI_REALTIME_MAX_OUTPUT_TOKENS = 220
+const OPENAI_REALTIME_BARGE_IN_MIN_SPEECH_MS = 160
+const OPENAI_REALTIME_BARGE_IN_RMS_THRESHOLD = 900
+
+interface RealtimePlaybackMark {
+  itemId: string
+  contentIndex: number
+  audioEndMs: number
+}
+
+interface RealtimePlaybackState {
+  itemId: string
+  contentIndex: number
+  sentMs: number
+  playedMs: number
+}
+
+interface RealtimeToolResponseState {
+  pendingCallIds: Set<string>
+  responseDone: boolean
+  followupRequested: boolean
+  suppressFollowup: boolean
+}
+
+interface OpenAISipHeader {
+  name?: unknown
+  value?: unknown
+}
+
+interface OpenAISipWebhookEvent {
+  type?: unknown
+  data?: {
+    call_id?: unknown
+    sip_headers?: unknown
+  }
+}
+
+interface OpenAISipCallMetadata {
+  callId: string
+  from: string
+  to: string
+  direction: string
+  outboundId: string
+  reason: string
+  friendId: string
+}
+
+const OPENAI_SIP_UNSUPPORTED_TOOL_NAMES = new Set(["voice_play_audio"])
+const OPENAI_SIP_DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
+const OPENAI_SIP_DEFAULT_WEBSOCKET_BASE_URL = "wss://api.openai.com/v1/realtime"
+
+function openAIRealtimeWebSocketUrl(options: OpenAIRealtimeTwilioOptions): string {
+  return options.websocketUrl?.trim()
+    || `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(options.model?.trim() || OPENAI_REALTIME_DEFAULT_MODEL)}`
+}
+
+export function computeOpenAIWebhookSignature(input: {
+  secret: string
+  webhookId?: string
+  timestamp: string
+  payload: string
+}): string {
+  const secret = input.secret.startsWith("whsec_")
+    ? Buffer.from(input.secret.slice("whsec_".length), "base64")
+    : Buffer.from(input.secret, "utf8")
+  const signedPayload = input.webhookId
+    ? `${input.webhookId}.${input.timestamp}.${input.payload}`
+    : `${input.timestamp}.${input.payload}`
+  return crypto.createHmac("sha256", secret).update(signedPayload).digest("base64")
+}
+
+export function validateOpenAIWebhookSignature(input: {
+  secret: string
+  headers: Record<string, string | string[] | undefined>
+  payload: string
+  toleranceSeconds?: number
+  nowSeconds?: number
+}): boolean {
+  const secret = input.secret.trim()
+  if (!secret) return false
+  const timestamp = headerValue(input.headers, "webhook-timestamp")
+  const signatureHeader = headerValue(input.headers, "webhook-signature")
+  const webhookId = headerValue(input.headers, "webhook-id")
+  if (!timestamp || !signatureHeader) return false
+  const timestampSeconds = Number.parseInt(timestamp, 10)
+  if (!Number.isFinite(timestampSeconds)) return false
+  const nowSeconds = input.nowSeconds ?? Math.floor(Date.now() / 1_000)
+  const toleranceSeconds = input.toleranceSeconds ?? 300
+  if (nowSeconds - timestampSeconds > toleranceSeconds) return false
+  if (timestampSeconds - nowSeconds > toleranceSeconds) return false
+
+  const expected = Buffer.from(computeOpenAIWebhookSignature({
+    secret,
+    webhookId: webhookId || undefined,
+    timestamp,
+    payload: input.payload,
+  }))
+  for (const candidate of signatureHeader.split(" ")) {
+    const raw = candidate.trim()
+    if (!raw) continue
+    const signature = Buffer.from(raw.startsWith("v1,") ? raw.slice(3) : raw)
+    if (signature.length === expected.length && crypto.timingSafeEqual(signature, expected)) return true
+  }
+  return false
+}
+
+function openAISipCallActionUrl(options: OpenAISipPhoneOptions, callId: string, action: "accept" | "hangup" | "reject"): string {
+  const base = (options.apiBaseUrl?.trim() || OPENAI_SIP_DEFAULT_API_BASE_URL).replace(/\/+$/, "")
+  return `${base}/realtime/calls/${encodeURIComponent(callId)}/${action}`
+}
+
+function openAISipControlWebSocketUrl(options: OpenAISipPhoneOptions, callId: string): string {
+  const url = new URL(options.websocketBaseUrl?.trim() || OPENAI_SIP_DEFAULT_WEBSOCKET_BASE_URL)
+  url.searchParams.set("call_id", callId)
+  return url.toString()
+}
+
+function parseOpenAISipWebhookEvent(rawBody: string): OpenAISipWebhookEvent | null {
+  try {
+    const parsed = JSON.parse(rawBody) as unknown
+    return parsed && typeof parsed === "object" ? parsed as OpenAISipWebhookEvent : null
+  } catch {
+    return null
+  }
+}
+
+function openAISipHeaders(value: unknown): OpenAISipHeader[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is OpenAISipHeader => item && typeof item === "object")
+}
+
+function openAISipHeaderValue(headers: OpenAISipHeader[], name: string): string {
+  const wanted = name.toLowerCase()
+  for (const header of headers) {
+    if (stringField(header.name).toLowerCase() === wanted) return stringField(header.value)
+  }
+  return ""
+}
+
+function phoneFromSipHeader(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  const tel = trimmed.match(/tel:([^>;]+)/i)?.[1]
+  if (tel) return tel.trim()
+  const sip = trimmed.match(/sip:([^@>;]+)/i)?.[1]
+  if (sip) return sip.trim()
+  const bracketed = trimmed.match(/<([^>]+)>/)?.[1]
+  return bracketed?.trim() || trimmed
+}
+
+function openAISipCallMetadata(event: OpenAISipWebhookEvent): OpenAISipCallMetadata | null {
+  const data = event.data
+  if (!data || typeof data !== "object") return null
+  const callId = stringField(data.call_id)
+  if (!callId) return null
+  const headers = openAISipHeaders(data.sip_headers)
+  const from = openAISipHeaderValue(headers, "X-Ouro-From") || phoneFromSipHeader(openAISipHeaderValue(headers, "From"))
+  const to = openAISipHeaderValue(headers, "X-Ouro-To") || phoneFromSipHeader(openAISipHeaderValue(headers, "To"))
+  const friendId = openAISipHeaderValue(headers, "X-Ouro-Friend-Id")
+  return {
+    callId,
+    from,
+    to,
+    direction: openAISipHeaderValue(headers, "X-Ouro-Direction") || "inbound",
+    outboundId: openAISipHeaderValue(headers, "X-Ouro-Outbound-Id"),
+    reason: openAISipHeaderValue(headers, "X-Ouro-Reason"),
+    friendId,
+  }
+}
+
+function openAISipCallConnectedPrompt(metadata: OpenAISipCallMetadata): string {
+  if (metadata.direction === "outbound") {
+    return [
+      "An outbound phone voice call just connected over OpenAI SIP.",
+      "This is the first audible turn in a call I chose to place.",
+      `Call reason/context: ${metadata.reason.trim() || "No additional reason was recorded."}`,
+      metadata.from ? `Callee phone: ${metadata.from}.` : "The callee phone number was not provided.",
+      metadata.to ? `Ouro phone line: ${metadata.to}.` : "The Ouro phone line was not provided.",
+      "Respond through the voice channel as yourself. Briefly greet them and state why you called. Keep this first turn short and conversational.",
+    ].join("\n")
+  }
+  return [
+    "A phone voice call just connected over OpenAI SIP.",
+    "This is the first audible turn in the call.",
+    metadata.from ? `Caller phone: ${metadata.from}.` : "Caller phone was not provided.",
+    metadata.to ? `Dialed line: ${metadata.to}.` : "Dialed line was not provided.",
+    "Respond through the voice channel as yourself. Greet the caller naturally and briefly, then invite them to speak.",
+  ].join("\n")
+}
+
+function openAISipResponseHeaders(params: Record<string, string>, extra: Record<string, string | undefined> = {}): Record<string, string | undefined> {
+  return {
+    "X-Ouro-Agent": params.Agent,
+    "X-Ouro-Direction": params.Direction,
+    "X-Ouro-From": params.From,
+    "X-Ouro-To": params.To,
+    ...extra,
+  }
+}
+
+function boundedNumber(value: number | undefined, min: number, max: number): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined
+  return Math.min(max, Math.max(min, value))
+}
+
+function boundedInteger(value: number | undefined, min: number, max: number): number | undefined {
+  const bounded = boundedNumber(value, min, max)
+  return bounded === undefined ? undefined : Math.round(bounded)
+}
+
+function realtimeNoiseReductionConfig(
+  realtime: OpenAIRealtimeTwilioOptions,
+): { type: "near_field" | "far_field" } | null {
+  const mode = realtime.noiseReduction ?? OPENAI_REALTIME_DEFAULT_NOISE_REDUCTION
+  if (mode === "none") return null
+  return { type: mode }
+}
+
+function realtimeTurnDetectionConfig(realtime: OpenAIRealtimeTwilioOptions): Record<string, unknown> {
+  const turnDetection = realtime.turnDetection
+  const createResponse = turnDetection?.createResponse ?? true
+  const interruptResponse = turnDetection?.interruptResponse ?? false
+  if (turnDetection?.mode === "semantic_vad") {
+    return {
+      type: "semantic_vad",
+      create_response: createResponse,
+      interrupt_response: interruptResponse,
+      eagerness: turnDetection.eagerness ?? "medium",
+    }
+  }
+  return {
+    type: "server_vad",
+    create_response: createResponse,
+    interrupt_response: interruptResponse,
+    threshold: boundedNumber(turnDetection?.threshold, 0, 1) ?? OPENAI_REALTIME_DEFAULT_VAD_THRESHOLD,
+    prefix_padding_ms: boundedInteger(turnDetection?.prefixPaddingMs, 0, 2_000) ?? OPENAI_REALTIME_DEFAULT_VAD_PREFIX_PADDING_MS,
+    silence_duration_ms: boundedInteger(turnDetection?.silenceDurationMs, 100, 2_000) ?? OPENAI_REALTIME_DEFAULT_VAD_SILENCE_DURATION_MS,
+    idle_timeout_ms: boundedInteger(turnDetection?.idleTimeoutMs, 5_000, 30_000) ?? OPENAI_REALTIME_DEFAULT_VAD_IDLE_TIMEOUT_MS,
+  }
+}
+
+function realtimeToolsFromChatTools(
+  tools: OpenAI.ChatCompletionFunctionTool[],
+  excludedToolNames: Set<string> = new Set(),
+): Array<{ type: "function"; name: string; description?: string; parameters?: unknown }> {
+  return tools
+    .filter((tool) => !REALTIME_TOOL_FLOW_NAMES.has(tool.function.name) && !excludedToolNames.has(tool.function.name))
+    .map((tool) => ({
+      type: "function" as const,
+      name: tool.function.name,
+      ...(tool.function.description ? { description: tool.function.description } : {}),
+      parameters: tool.function.parameters ?? { type: "object", properties: {} },
+    }))
+}
+
+function parseToolArguments(raw: string): Record<string, string> {
+  if (!raw.trim()) return {}
+  const parsed = JSON.parse(raw) as unknown
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+  const args: Record<string, string> = {}
+  for (const [key, value] of Object.entries(parsed)) {
+    if (typeof value === "string") {
+      args[key] = value
+    } else if (value === undefined) {
+      args[key] = ""
+    } else {
+      args[key] = JSON.stringify(value)
+    }
+  }
+  return args
+}
+
+function transcriptMessageText(messages: OpenAI.ChatCompletionMessageParam[]): string {
+  const recent = messages
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .slice(-8)
+    .map((message) => {
+      const content = typeof message.content === "string" ? message.content.trim() : ""
+      return content ? `${message.role}: ${content}` : ""
+    })
+    .filter(Boolean)
+  if (recent.length === 0) return ""
+  return [
+    "Recent durable voice transcript for this same voice session:",
+    ...recent,
+  ].join("\n")
+}
+
+async function readOptionalText(filePath: string, maxChars: number): Promise<string> {
+  try {
+    const text = (await fs.readFile(filePath, "utf8")).trim()
+    if (text.length <= maxChars) return text
+    return `${text.slice(0, maxChars).trim()}\n[truncated for low-latency voice]`
+  } catch {
+    return ""
+  }
+}
+
+async function buildRealtimeVoiceInstructions(options: {
+  agentName: string
+  agentRoot: string
+  priorTranscript: string
+  realtimeVoice?: string
+  realtimeModel?: string
+  supportsAudioTools?: boolean
+}): Promise<string> {
+  const psycheDir = path.join(options.agentRoot, "psyche")
+  const [soul, identity, tacit] = await Promise.all([
+    readOptionalText(path.join(psycheDir, "SOUL.md"), 1_600),
+    readOptionalText(path.join(psycheDir, "IDENTITY.md"), 3_200),
+    readOptionalText(path.join(psycheDir, "TACIT.md"), 1_400),
+  ])
+  return [
+    `You are ${options.agentName} in the live Voice sense.`,
+    "This is the same agent identity as every other Ouro surface. Voice is not a reduced or alternate self.",
+    `Current native Realtime provider config for this call: model=${options.realtimeModel?.trim() || OPENAI_REALTIME_DEFAULT_MODEL}, voice=${options.realtimeVoice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE}.`,
+    "Speak as yourself through live audio. Follow voice/style preferences from identity notes; do not say you lack identity, preferences, or agency because the provider voice is configured by the transport.",
+    "Audio is synchronous. Default to one short sentence. Use two short sentences only when needed. Do not use markdown, lists, or long explanations unless the caller explicitly asks.",
+    "If the caller interrupts, stop the older path and answer the newest thing first.",
+    "If the caller says they are counting, measuring latency, testing lag, waiting, or wants you quiet, say at most 'got it' and then stay silent until they ask or say something that needs an answer.",
+    "Use tools for outside facts or side effects. While a tool is running, give at most one tiny preamble, then summarize the result compactly when it returns.",
+    options.supportsAudioTools === false
+      ? "This SIP lane cannot yet inject arbitrary non-speech audio. If the caller asks for a tone, clip, or sample, answer transparently and offer a spoken alternative."
+      : "If the caller asks to hear audio, a tone, a sample, or a clip, use voice_play_audio; people on phone calls can do more than talk.",
+    "If the caller is done, asks to hang up, or you need to end the call, say a brief natural goodbye first, then call voice_end_call. After voice_end_call, do not say anything else.",
+    soul ? `# SOUL\n${soul}` : "",
+    identity ? `# IDENTITY\n${identity}` : "",
+    tacit ? `# TACIT\n${tacit}` : "",
+    options.priorTranscript,
+  ].filter(Boolean).join("\n\n")
+}
+
+function realtimeBootstrapInstructions(agentName: string): string {
+  return [
+    `You are ${agentName} on a live phone call.`,
+    "Speak naturally through live audio. Keep turns very short, answer quickly, and accept interruptions immediately.",
+    "If the caller is done or asks to end the call, say a brief goodbye and call voice_end_call.",
+  ].join(" ")
+}
+
+function realtimeBootstrapTools(): Array<{ type: "function"; name: string; description?: string; parameters?: unknown }> {
+  return [{
+    type: "function",
+    name: "voice_end_call",
+    description: "End the active live voice phone call after a natural goodbye.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: "Short reason for ending the call." },
+      },
+      additionalProperties: false,
+    },
+  }]
+}
+
+function timeoutAfter(ms: number): Promise<undefined> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(undefined), ms)
+    timer.unref?.()
+  })
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(), ms)
+    timer.unref?.()
+  })
+}
+
+function numberField(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined
+}
+
+function realtimeResponseId(event: Record<string, unknown>): string {
+  const direct = stringField(event.response_id)
+  if (direct) return direct
+  const response = event.response
+  if (!response || typeof response !== "object" || Array.isArray(response)) return ""
+  return stringField((response as Record<string, unknown>).id)
+}
+
+function pcmuPayloadDurationMs(payload: string): number {
+  const byteLength = Buffer.from(payload, "base64").byteLength
+  if (byteLength <= 0) return 0
+  return Math.max(1, Math.round(byteLength / OPENAI_REALTIME_PCMS_BYTES_PER_MS))
+}
+
+class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecycleSession {
+  private streamSid = ""
+  private callSid = "media-stream"
+  private direction = ""
+  private outboundId = ""
+  private outboundReason = ""
+  private from = ""
+  private to = ""
+  private friendId = ""
+  private sessionKey = ""
+  private sessionPath = ""
+  private closed = false
+  private openaiReady = false
+  private greetingSent = false
+  private hangupRequested = false
+  private pendingAudioPayloads: string[] = []
+  private openaiWs: WebSocket | null = null
+  private toolContext: ToolContext | undefined
+  private sessionMessages: OpenAI.ChatCompletionMessageParam[] = []
+  private playbackState: RealtimePlaybackState | undefined
+  private playbackMarkIndex = 0
+  private readonly playbackMarks = new Map<string, RealtimePlaybackMark>()
+  private readonly toolResponses = new Map<string, RealtimeToolResponseState>()
+  private readonly completedRealtimeResponseIds = new Set<string>()
+  private initialAudio: VoiceCallAudioRequest | undefined
+  private initialAudioPlayed = false
+  private callerBargeInSpeechMs = 0
+  private lastCallerBargeInSpeechAt = 0
+
+  constructor(
+    private readonly ws: WebSocket,
+    private readonly options: TwilioPhoneBridgeOptions,
+    private readonly lifecycle?: {
+      onIdentityChange?: (session: TwilioMediaStreamLifecycleSession, identity: { callSid: string; outboundId: string }) => void
+      onClose?: (session: TwilioMediaStreamLifecycleSession, identity: { callSid: string; outboundId: string }) => void
+    },
+  ) {}
+
+  attach(): void {
+    this.ws.on("message", (raw) => this.handleRawMessage(raw))
+    this.ws.on("close", () => this.close())
+    this.ws.on("error", (error) => {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_socket_error",
+        message: "Twilio OpenAI Realtime socket failed",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), error: errorMessage(error) },
+      })
+    })
+  }
+
+  end(): void {
+    if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+      this.ws.close()
+    }
+    this.close()
+  }
+
+  private handleRawMessage(raw: RawData): void {
+    const message = parseTwilioMediaStreamMessage(raw)
+    if (!message) {
+      emitNervesEvent({
+        level: "warn",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_message_rejected",
+        message: "Twilio OpenAI Realtime message was not valid JSON",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid) },
+      })
+      return
+    }
+
+    const event = stringField(message.event)
+    if (event === "start") {
+      void this.handleStart(message.start)
+      return
+    }
+    if (event === "media") {
+      this.handleMedia(message.media)
+      return
+    }
+    if (event === "mark") {
+      this.handleMark(message.mark)
+      return
+    }
+    if (event === "stop") {
+      this.close()
+    }
+  }
+
+  private async handleStart(start: TwilioMediaStreamStart | undefined): Promise<void> {
+    this.streamSid = stringField(start?.streamSid)
+    this.callSid = stringField(start?.callSid) || this.callSid
+    this.direction = customParameter(start, "Direction")
+    this.outboundId = customParameter(start, "OutboundId")
+    this.outboundReason = customParameter(start, "Reason")
+    this.initialAudio = decodeVoiceCallAudioCustomParameter(customParameter(start, "InitialAudio"))
+    const explicitFriendId = customParameter(start, "FriendId")
+    if (this.direction === "outbound") {
+      this.from = customParameter(start, "Remote") || customParameter(start, "To")
+      this.to = customParameter(start, "Line") || customParameter(start, "From")
+    } else {
+      this.from = customParameter(start, "From")
+      this.to = customParameter(start, "To")
+    }
+    this.friendId = explicitFriendId || voiceFriendId(this.options, this.from, this.callSid)
+    this.sessionKey = twilioPhoneVoiceSessionKey({
+      defaultFriendId: explicitFriendId || this.options.defaultFriendId,
+      from: this.from,
+      to: this.to,
+      callSid: this.callSid,
+    })
+    this.lifecycle?.onIdentityChange?.(this, { callSid: this.callSid, outboundId: this.outboundId })
+
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_realtime_start",
+      message: "Twilio OpenAI Realtime stream started",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        sessionKey: this.sessionKey,
+      },
+    })
+
+    try {
+      await this.startOpenAIRealtimeSession()
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_start_error",
+        message: "Twilio OpenAI Realtime stream could not connect",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), error: errorMessage(error) },
+      })
+      this.end()
+    }
+  }
+
+  private async startOpenAIRealtimeSession(): Promise<void> {
+    const realtime = this.options.openaiRealtime
+    if (!realtime?.apiKey?.trim()) {
+      throw new Error("OpenAI Realtime API key is not configured")
+    }
+
+    this.ensureVoiceToolContext()
+    const instructionsPromise = this.buildInstructions()
+      .catch(() => realtimeBootstrapInstructions(this.options.agentName))
+    const toolsPromise = this.buildRealtimeTools()
+      .then((tools) => realtimeToolsFromChatTools(tools))
+      .catch(() => realtimeBootstrapTools())
+    const ws = new WebSocket(openAIRealtimeWebSocketUrl(realtime), {
+      headers: {
+        Authorization: `Bearer ${realtime.apiKey.trim()}`,
+        "OpenAI-Safety-Identifier": safeSegment(`${this.options.agentName}-${this.friendId}`),
+      },
+    })
+    this.openaiWs = ws
+
+    ws.on("open", () => {
+      this.openaiReady = true
+      void this.configureOpenAIRealtimeSession(realtime, instructionsPromise, toolsPromise)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_realtime_openai_open",
+        message: "OpenAI Realtime session connected for Twilio call",
+        meta: {
+          agentName: this.options.agentName,
+          callSid: safeSegment(this.callSid),
+          model: realtime.model?.trim() || OPENAI_REALTIME_DEFAULT_MODEL,
+          voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
+          apiKeySource: realtime.apiKeySource ?? "unknown",
+        },
+      })
+    })
+
+    ws.on("message", (raw) => this.handleOpenAIMessage(raw))
+    ws.on("close", () => {
+      this.openaiReady = false
+      if (!this.closed) this.end()
+    })
+    ws.on("error", (error) => {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_openai_error",
+        message: "OpenAI Realtime socket failed during Twilio call",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), error: errorMessage(error) },
+      })
+    })
+  }
+
+  private async configureOpenAIRealtimeSession(
+    realtime: OpenAIRealtimeTwilioOptions,
+    instructionsPromise: Promise<string>,
+    toolsPromise: Promise<Array<{ type: "function"; name: string; description?: string; parameters?: unknown }>>,
+  ): Promise<void> {
+    const ready = await Promise.race([
+      Promise.all([instructionsPromise, toolsPromise] as const),
+      timeoutAfter(OPENAI_REALTIME_BOOTSTRAP_TIMEOUT_MS),
+    ])
+    const usedBootstrap = ready === undefined
+    const [instructions, tools] = ready ?? [
+      realtimeBootstrapInstructions(this.options.agentName),
+      realtimeBootstrapTools(),
+    ]
+    this.sendOpenAIRealtimeSessionUpdate(realtime, instructions, tools)
+    this.flushPendingAudio()
+    this.sendInitialGreeting()
+
+    if (!usedBootstrap) return
+    Promise.all([instructionsPromise, toolsPromise] as const)
+      .then(([fullInstructions, fullTools]) => {
+        if (this.closed) return
+        this.sendOpenAI({
+          type: "session.update",
+          session: {
+            type: "realtime",
+            instructions: fullInstructions,
+            tools: fullTools,
+            tool_choice: "auto",
+          },
+        })
+      })
+      .catch(() => undefined)
+  }
+
+  private sendOpenAIRealtimeSessionUpdate(
+    realtime: OpenAIRealtimeTwilioOptions,
+    instructions: string,
+    tools: Array<{ type: "function"; name: string; description?: string; parameters?: unknown }>,
+  ): void {
+    this.sendOpenAI({
+      type: "session.update",
+      session: {
+        type: "realtime",
+        model: realtime.model?.trim() || OPENAI_REALTIME_DEFAULT_MODEL,
+        instructions,
+        audio: {
+          input: {
+            format: { type: "audio/pcmu" },
+            noise_reduction: realtimeNoiseReductionConfig(realtime),
+            transcription: { model: OPENAI_REALTIME_DEFAULT_TRANSCRIPTION_MODEL },
+            turn_detection: realtimeTurnDetectionConfig(realtime),
+          },
+          output: {
+            format: { type: "audio/pcmu" },
+            voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
+          },
+        },
+        tools,
+        tool_choice: "auto",
+        max_output_tokens: OPENAI_REALTIME_MAX_OUTPUT_TOKENS,
+        ...(realtime.reasoningEffort ? { reasoning: { effort: realtime.reasoningEffort } } : {}),
+      },
+    })
+  }
+
+  private async buildInstructions(): Promise<string> {
+    setAgentName(this.options.agentName)
+    const agentRoot = this.options.agentRoot ?? getAgentRoot(this.options.agentName)
+    const sessionDir = path.join(agentRoot, "state", "sessions", this.friendId, "voice")
+    await fs.mkdir(sessionDir, { recursive: true })
+    this.sessionPath = path.join(sessionDir, `${sanitizeKey(this.sessionKey)}.json`)
+
+    const existing = loadSession(this.sessionPath)
+    const prior = existing?.messages ? transcriptMessageText(existing.messages) : ""
+    const realtimeSystem = await buildRealtimeVoiceInstructions({
+      agentName: this.options.agentName,
+      agentRoot,
+      priorTranscript: prior,
+      realtimeVoice: this.options.openaiRealtime?.voice,
+      realtimeModel: this.options.openaiRealtime?.model,
+    })
+    this.sessionMessages = existing?.messages && existing.messages.length > 0
+      ? existing.messages
+      : [{ role: "system", content: realtimeSystem }]
+    if (!existing) saveSession(this.sessionPath, this.sessionMessages)
+
+    return realtimeSystem
+  }
+
+  private requestHangupFromTool(): void {
+    this.hangupRequested = true
+    setTimeout(() => this.completeHangupIfReady("tool_fallback"), 7_500).unref?.()
+  }
+
+  private ensureVoiceToolContext(): void {
+    if (this.toolContext) return
+    this.toolContext = {
+      signin: async () => undefined,
+      voiceCall: {
+        requestEnd: () => this.requestHangupFromTool(),
+        playAudio: (request) => this.playPreparedAudio(request),
+      },
+    }
+  }
+
+  private async buildRealtimeTools(): Promise<OpenAI.ChatCompletionFunctionTool[]> {
+    const agentRoot = this.options.agentRoot ?? getAgentRoot(this.options.agentName)
+    const friendsPath = path.join(agentRoot, "friends")
+    const friendStore = new FileFriendStore(friendsPath)
+    const resolver = new FriendResolver(friendStore, {
+      provider: "local",
+      externalId: this.friendId,
+      displayName: this.friendId,
+      channel: "voice",
+    })
+    const resolved = await resolver.resolve()
+    this.toolContext = {
+      signin: async () => undefined,
+      context: resolved,
+      friendStore,
+      voiceCall: {
+        requestEnd: () => this.requestHangupFromTool(),
+        playAudio: (request) => this.playPreparedAudio(request),
+      },
+    }
+    void this.refreshRealtimeToolsWithMcp(resolved)
+    return getToolsForChannel(
+      getChannelCapabilities("voice"),
+      resolved.friend.toolPreferences,
+      resolved,
+      undefined,
+      undefined,
+    )
+  }
+
+  private async refreshRealtimeToolsWithMcp(resolved: Awaited<ReturnType<FriendResolver["resolve"]>>): Promise<void> {
+    try {
+      const mcpManager = await getSharedMcpManager() ?? undefined
+      if (!mcpManager || this.closed) return
+      const tools = realtimeToolsFromChatTools(getToolsForChannel(
+        getChannelCapabilities("voice"),
+        resolved.friend.toolPreferences,
+        resolved,
+        undefined,
+        mcpManager,
+      ))
+      this.sendOpenAI({
+        type: "session.update",
+        session: {
+          type: "realtime",
+          tools,
+          tool_choice: "auto",
+        },
+      })
+    } catch {
+      // Keep realtime calls conversational even if optional MCP tool discovery is slow or unavailable.
+    }
+  }
+
+  private sendInitialGreeting(): void {
+    if (this.greetingSent) return
+    this.greetingSent = true
+    const promptText = this.direction === "outbound" && this.outboundId
+      ? outboundCallAnsweredPrompt({
+          schemaVersion: 1,
+          outboundId: this.outboundId,
+          agentName: this.options.agentName,
+          ...(this.friendId ? { friendId: this.friendId } : {}),
+          to: this.from,
+          from: this.to,
+          reason: this.outboundReason || "Voice call connected.",
+          createdAt: new Date().toISOString(),
+        }, { From: this.to, To: this.from })
+      : callConnectedPrompt({ From: this.from, To: this.to })
+    this.sendOpenAI({
+      type: "response.create",
+      response: {
+        instructions: promptText,
+      },
+    })
+  }
+
+  private handleMedia(media: TwilioMediaPayload | undefined): void {
+    const payload = stringField(media?.payload)
+    if (!payload) return
+    this.trackCallerBargeInEnergy(payload)
+    if (!this.openaiReady) {
+      this.pendingAudioPayloads.push(payload)
+      if (this.pendingAudioPayloads.length > 250) this.pendingAudioPayloads.shift()
+      return
+    }
+    this.sendOpenAI({ type: "input_audio_buffer.append", audio: payload })
+  }
+
+  private trackCallerBargeInEnergy(payload: string): void {
+    const frame = Buffer.from(payload, "base64")
+    if (frame.byteLength === 0) return
+    const rms = mulawFrameRms(frame)
+    if (rms >= OPENAI_REALTIME_BARGE_IN_RMS_THRESHOLD) {
+      this.callerBargeInSpeechMs += pcmuPayloadDurationMs(payload)
+      this.lastCallerBargeInSpeechAt = Date.now()
+      return
+    }
+    this.callerBargeInSpeechMs = Math.max(0, this.callerBargeInSpeechMs - pcmuPayloadDurationMs(payload))
+  }
+
+  private hasReliableCallerBargeInSpeech(): boolean {
+    if (Date.now() - this.lastCallerBargeInSpeechAt > 600) return false
+    return this.callerBargeInSpeechMs >= OPENAI_REALTIME_BARGE_IN_MIN_SPEECH_MS
+  }
+
+  private handleMark(mark: TwilioMediaMark | undefined): void {
+    const name = stringField(mark?.name)
+    if (!name) return
+    const playback = this.playbackMarks.get(name)
+    if (!playback) return
+    this.playbackMarks.delete(name)
+    if (
+      this.playbackState
+      && this.playbackState.itemId === playback.itemId
+      && this.playbackState.contentIndex === playback.contentIndex
+    ) {
+      this.playbackState.playedMs = Math.max(this.playbackState.playedMs, playback.audioEndMs)
+    }
+  }
+
+  private handleOpenAIMessage(raw: RawData): void {
+    let event: Record<string, unknown>
+    try {
+      event = JSON.parse(Buffer.from(raw as Buffer).toString("utf8")) as Record<string, unknown>
+    } catch {
+      return
+    }
+    const type = typeof event.type === "string" ? event.type : ""
+    if (type === "response.output_audio.delta" && typeof event.delta === "string") {
+      this.handleOpenAIAudioDelta(event)
+      return
+    }
+    if (type === "input_audio_buffer.speech_started") {
+      this.handleCallerSpeechStarted()
+      return
+    }
+    if (type === "conversation.item.input_audio_transcription.completed" && typeof event.transcript === "string") {
+      this.appendTranscript("user", event.transcript)
+      return
+    }
+    if (type === "response.output_audio_transcript.done" && typeof event.transcript === "string") {
+      this.appendTranscript("assistant", event.transcript)
+      return
+    }
+    if (type === "response.function_call_arguments.done") {
+      void this.runRealtimeTool(event)
+      return
+    }
+    if (type === "response.done") {
+      if (this.completeRealtimeToolResponse(realtimeResponseId(event))) return
+      void this.playInitialAudioAfterGreeting()
+      this.completeHangupIfReady("response_done")
+      return
+    }
+    if (type === "error") {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_openai_event_error",
+        message: "OpenAI Realtime emitted an error during Twilio call",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), event: JSON.stringify(event).slice(0, 500) },
+      })
+    }
+  }
+
+  private handleOpenAIAudioDelta(event: Record<string, unknown>): void {
+    const payload = stringField(event.delta)
+    if (!payload) return
+    const itemId = stringField(event.item_id)
+    const contentIndex = numberField(event.content_index) ?? 0
+    let audioEndMs: number | undefined
+    if (itemId) {
+      let current = this.playbackState
+      if (!current || current.itemId !== itemId || current.contentIndex !== contentIndex) {
+        current = { itemId, contentIndex, sentMs: 0, playedMs: 0 }
+        this.playbackState = current
+      }
+      current.sentMs += pcmuPayloadDurationMs(payload)
+      audioEndMs = current.sentMs
+    }
+    this.sendTwilioMedia(payload)
+    if (itemId && audioEndMs !== undefined) this.sendTwilioMark({ itemId, contentIndex, audioEndMs })
+  }
+
+  private handleCallerSpeechStarted(): void {
+    const playback = this.playbackState
+    if (!this.hasReliableCallerBargeInSpeech()) {
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_realtime_barge_in_ignored",
+        message: "ignored low-confidence OpenAI Realtime barge-in signal",
+        meta: {
+          agentName: this.options.agentName,
+          callSid: safeSegment(this.callSid),
+          speechMs: String(this.callerBargeInSpeechMs),
+        },
+      })
+      return
+    }
+    this.playbackMarks.clear()
+    this.sendTwilioClear()
+    if (!playback?.itemId) return
+    this.sendOpenAI({
+      type: "conversation.item.truncate",
+      item_id: playback.itemId,
+      content_index: playback.contentIndex,
+      audio_end_ms: playback.playedMs,
+    })
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_realtime_output_truncated",
+      message: "truncated interrupted OpenAI Realtime voice output",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        audioEndMs: playback.playedMs,
+      },
+    })
+    this.playbackState = undefined
+  }
+
+  private registerRealtimeToolResponse(responseId: string, callId: string): RealtimeToolResponseState | undefined {
+    if (!responseId) return undefined
+    const existing = this.toolResponses.get(responseId)
+    const state = existing ?? {
+      pendingCallIds: new Set<string>(),
+      responseDone: this.completedRealtimeResponseIds.has(responseId),
+      followupRequested: false,
+      suppressFollowup: false,
+    }
+    state.pendingCallIds.add(callId)
+    if (!existing) this.toolResponses.set(responseId, state)
+    return state
+  }
+
+  private completeRealtimeToolCall(responseId: string, callId: string): boolean {
+    if (!responseId) return false
+    const state = this.toolResponses.get(responseId)
+    if (!state) return false
+    state.pendingCallIds.delete(callId)
+    return this.maybeCreateRealtimeToolFollowup(responseId, state)
+  }
+
+  private completeRealtimeToolResponse(responseId: string): boolean {
+    if (!responseId) return false
+    this.completedRealtimeResponseIds.add(responseId)
+    const state = this.toolResponses.get(responseId)
+    if (!state) return false
+    state.responseDone = true
+    this.maybeCreateRealtimeToolFollowup(responseId, state)
+    return true
+  }
+
+  private maybeCreateRealtimeToolFollowup(responseId: string, state: RealtimeToolResponseState): boolean {
+    if (!state.responseDone || state.pendingCallIds.size > 0 || state.followupRequested) return false
+    state.followupRequested = true
+    this.toolResponses.delete(responseId)
+    if (state.suppressFollowup) return true
+    this.sendOpenAI({ type: "response.create" })
+    return true
+  }
+
+  private async runRealtimeTool(event: Record<string, unknown>): Promise<void> {
+    const name = typeof event.name === "string" ? event.name : ""
+    const callId = typeof event.call_id === "string" ? event.call_id : ""
+    if (!name || !callId) return
+    const responseId = realtimeResponseId(event)
+    const toolState = this.registerRealtimeToolResponse(responseId, callId)
+    const coordinated = !!toolState
+    if (name === "voice_end_call" && toolState) toolState.suppressFollowup = true
+    let output: string
+    try {
+      const args = parseToolArguments(typeof event.arguments === "string" ? event.arguments : "")
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_realtime_tool_start",
+        message: "OpenAI Realtime voice tool call started",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), tool: name },
+      })
+      output = await execTool(name, args, this.toolContext)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_realtime_tool_end",
+        message: "OpenAI Realtime voice tool call completed",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), tool: name },
+      })
+    } catch (error) {
+      output = `[tool error] ${errorMessage(error)}`
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_tool_error",
+        message: "OpenAI Realtime voice tool call failed",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), tool: name, error: errorMessage(error) },
+      })
+    }
+    this.sendOpenAI({
+      type: "conversation.item.create",
+      item: {
+        type: "function_call_output",
+        call_id: callId,
+        output,
+      },
+    })
+    if (!this.completeRealtimeToolCall(responseId, callId) && !coordinated) {
+      this.sendOpenAI({ type: "response.create" })
+    }
+  }
+
+  private flushPendingAudio(): void {
+    const pending = this.pendingAudioPayloads.splice(0)
+    for (const payload of pending) {
+      this.sendOpenAI({ type: "input_audio_buffer.append", audio: payload })
+    }
+  }
+
+  private sendOpenAI(event: unknown): void {
+    if (!this.openaiWs || this.openaiWs.readyState !== WebSocket.OPEN) return
+    this.openaiWs.send(JSON.stringify(event))
+  }
+
+  private async playInitialAudioAfterGreeting(): Promise<void> {
+    if (this.initialAudioPlayed || !this.initialAudio) return
+    this.initialAudioPlayed = true
+    try {
+      await this.playPreparedAudio(this.initialAudio, { clearFirst: false })
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_twilio_realtime_initial_audio_error",
+        message: "failed to play initial audio into Twilio Realtime call",
+        meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), error: errorMessage(error) },
+      })
+    }
+  }
+
+  private async playPreparedAudio(
+    request: VoiceCallAudioRequest,
+    playbackOptions: { clearFirst?: boolean } = {},
+  ): Promise<VoiceCallAudioResult> {
+    if (!this.streamSid || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error("voice call media stream is not ready")
+    }
+    const prepared = await prepareVoiceCallAudio(request, {
+      agentRoot: this.options.agentRoot ?? getAgentRoot(this.options.agentName),
+    })
+    this.playbackMarks.clear()
+    this.playbackState = undefined
+    if (playbackOptions.clearFirst ?? true) this.sendTwilioClear()
+    for (let offset = 0; offset < prepared.audio.byteLength; offset += 160) {
+      if (this.closed || this.ws.readyState !== WebSocket.OPEN) break
+      this.sendTwilioMedia(Buffer.from(prepared.audio.subarray(offset, offset + 160)).toString("base64"))
+      await delay(20)
+    }
+    if (!this.closed && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        event: "mark",
+        streamSid: this.streamSid,
+        mark: { name: `tool-audio-${Date.now()}` },
+      }))
+    }
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_realtime_tool_audio_played",
+      message: "played tool-requested audio into Twilio Realtime call",
+      meta: {
+        agentName: this.options.agentName,
+        callSid: safeSegment(this.callSid),
+        label: prepared.label,
+        durationMs: String(prepared.durationMs),
+      },
+    })
+    return { label: prepared.label, durationMs: prepared.durationMs }
+  }
+
+  private sendTwilioMedia(payload: string): void {
+    if (this.closed || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return
+    this.ws.send(JSON.stringify({
+      event: "media",
+      streamSid: this.streamSid,
+      media: { payload },
+    }))
+  }
+
+  private sendTwilioMark(playback: RealtimePlaybackMark): void {
+    if (this.closed || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return
+    const name = `rt-${++this.playbackMarkIndex}`
+    this.playbackMarks.set(name, playback)
+    this.ws.send(JSON.stringify({
+      event: "mark",
+      streamSid: this.streamSid,
+      mark: { name },
+    }))
+  }
+
+  private sendTwilioClear(): void {
+    if (this.closed || !this.streamSid || this.ws.readyState !== WebSocket.OPEN) return
+    this.ws.send(JSON.stringify({ event: "clear", streamSid: this.streamSid }))
+  }
+
+  private appendTranscript(role: "user" | "assistant", text: string): void {
+    const content = text.trim()
+    if (!content || !this.sessionPath) return
+    this.sessionMessages.push({ role, content })
+    saveSession(this.sessionPath, this.sessionMessages)
+  }
+
+  private completeHangupIfReady(trigger: string): void {
+    if (!this.hangupRequested || this.closed) return
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_realtime_hangup_end",
+      message: "ending Twilio OpenAI Realtime call after hangup request",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid), trigger },
+    })
+    this.end()
+  }
+
+  private close(): void {
+    if (this.closed) return
+    this.closed = true
+    if (this.openaiWs && (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING)) {
+      this.openaiWs.close()
+    }
+    this.lifecycle?.onClose?.(this, { callSid: this.callSid, outboundId: this.outboundId })
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_realtime_stop",
+      message: "Twilio OpenAI Realtime stream stopped",
+      meta: { agentName: this.options.agentName, callSid: safeSegment(this.callSid) },
+    })
+  }
+}
+
+class OpenAISipPhoneSession {
+  private friendId = ""
+  private sessionKey = ""
+  private sessionPath = ""
+  private closed = false
+  private hangupRequested = false
+  private hangupStarted = false
+  private openaiWs: WebSocket | null = null
+  private toolContext: ToolContext | undefined
+  private sessionMessages: OpenAI.ChatCompletionMessageParam[] = []
+  private readonly toolResponses = new Map<string, RealtimeToolResponseState>()
+  private readonly completedRealtimeResponseIds = new Set<string>()
+
+  constructor(
+    private readonly options: TwilioPhoneBridgeOptions,
+    private readonly metadata: OpenAISipCallMetadata,
+  ) {}
+
+  async start(): Promise<void> {
+    try {
+      const realtime = this.options.openaiRealtime
+      const sip = this.options.openaiSip
+      if (!realtime?.apiKey?.trim()) throw new Error("OpenAI Realtime API key is not configured")
+      if (!sip) throw new Error("OpenAI SIP options are not configured")
+
+      this.friendId = this.metadata.friendId
+        || this.options.defaultFriendId?.trim()
+        || voiceFriendId(this.options, this.metadata.from, this.metadata.callId)
+      this.sessionKey = twilioPhoneVoiceSessionKey({
+        defaultFriendId: this.friendId || this.options.defaultFriendId,
+        from: this.metadata.from,
+        to: this.metadata.to,
+        callSid: this.metadata.callId,
+      })
+      await this.updateOutboundJobIfNeeded()
+      this.ensureVoiceToolContext()
+
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_call_start",
+        message: "OpenAI SIP phone call webhook accepted for voice handling",
+        meta: {
+          agentName: this.options.agentName,
+          callId: safeSegment(this.metadata.callId),
+          sessionKey: this.sessionKey,
+          direction: this.metadata.direction,
+        },
+      })
+
+      const fullConfigPromise = Promise.all([
+        this.buildInstructions(),
+        this.buildRealtimeTools()
+          .then((tools) => realtimeToolsFromChatTools(tools, OPENAI_SIP_UNSUPPORTED_TOOL_NAMES)),
+      ] as const)
+      const ready = await Promise.race([
+        fullConfigPromise,
+        timeoutAfter(OPENAI_REALTIME_BOOTSTRAP_TIMEOUT_MS),
+      ])
+      const usedBootstrap = ready === undefined
+      const [instructions, tools] = ready ?? [
+        realtimeBootstrapInstructions(this.options.agentName),
+        realtimeBootstrapTools(),
+      ]
+
+      await this.acceptOpenAISipCall(realtime, sip, instructions, tools)
+      this.openControlWebSocket(realtime, sip, fullConfigPromise, usedBootstrap)
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_openai_sip_call_error",
+        message: "OpenAI SIP phone call could not be started",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), error: errorMessage(error) },
+      })
+      throw error
+    }
+  }
+
+  private async updateOutboundJobIfNeeded(): Promise<void> {
+    if (this.metadata.direction !== "outbound" || !this.metadata.outboundId) return
+    const job = await readTwilioOutboundCallJob(this.options.outputDir, this.metadata.outboundId)
+    if (!job) return
+    await updateTwilioOutboundCallJob(this.options.outputDir, job.outboundId, {
+      status: "answered",
+      transportCallSid: this.metadata.callId,
+      events: [
+        ...(job.events ?? []),
+        { at: new Date().toISOString(), status: "answered", callSid: this.metadata.callId },
+      ],
+    })
+  }
+
+  private async acceptOpenAISipCall(
+    realtime: OpenAIRealtimeTwilioOptions,
+    sip: OpenAISipPhoneOptions,
+    instructions: string,
+    tools: Array<{ type: "function"; name: string; description?: string; parameters?: unknown }>,
+  ): Promise<void> {
+    const fetchImpl = sip.fetch ?? fetch
+    const response = await fetchImpl(openAISipCallActionUrl(sip, this.metadata.callId, "accept"), {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${realtime.apiKey.trim()}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "realtime",
+        model: realtime.model?.trim() || OPENAI_REALTIME_DEFAULT_MODEL,
+        instructions,
+        audio: {
+          input: {
+            noise_reduction: realtimeNoiseReductionConfig(realtime),
+            transcription: { model: OPENAI_REALTIME_DEFAULT_TRANSCRIPTION_MODEL },
+            turn_detection: realtimeTurnDetectionConfig(realtime),
+          },
+          output: {
+            voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
+          },
+        },
+        tools,
+        tool_choice: "auto",
+        max_output_tokens: OPENAI_REALTIME_MAX_OUTPUT_TOKENS,
+      }),
+    })
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "")
+      throw new Error(`OpenAI SIP call accept failed: ${response.status} ${responseText}`.trim())
+    }
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_openai_sip_call_accepted",
+      message: "OpenAI SIP phone call accepted",
+      meta: {
+        agentName: this.options.agentName,
+        callId: safeSegment(this.metadata.callId),
+        model: realtime.model?.trim() || OPENAI_REALTIME_DEFAULT_MODEL,
+        voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
+      },
+    })
+  }
+
+  private openControlWebSocket(
+    realtime: OpenAIRealtimeTwilioOptions,
+    sip: OpenAISipPhoneOptions,
+    fullConfigPromise: Promise<readonly [
+      string,
+      Array<{ type: "function"; name: string; description?: string; parameters?: unknown }>,
+    ]>,
+    usedBootstrap: boolean,
+  ): void {
+    const ws = new WebSocket(openAISipControlWebSocketUrl(sip, this.metadata.callId), {
+      headers: {
+        Authorization: `Bearer ${realtime.apiKey.trim()}`,
+        "OpenAI-Safety-Identifier": safeSegment(`${this.options.agentName}-${this.friendId}`),
+      },
+    })
+    this.openaiWs = ws
+
+    ws.on("open", () => {
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_control_open",
+        message: "OpenAI SIP Realtime control socket connected",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId) },
+      })
+      this.sendInitialGreeting()
+      if (!usedBootstrap) return
+      fullConfigPromise
+        .then(([instructions, tools]) => {
+          if (this.closed) return
+          this.sendOpenAI({
+            type: "session.update",
+            session: {
+              type: "realtime",
+              instructions,
+              tools,
+              tool_choice: "auto",
+              ...(realtime.reasoningEffort ? { reasoning: { effort: realtime.reasoningEffort } } : {}),
+            },
+          })
+        })
+        .catch(() => undefined)
+    })
+    ws.on("message", (raw) => this.handleOpenAIMessage(raw))
+    ws.on("close", () => {
+      if (!this.closed) this.close("control_socket_closed")
+    })
+    ws.on("error", (error) => {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_openai_sip_control_error",
+        message: "OpenAI SIP Realtime control socket failed",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), error: errorMessage(error) },
+      })
+    })
+  }
+
+  private async buildInstructions(): Promise<string> {
+    setAgentName(this.options.agentName)
+    const agentRoot = this.options.agentRoot ?? getAgentRoot(this.options.agentName)
+    const sessionDir = path.join(agentRoot, "state", "sessions", this.friendId, "voice")
+    await fs.mkdir(sessionDir, { recursive: true })
+    this.sessionPath = path.join(sessionDir, `${sanitizeKey(this.sessionKey)}.json`)
+
+    const existing = loadSession(this.sessionPath)
+    const prior = existing?.messages ? transcriptMessageText(existing.messages) : ""
+    const realtimeSystem = await buildRealtimeVoiceInstructions({
+      agentName: this.options.agentName,
+      agentRoot,
+      priorTranscript: prior,
+      realtimeVoice: this.options.openaiRealtime?.voice,
+      realtimeModel: this.options.openaiRealtime?.model,
+      supportsAudioTools: false,
+    })
+    this.sessionMessages = existing?.messages && existing.messages.length > 0
+      ? existing.messages
+      : [{ role: "system", content: realtimeSystem }]
+    if (!existing) saveSession(this.sessionPath, this.sessionMessages)
+
+    return realtimeSystem
+  }
+
+  private ensureVoiceToolContext(): void {
+    if (this.toolContext) return
+    this.toolContext = {
+      signin: async () => undefined,
+      voiceCall: {
+        requestEnd: () => this.requestHangupFromTool(),
+      },
+    }
+  }
+
+  private async buildRealtimeTools(): Promise<OpenAI.ChatCompletionFunctionTool[]> {
+    const agentRoot = this.options.agentRoot ?? getAgentRoot(this.options.agentName)
+    const friendsPath = path.join(agentRoot, "friends")
+    const friendStore = new FileFriendStore(friendsPath)
+    const resolver = new FriendResolver(friendStore, {
+      provider: "local",
+      externalId: this.friendId,
+      displayName: this.friendId,
+      channel: "voice",
+    })
+    const resolved = await resolver.resolve()
+    this.toolContext = {
+      signin: async () => undefined,
+      context: resolved,
+      friendStore,
+      voiceCall: {
+        requestEnd: () => this.requestHangupFromTool(),
+      },
+    }
+    void this.refreshRealtimeToolsWithMcp(resolved)
+    return getToolsForChannel(
+      getChannelCapabilities("voice"),
+      resolved.friend.toolPreferences,
+      resolved,
+      undefined,
+      undefined,
+    )
+  }
+
+  private async refreshRealtimeToolsWithMcp(resolved: Awaited<ReturnType<FriendResolver["resolve"]>>): Promise<void> {
+    try {
+      const mcpManager = await getSharedMcpManager() ?? undefined
+      if (!mcpManager || this.closed) return
+      const tools = realtimeToolsFromChatTools(getToolsForChannel(
+        getChannelCapabilities("voice"),
+        resolved.friend.toolPreferences,
+        resolved,
+        undefined,
+        mcpManager,
+      ), OPENAI_SIP_UNSUPPORTED_TOOL_NAMES)
+      this.sendOpenAI({
+        type: "session.update",
+        session: {
+          type: "realtime",
+          tools,
+          tool_choice: "auto",
+        },
+      })
+    } catch {
+      // Keep SIP calls conversational even if optional MCP tool discovery is slow or unavailable.
+    }
+  }
+
+  private sendInitialGreeting(): void {
+    this.sendOpenAI({
+      type: "response.create",
+      response: {
+        instructions: openAISipCallConnectedPrompt(this.metadata),
+      },
+    })
+  }
+
+  private handleOpenAIMessage(raw: RawData): void {
+    let event: Record<string, unknown>
+    try {
+      event = JSON.parse(Buffer.from(raw as Buffer).toString("utf8")) as Record<string, unknown>
+    } catch {
+      return
+    }
+    const type = typeof event.type === "string" ? event.type : ""
+    if (type === "conversation.item.input_audio_transcription.completed" && typeof event.transcript === "string") {
+      this.appendTranscript("user", event.transcript)
+      return
+    }
+    if (type === "response.output_audio_transcript.done" && typeof event.transcript === "string") {
+      this.appendTranscript("assistant", event.transcript)
+      return
+    }
+    if (type === "response.function_call_arguments.done") {
+      void this.runRealtimeTool(event)
+      return
+    }
+    if (type === "response.done") {
+      if (this.completeRealtimeToolResponse(realtimeResponseId(event))) return
+      this.completeHangupIfReady("response_done")
+      return
+    }
+    if (type === "error") {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_openai_sip_event_error",
+        message: "OpenAI Realtime emitted an error during SIP call",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), event: JSON.stringify(event).slice(0, 500) },
+      })
+    }
+  }
+
+  private registerRealtimeToolResponse(responseId: string, callId: string): RealtimeToolResponseState | undefined {
+    if (!responseId) return undefined
+    const existing = this.toolResponses.get(responseId)
+    const state = existing ?? {
+      pendingCallIds: new Set<string>(),
+      responseDone: this.completedRealtimeResponseIds.has(responseId),
+      followupRequested: false,
+      suppressFollowup: false,
+    }
+    state.pendingCallIds.add(callId)
+    if (!existing) this.toolResponses.set(responseId, state)
+    return state
+  }
+
+  private completeRealtimeToolCall(responseId: string, callId: string): boolean {
+    if (!responseId) return false
+    const state = this.toolResponses.get(responseId)
+    if (!state) return false
+    state.pendingCallIds.delete(callId)
+    return this.maybeCreateRealtimeToolFollowup(responseId, state)
+  }
+
+  private completeRealtimeToolResponse(responseId: string): boolean {
+    if (!responseId) return false
+    this.completedRealtimeResponseIds.add(responseId)
+    const state = this.toolResponses.get(responseId)
+    if (!state) return false
+    state.responseDone = true
+    this.maybeCreateRealtimeToolFollowup(responseId, state)
+    return true
+  }
+
+  private maybeCreateRealtimeToolFollowup(responseId: string, state: RealtimeToolResponseState): boolean {
+    if (!state.responseDone || state.pendingCallIds.size > 0 || state.followupRequested) return false
+    state.followupRequested = true
+    this.toolResponses.delete(responseId)
+    if (state.suppressFollowup) {
+      this.completeHangupIfReady("tool_response_done")
+      return true
+    }
+    this.sendOpenAI({ type: "response.create" })
+    return true
+  }
+
+  private async runRealtimeTool(event: Record<string, unknown>): Promise<void> {
+    const name = typeof event.name === "string" ? event.name : ""
+    const callId = typeof event.call_id === "string" ? event.call_id : ""
+    if (!name || !callId) return
+    const responseId = realtimeResponseId(event)
+    const toolState = this.registerRealtimeToolResponse(responseId, callId)
+    const coordinated = !!toolState
+    if (name === "voice_end_call" && toolState) toolState.suppressFollowup = true
+    let output: string
+    try {
+      const args = parseToolArguments(typeof event.arguments === "string" ? event.arguments : "")
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_tool_start",
+        message: "OpenAI SIP voice tool call started",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), tool: name },
+      })
+      output = await execTool(name, args, this.toolContext)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_tool_end",
+        message: "OpenAI SIP voice tool call completed",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), tool: name },
+      })
+    } catch (error) {
+      output = `[tool error] ${errorMessage(error)}`
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_openai_sip_tool_error",
+        message: "OpenAI SIP voice tool call failed",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), tool: name, error: errorMessage(error) },
+      })
+    }
+    this.sendOpenAI({
+      type: "conversation.item.create",
+      item: {
+        type: "function_call_output",
+        call_id: callId,
+        output,
+      },
+    })
+    if (!this.completeRealtimeToolCall(responseId, callId) && !coordinated) {
+      this.sendOpenAI({ type: "response.create" })
+    }
+  }
+
+  private requestHangupFromTool(): void {
+    if (this.closed) return
+    this.hangupRequested = true
+    setTimeout(() => this.completeHangupIfReady("tool_fallback"), 7_500).unref?.()
+  }
+
+  private completeHangupIfReady(trigger: string): void {
+    if (!this.hangupRequested || this.closed || this.hangupStarted) return
+    this.hangupStarted = true
+    void this.hangup(trigger)
+  }
+
+  private async hangup(trigger: string): Promise<void> {
+    const realtime = this.options.openaiRealtime
+    const sip = this.options.openaiSip
+    if (!realtime?.apiKey?.trim() || !sip) {
+      this.close(trigger)
+      return
+    }
+    try {
+      const response = await (sip.fetch ?? fetch)(openAISipCallActionUrl(sip, this.metadata.callId, "hangup"), {
+        method: "POST",
+        headers: { authorization: `Bearer ${realtime.apiKey.trim()}` },
+      })
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => "")
+        throw new Error(`OpenAI SIP call hangup failed: ${response.status} ${responseText}`.trim())
+      }
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_hangup_end",
+        message: "OpenAI SIP phone call hangup requested",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), trigger },
+      })
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_openai_sip_hangup_error",
+        message: "OpenAI SIP phone call hangup request failed",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), trigger, error: errorMessage(error) },
+      })
+    } finally {
+      this.close(trigger)
+    }
+  }
+
+  private sendOpenAI(event: unknown): void {
+    if (!this.openaiWs || this.openaiWs.readyState !== WebSocket.OPEN) return
+    this.openaiWs.send(JSON.stringify(event))
+  }
+
+  private appendTranscript(role: "user" | "assistant", text: string): void {
+    const content = text.trim()
+    if (!content || !this.sessionPath) return
+    this.sessionMessages.push({ role, content })
+    saveSession(this.sessionPath, this.sessionMessages)
+  }
+
+  private close(trigger: string): void {
+    if (this.closed) return
+    this.closed = true
+    if (this.openaiWs && (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING)) {
+      this.openaiWs.close()
+    }
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_openai_sip_call_stop",
+      message: "OpenAI SIP phone call control session stopped",
+      meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), trigger },
+    })
+  }
+}
+
+interface ActiveTwilioMediaStreams {
+  byCallSid: Map<string, TwilioMediaStreamLifecycleSession>
+  byOutboundId: Map<string, TwilioMediaStreamLifecycleSession>
 }
 
 function parseRecordingParams(params: Record<string, string>): RecordingCallbackParams | null {
@@ -1478,6 +3419,13 @@ export async function createTwilioOutboundCall(
   if (request.machineDetection) {
     body.set("MachineDetection", request.machineDetection)
   }
+  if (request.asyncAmd === true) {
+    body.set("AsyncAmd", "true")
+  }
+  if (request.asyncAmdStatusCallbackUrl) {
+    body.set("AsyncAmdStatusCallback", request.asyncAmdStatusCallbackUrl)
+    body.set("AsyncAmdStatusCallbackMethod", "POST")
+  }
   if (request.statusCallbackUrl) {
     body.set("StatusCallback", request.statusCallbackUrl)
     body.set("StatusCallbackMethod", "POST")
@@ -1528,6 +3476,49 @@ function verifyRequest(options: TwilioPhoneBridgeOptions, request: TwilioPhoneBr
   })
 }
 
+async function handleOpenAISipWebhook(
+  options: TwilioPhoneBridgeOptions,
+  request: TwilioPhoneBridgeRequest,
+): Promise<TwilioPhoneBridgeResponse> {
+  const rawBody = bodyText(request.body)
+  const sip = options.openaiSip
+  const webhookSecret = sip?.webhookSecret?.trim()
+  if (!webhookSecret && !sip?.allowUnsignedWebhooks) {
+    emitNervesEvent({
+      level: "warn",
+      component: "senses",
+      event: "senses.voice_openai_sip_webhook_unsigned_rejected",
+      message: "rejected OpenAI SIP webhook because no signing secret is configured",
+      meta: { agentName: options.agentName, path: request.path },
+    })
+    return textResponse(401, "OpenAI SIP webhook signing secret is not configured")
+  }
+  if (webhookSecret && !validateOpenAIWebhookSignature({
+    secret: webhookSecret,
+    headers: request.headers,
+    payload: rawBody,
+  })) {
+    emitNervesEvent({
+      level: "warn",
+      component: "senses",
+      event: "senses.voice_openai_sip_signature_rejected",
+      message: "rejected OpenAI SIP webhook with invalid signature",
+      meta: { agentName: options.agentName, path: request.path },
+    })
+    return textResponse(400, "invalid OpenAI webhook signature")
+  }
+
+  const event = parseOpenAISipWebhookEvent(rawBody)
+  if (!event) return textResponse(400, "invalid OpenAI webhook payload")
+  if (event.type !== "realtime.call.incoming") return textResponse(200, "ok")
+  const metadata = openAISipCallMetadata(event)
+  if (!metadata) return textResponse(400, "missing OpenAI SIP call metadata")
+
+  const session = new OpenAISipPhoneSession(options, metadata)
+  void session.start().catch(() => undefined)
+  return textResponse(200, "ok")
+}
+
 async function handleIncoming(
   options: TwilioPhoneBridgeOptions,
   basePath: string,
@@ -1552,7 +3543,32 @@ async function handleIncoming(
     meta: { agentName: options.agentName, callSid: safeCallSid, sessionKey },
   })
 
+  if (usesOpenAISipConversationEngine(options)) {
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_sip_connect",
+      message: "answering Twilio call by dialing OpenAI SIP",
+      meta: { agentName: options.agentName, callSid: safeCallSid, sessionKey, conversationEngine: "openai-sip" },
+    })
+    return xmlResponse(openAISipDialTwiml(options, openAISipResponseHeaders({
+      Agent: options.agentName,
+      Direction: "inbound",
+      From: params.From,
+      To: params.To,
+    })))
+  }
+
   if (normalizeTwilioPhoneTransportMode(options.transportMode) === "media-stream") {
+    if (usesOpenAIRealtimeConversationEngine(options)) {
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_twilio_media_connect",
+        message: "answering Twilio call with OpenAI Realtime Media Stream",
+        meta: { agentName: options.agentName, callSid: safeCallSid, sessionKey, conversationEngine: "openai-realtime" },
+      })
+      return xmlResponse(mediaStreamTwiml(options, basePath, params))
+    }
+
     try {
       await fs.mkdir(callDir, { recursive: true })
       const transcript = buildVoiceTranscript({
@@ -1751,22 +3767,82 @@ async function handleOutgoing(
     meta: { agentName: options.agentName, callSid: safeCallSid, outboundId: safeSegment(job.outboundId), sessionKey },
   })
 
+  const streamParams = {
+    Direction: "outbound",
+    Remote: to,
+    Line: from,
+    FriendId: friendId,
+    OutboundId: job.outboundId,
+    Reason: job.reason,
+    InitialAudio: encodeVoiceCallAudioCustomParameter(job.initialAudio),
+  }
+
+  if (usesOpenAISipConversationEngine(options)) {
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_sip_connect",
+      message: "answering Twilio outbound call by dialing OpenAI SIP",
+      meta: { agentName: options.agentName, callSid: safeCallSid, outboundId: safeSegment(job.outboundId), sessionKey, conversationEngine: "openai-sip" },
+    })
+    return xmlResponse(openAISipDialTwiml(options, openAISipResponseHeaders({
+      Agent: options.agentName,
+      Direction: "outbound",
+      From: to,
+      To: from,
+    }, {
+      "X-Ouro-Outbound-Id": job.outboundId,
+      "X-Ouro-Friend-Id": friendId,
+      "X-Ouro-Reason": job.reason,
+    })))
+  }
+
   if (normalizeTwilioPhoneTransportMode(options.transportMode) === "media-stream") {
+    if (usesOpenAIRealtimeConversationEngine(options)) {
+      return xmlResponse(mediaStreamTwiml(options, basePath, { From: from, To: to }, undefined, streamParams))
+    }
+
     try {
       await fs.mkdir(callDir, { recursive: true })
+      const greetingJobId = safeSegment(utteranceId)
+      if (job.prewarmedGreeting?.audioPath) {
+        try {
+          const streamJob = jobs.create(safeCallSid, greetingJobId, job.prewarmedGreeting.mimeType)
+          streamJob.append(await fs.readFile(job.prewarmedGreeting.audioPath))
+          streamJob.complete()
+          emitNervesEvent({
+            component: "senses",
+            event: "senses.voice_twilio_greeting_prewarmed",
+            message: "Twilio Media Stream outbound greeting was ready before answer",
+            meta: {
+              agentName: options.agentName,
+              callSid: safeCallSid,
+              outboundId: safeSegment(job.outboundId),
+              utteranceId,
+              byteLength: String(job.prewarmedGreeting.byteLength),
+            },
+          })
+          return xmlResponse(mediaStreamTwiml(options, basePath, { From: from, To: to }, greetingJobId, streamParams))
+        } catch (error) {
+          emitNervesEvent({
+            level: "warn",
+            component: "senses",
+            event: "senses.voice_twilio_greeting_prewarm_unavailable",
+            message: "Twilio Media Stream outbound greeting prewarm could not be used",
+            meta: {
+              agentName: options.agentName,
+              callSid: safeCallSid,
+              outboundId: safeSegment(job.outboundId),
+              utteranceId,
+              error: errorMessage(error),
+            },
+          })
+        }
+      }
       const transcript = buildVoiceTranscript({
         utteranceId,
         text: outboundCallAnsweredPrompt(job, { From: from, To: to }),
         source: "loopback",
       })
-      const greetingJobId = safeSegment(utteranceId)
-      const streamParams = {
-        Direction: "outbound",
-        Remote: to,
-        Line: from,
-        FriendId: friendId,
-        OutboundId: job.outboundId,
-      }
       const streamJob = startTwilioPlaybackStreamJob({
         jobs,
         bridgeOptions: options,
@@ -1809,11 +3885,7 @@ async function handleOutgoing(
         meta: { agentName: options.agentName, callSid: safeCallSid, outboundId: safeSegment(job.outboundId), error: errorMessage(error), transportMode: "media-stream" },
       })
       return xmlResponse(mediaStreamTwiml(options, basePath, { From: from, To: to }, undefined, {
-        Direction: "outbound",
-        Remote: to,
-        Line: from,
-        FriendId: friendId,
-        OutboundId: job.outboundId,
+        ...streamParams,
       }))
     }
   }
@@ -1858,7 +3930,8 @@ async function handleOutgoingStatus(
   const rawStatus = params.CallStatus?.trim() || params.CallStatusCallbackEvent?.trim() || "unknown"
   const callSid = params.CallSid?.trim() || job.transportCallSid
   const answeredBy = params.AnsweredBy?.trim() || undefined
-  const status = nonHumanAnsweredStatus(answeredBy) ?? rawStatus
+  const existingTerminalNonHuman = job.status === "voicemail" || job.status === "fax" ? job.status : undefined
+  const status = nonHumanAnsweredStatus(answeredBy) ?? existingTerminalNonHuman ?? rawStatus
   await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
     status,
     ...(answeredBy ? { answeredBy } : {}),
@@ -1873,6 +3946,60 @@ async function handleOutgoingStatus(
     event: "senses.voice_twilio_outgoing_status",
     message: "Twilio outbound voice call status changed",
     meta: { agentName: options.agentName, callSid: safeSegment(callSid ?? "unknown"), outboundId: safeSegment(job.outboundId), status },
+  })
+  return textResponse(200, "ok")
+}
+
+async function handleOutgoingAmdStatus(
+  options: TwilioPhoneBridgeOptions,
+  outboundId: string,
+  params: Record<string, string>,
+  activeMediaStreams: ActiveTwilioMediaStreams,
+): Promise<TwilioPhoneBridgeResponse> {
+  const job = await readTwilioOutboundCallJob(options.outputDir, outboundId)
+  if (!job) return textResponse(404, "outbound voice call not found")
+  const callSid = params.CallSid?.trim() || job.transportCallSid
+  const answeredBy = params.AnsweredBy?.trim() || "unknown"
+  const nonHumanStatus = nonHumanAnsweredStatus(answeredBy)
+  const status = nonHumanStatus ?? job.status ?? "answered"
+  await updateTwilioOutboundCallJob(options.outputDir, job.outboundId, {
+    status,
+    answeredBy,
+    transportCallSid: callSid,
+    events: [
+      ...(job.events ?? []),
+      { at: new Date().toISOString(), status: nonHumanStatus ? status : `amd-${answeredBy}`, ...(callSid ? { callSid } : {}), answeredBy },
+    ],
+  })
+  if (nonHumanStatus) {
+    const session = activeMediaStreams.byOutboundId.get(job.outboundId)
+      ?? (callSid ? activeMediaStreams.byCallSid.get(callSid) : undefined)
+    session?.end()
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_twilio_outgoing_async_amd_nonhuman",
+      message: "Twilio async AMD reported a non-human outbound answer",
+      meta: {
+        agentName: options.agentName,
+        callSid: safeSegment(callSid ?? "unknown"),
+        outboundId: safeSegment(job.outboundId),
+        answeredBy,
+        status,
+      },
+    })
+    return textResponse(200, "ok")
+  }
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.voice_twilio_outgoing_async_amd",
+    message: "Twilio async AMD reported an outbound answer classification",
+    meta: {
+      agentName: options.agentName,
+      callSid: safeSegment(callSid ?? "unknown"),
+      outboundId: safeSegment(job.outboundId),
+      answeredBy,
+      status,
+    },
   })
   return textResponse(200, "ok")
 }
@@ -2100,11 +4227,35 @@ async function handleAudioStream(
 export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): TwilioPhoneBridge {
   new URL(options.publicBaseUrl)
   const basePath = normalizeTwilioPhoneBasePath(options.basePath)
+  const sipWebhookPath = normalizeTwilioPhoneBasePath(options.openaiSip?.webhookPath ?? openAISipWebhookPath(options.agentName))
   const jobs = new TwilioAudioStreamJobStore()
   const mediaStreams = new WebSocketServer({ noServer: true })
+  const activeMediaStreams: ActiveTwilioMediaStreams = {
+    byCallSid: new Map(),
+    byOutboundId: new Map(),
+  }
 
   mediaStreams.on("connection", (ws) => {
-    const session = new TwilioMediaStreamSession(ws, options, jobs)
+    const lifecycle: {
+      onIdentityChange: (session: TwilioMediaStreamLifecycleSession, identity: { callSid: string; outboundId: string }) => void
+      onClose: (session: TwilioMediaStreamLifecycleSession, identity: { callSid: string; outboundId: string }) => void
+    } = {
+      onIdentityChange: (activeSession, identity) => {
+        if (identity.callSid) activeMediaStreams.byCallSid.set(identity.callSid, activeSession)
+        if (identity.outboundId) activeMediaStreams.byOutboundId.set(identity.outboundId, activeSession)
+      },
+      onClose: (activeSession, identity) => {
+        if (identity.callSid && activeMediaStreams.byCallSid.get(identity.callSid) === activeSession) {
+          activeMediaStreams.byCallSid.delete(identity.callSid)
+        }
+        if (identity.outboundId && activeMediaStreams.byOutboundId.get(identity.outboundId) === activeSession) {
+          activeMediaStreams.byOutboundId.delete(identity.outboundId)
+        }
+      },
+    }
+    const session = usesOpenAIRealtimeConversationEngine(options)
+      ? new TwilioOpenAIRealtimeMediaStreamSession(ws, options, lifecycle)
+      : new TwilioMediaStreamSession(ws, options, jobs, lifecycle)
     session.attach()
   })
 
@@ -2122,7 +4273,14 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
       if (method === "GET" && routePath === `${basePath}/health`) {
         return textResponse(200, "ok")
       }
+      if (method === "GET" && routePath === `${sipWebhookPath}/health`) {
+        return textResponse(200, "ok")
+      }
       if (method !== "POST") return textResponse(405, "method not allowed")
+
+      if (routePath === sipWebhookPath) {
+        return handleOpenAISipWebhook(options, { ...request, path: requestPath })
+      }
 
       const params = formParams(bodyText(request.body))
       if (!verifyRequest(options, { ...request, path: requestPath }, params)) {
@@ -2143,6 +4301,7 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
         const outboundId = outboundIdPart ? decodeSafeSegment(outboundIdPart) : null
         if (!outboundId) return textResponse(404, "not found")
         if (suffix === "status") return handleOutgoingStatus(options, outboundId, params)
+        if (suffix === "amd") return handleOutgoingAmdStatus(options, outboundId, params, activeMediaStreams)
         if (suffix === undefined) return handleOutgoing(options, basePath, outboundId, params, jobs)
       }
       if (routePath === `${basePath}/listen`) return handleListen(options, basePath)

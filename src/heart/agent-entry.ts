@@ -23,8 +23,25 @@ emitNervesEvent({
 // Dynamic import: agent-entry is boot-time wiring that starts a sense process.
 // Using dynamic import avoids a static heart/ -> senses/ dependency.
 import("./runtime-credentials")
-  .then(async ({ refreshRuntimeCredentialConfig }) => {
-    void refreshRuntimeCredentialConfig(agentName, { preserveCachedOnFailure: true }).catch(() => undefined)
+  .then(async ({
+    readMachineRuntimeCredentialConfig,
+    readRuntimeCredentialConfig,
+    refreshMachineRuntimeCredentialConfig,
+    refreshRuntimeCredentialConfig,
+    waitForRuntimeCredentialBootstrap,
+  }) => {
+    await waitForRuntimeCredentialBootstrap(agentName)
+    if (!readRuntimeCredentialConfig(agentName).ok) {
+      void refreshRuntimeCredentialConfig(agentName, { preserveCachedOnFailure: true }).catch(() => undefined)
+    }
+    if (!readMachineRuntimeCredentialConfig(agentName).ok) {
+      void import("./machine-identity")
+        .then(({ loadOrCreateMachineIdentity }) => {
+          const machine = loadOrCreateMachineIdentity()
+          return refreshMachineRuntimeCredentialConfig(agentName, machine.machineId, { preserveCachedOnFailure: true })
+        })
+        .catch(() => undefined)
+    }
     const { startInnerDialogWorker } = await import("../senses/inner-dialog-worker")
     await startInnerDialogWorker()
   })

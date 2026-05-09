@@ -9,19 +9,45 @@ import { emitNervesEvent } from "../nerves/runtime";
 import * as path from "path";
 import type { AttentionItem } from "../arc/attention-types";
 import { placeTrustedFriendVoiceOutboundCall } from "../senses/voice/outbound";
-import type { ToolDefinition } from "./tools-base";
+import type { ToolDefinition, VoiceCallAudioRequest } from "./tools-base";
 
 type SurfaceDeliveryChannel = "auto" | "voice"
 
 interface SurfaceDeliveryHint {
   channel?: SurfaceDeliveryChannel
   phoneNumber?: string
+  initialAudio?: VoiceCallAudioRequest
 }
 
 function normalizeSurfaceDeliveryChannel(value: unknown): SurfaceDeliveryChannel {
   if (typeof value !== "string") return "auto"
   const normalized = value.trim().toLowerCase()
   return normalized === "voice" ? "voice" : "auto"
+}
+
+function parseSurfaceVoiceInitialAudio(args: Record<string, string>): VoiceCallAudioRequest | undefined {
+  const source = args.voiceAudioSource === "url" || args.voiceAudioSource === "file" || args.voiceAudioSource === "tone"
+    ? args.voiceAudioSource
+    : undefined
+  const hasAudioHint = Boolean(
+    source
+    || args.voiceAudioUrl?.trim()
+    || args.voiceAudioPath?.trim()
+    || args.voiceAudioLabel?.trim()
+    || args.voiceAudioToneHz?.trim()
+    || args.voiceAudioDurationMs?.trim(),
+  )
+  if (!hasAudioHint) return undefined
+  const toneHz = args.voiceAudioToneHz?.trim() ? Number(args.voiceAudioToneHz) : undefined
+  const durationMs = args.voiceAudioDurationMs?.trim() ? Number(args.voiceAudioDurationMs) : undefined
+  return {
+    source: source ?? "tone",
+    ...(args.voiceAudioUrl?.trim() ? { url: args.voiceAudioUrl.trim() } : {}),
+    ...(args.voiceAudioPath?.trim() ? { path: args.voiceAudioPath.trim() } : {}),
+    ...(args.voiceAudioLabel?.trim() ? { label: args.voiceAudioLabel.trim() } : {}),
+    ...(Number.isFinite(toneHz) ? { toneHz } : {}),
+    ...(Number.isFinite(durationMs) ? { durationMs } : {}),
+  }
 }
 
 // Surface tool schema — canonical home. Handler lives in senses/surface-tool.ts.
@@ -55,6 +81,31 @@ export const surfaceToolDef: OpenAI.ChatCompletionFunctionTool = {
           type: "string",
           description: "optional E.164 phone override for channel=voice when the trusted friend's record has no usable phone handle",
         },
+        voiceAudioSource: {
+          type: "string",
+          enum: ["tone", "url", "file"],
+          description: "optional initial non-speech audio to play after the opening greeting when channel=voice",
+        },
+        voiceAudioUrl: {
+          type: "string",
+          description: "short audio URL for voiceAudioSource=url",
+        },
+        voiceAudioPath: {
+          type: "string",
+          description: "local audio file path for voiceAudioSource=file",
+        },
+        voiceAudioLabel: {
+          type: "string",
+          description: "short label for the initial voice audio",
+        },
+        voiceAudioToneHz: {
+          type: "number",
+          description: "tone frequency for voiceAudioSource=tone",
+        },
+        voiceAudioDurationMs: {
+          type: "number",
+          description: "initial audio duration in milliseconds",
+        },
       },
       required: ["content"],
     },
@@ -70,6 +121,7 @@ export const surfaceToolDefinition: ToolDefinition = {
     const deliveryHint: SurfaceDeliveryHint = {
       channel: normalizeSurfaceDeliveryChannel(args.channel),
       phoneNumber: typeof args.phoneNumber === "string" ? args.phoneNumber : undefined,
+      initialAudio: parseSurfaceVoiceInitialAudio(args),
     }
     if (containsInternalMetaMarkers(rawContent)) {
       emitNervesEvent({
@@ -120,6 +172,7 @@ export const surfaceToolDefinition: ToolDefinition = {
             friendId,
             reason: content,
             phoneNumber: hint.phoneNumber,
+            ...(hint.initialAudio ? { initialAudio: hint.initialAudio } : {}),
           })
           return voiceResult.status === "placed"
             ? { status: "delivered", detail: voiceResult.detail }

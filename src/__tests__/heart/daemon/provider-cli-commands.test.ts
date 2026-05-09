@@ -1354,6 +1354,9 @@ describe("provider CLI command execution", () => {
     const result = await runOuroCli(["connect", "voice", "--agent", "Slugger"], makeCliDeps(homeDir, bundlesRoot))
 
     expect(result).toContain("Voice foundation for Slugger")
+    expect(result).toContain("voice.openaiSipProjectId")
+    expect(result).toContain("voice.openaiSipWebhookSecret")
+    expect(result).toContain("/voice/agents/slugger/sip/openai")
     expect(result).toContain("integrations.elevenLabsApiKey")
     expect(result).toContain("integrations.elevenLabsVoiceId")
     expect(result).toContain("voice.whisperCliPath")
@@ -1362,7 +1365,7 @@ describe("provider CLI command execution", () => {
     expect(result).toContain("voice.twilioTransportMode")
     expect(result).toContain("voice.twilioPlaybackMode")
     expect(result).toContain("/voice/agents/slugger/twilio")
-    expect(result).toContain("media-stream for bidirectional low-latency calls")
+    expect(result).toContain("Phone testing should use SIP when the carrier can route it")
   })
 
   it("uses a safe fallback segment in Voice setup guidance for punctuation-only agent names", async () => {

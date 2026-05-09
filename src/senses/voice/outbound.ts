@@ -2,6 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { isTrustedLevel, type FriendRecord } from "../../mind/friends/types"
 import { normalizeTwilioE164PhoneNumber } from "./phone"
+import type { VoiceCallAudioRequest } from "../../repertoire/tools-base"
 
 export interface VoiceOutboundCallRequest {
   agentName: string
@@ -9,6 +10,7 @@ export interface VoiceOutboundCallRequest {
   friendId: string
   reason: string
   phoneNumber?: string
+  initialAudio?: VoiceCallAudioRequest
 }
 
 export type VoiceOutboundCallResult =
@@ -105,6 +107,7 @@ export async function placeTrustedFriendVoiceOutboundCall(
       friendId: friend.id,
       to: phoneNumber,
       reason: request.reason,
+      ...(request.initialAudio ? { initialAudio: request.initialAudio } : {}),
     })
     return {
       status: "placed",

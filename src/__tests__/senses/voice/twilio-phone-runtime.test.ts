@@ -56,6 +56,9 @@ function fakeDeps(runtimeConfig: Record<string, unknown>, machineConfig: Record<
 }
 
 function fakeOutboundDeps(runtimeConfig: Record<string, unknown>, machineConfig: Record<string, unknown>): TwilioPhoneOutboundCallRuntimeDeps {
+  const tts: VoiceTtsService = {
+    synthesize: vi.fn(),
+  }
   return {
     waitForRuntimeCredentialBootstrap: vi.fn(async () => undefined),
     loadMachineIdentity: vi.fn(() => ({
@@ -69,6 +72,34 @@ function fakeOutboundDeps(runtimeConfig: Record<string, unknown>, machineConfig:
     refreshMachineRuntimeConfig: vi.fn(async () => runtimeReadResult(machineConfig)),
     readRuntimeConfig: vi.fn(() => runtimeReadResult(runtimeConfig)),
     readMachineRuntimeConfig: vi.fn(() => runtimeReadResult(machineConfig)),
+    createTts: vi.fn(() => tts),
+    runVoiceLoopbackTurn: vi.fn(async () => ({
+      responseText: "hey Ari, it is Slugger",
+      ponderDeferred: false,
+      tts: {
+        status: "delivered",
+        audio: Buffer.from("ulaw-ready"),
+        byteLength: Buffer.byteLength("ulaw-ready"),
+        chunkCount: 1,
+        mimeType: "audio/x-mulaw;rate=8000",
+        modelId: "eleven_flash_v2_5",
+        voiceId: "voice_123",
+      },
+      speechSegments: [],
+      speechDeliveryErrors: [],
+    })),
+    writeVoicePlaybackArtifact: vi.fn(async (request) => {
+      const audioPath = path.join(request.outputDir, `${request.utteranceId}.audio`)
+      await fs.mkdir(request.outputDir, { recursive: true })
+      await fs.writeFile(audioPath, request.delivery.audio)
+      return {
+        status: "written",
+        audioPath,
+        byteLength: request.delivery.byteLength,
+        mimeType: request.delivery.mimeType,
+        playbackAttempted: false,
+      }
+    }),
     createOutboundCall: vi.fn(async () => ({ callSid: "CAOUT", status: "queued" })),
   }
 }
@@ -147,6 +178,178 @@ describe("Twilio phone transport runtime", () => {
     })
   })
 
+  it("resolves OpenAI Realtime phone voice without requiring cascade STT/TTS credentials", () => {
+    const resolution = resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        integrations: {
+          openaiEmbeddingsApiKey: "openai-compat-key",
+        },
+        voice: {
+          twilioAccountSid: "AC123",
+          twilioAuthToken: "twilio-secret",
+          twilioFromNumber: "+15557654321",
+          openaiRealtimeVoice: "cedar",
+          openaiRealtimeVadThreshold: "0.64",
+        },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioBasePath: "/voice/agents/slugger/twilio",
+          twilioTransportMode: "media-stream",
+          twilioConversationEngine: "openai-realtime",
+          openaiRealtimeModel: "gpt-realtime-2",
+          openaiRealtimeVoice: "marin",
+          openaiRealtimeReasoningEffort: "low",
+          openaiRealtimeNoiseReduction: "near_field",
+          openaiRealtimeVadSilenceDurationMs: "420",
+          openaiRealtimeVadPrefixPaddingMs: 300,
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })
+
+    expect(resolution).toMatchObject({
+      status: "configured",
+      settings: {
+        conversationEngine: "openai-realtime",
+        transportMode: "media-stream",
+        elevenLabsApiKey: "",
+        elevenLabsVoiceId: "",
+        whisperCliPath: "",
+        whisperModelPath: "",
+        openaiRealtime: {
+          apiKey: "openai-compat-key",
+          apiKeySource: "integrations.openaiEmbeddingsApiKey",
+          model: "gpt-realtime-2",
+          voice: "cedar",
+          reasoningEffort: "low",
+          noiseReduction: "near_field",
+          turnDetection: {
+            threshold: 0.64,
+            prefixPaddingMs: 300,
+            silenceDurationMs: 420,
+          },
+        },
+      },
+    })
+  })
+
+  it("requires Media Streams and an OpenAI key for the Realtime phone engine", () => {
+    expect(() => resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        voice: { openaiRealtimeApiKey: "openai-secret" },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioTransportMode: "record-play",
+          twilioConversationEngine: "openai-realtime",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })).toThrow("voice.twilioConversationEngine=openai-realtime requires voice.twilioTransportMode=media-stream")
+
+    expect(() => resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {},
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioTransportMode: "media-stream",
+          twilioConversationEngine: "openai-realtime",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })).toThrow("missing voice.openaiRealtimeApiKey")
+  })
+
+  it("resolves OpenAI SIP phone voice without requiring cascade STT/TTS credentials", () => {
+    const resolution = resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        voice: {
+          twilioAccountSid: "AC123",
+          twilioAuthToken: "twilio-secret",
+          twilioFromNumber: "+15557654321",
+          openaiRealtimeApiKey: "openai-secret",
+          openaiSipProjectId: "proj_test",
+          openaiSipWebhookSecret: "whsec_test",
+        },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioBasePath: "/voice/agents/slugger/twilio",
+          twilioTransportMode: "media-stream",
+          twilioConversationEngine: "openai-sip",
+          openaiRealtimeModel: "gpt-realtime-2",
+          openaiRealtimeVoice: "cedar",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })
+
+    expect(resolution).toMatchObject({
+      status: "configured",
+      settings: {
+        conversationEngine: "openai-sip",
+        transportMode: "media-stream",
+        elevenLabsApiKey: "",
+        elevenLabsVoiceId: "",
+        whisperCliPath: "",
+        whisperModelPath: "",
+        openaiRealtime: {
+          apiKey: "openai-secret",
+          apiKeySource: "voice.openaiRealtimeApiKey",
+          model: "gpt-realtime-2",
+          voice: "cedar",
+        },
+        openaiSip: {
+          projectId: "proj_test",
+          webhookPath: "/voice/agents/slugger/sip/openai",
+          webhookSecret: "whsec_test",
+        },
+        openaiSipWebhookUrl: "https://voice.example.test/voice/agents/slugger/sip/openai",
+      },
+    })
+  })
+
+  it("requires an OpenAI project id and webhook secret for the SIP phone engine", () => {
+    expect(() => resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        voice: { openaiRealtimeApiKey: "openai-secret" },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioConversationEngine: "openai-sip",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })).toThrow("missing voice.openaiSipProjectId")
+
+    expect(() => resolveTwilioPhoneTransportRuntime({
+      agentName: "slugger",
+      runtimeConfig: {
+        voice: {
+          openaiRealtimeApiKey: "openai-secret",
+          openaiSipProjectId: "proj_test",
+        },
+      },
+      machineConfig: {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioConversationEngine: "openai-sip",
+        },
+      },
+      defaultBasePath: "/voice/agents/ignored/twilio",
+    })).toThrow("missing voice.openaiSipWebhookSecret")
+  })
+
   it("places configured outbound phone calls through the Twilio transport", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-twilio-runtime-"))
     try {
@@ -164,6 +367,7 @@ describe("Twilio phone transport runtime", () => {
         reason: "check in about the phone alpha",
         outboundId: "outbound-test",
         now: new Date("2026-05-08T12:00:00.000Z"),
+        initialAudio: { source: "tone", label: "hello tone", toneHz: 440, durationMs: 80 },
       }, deps)
 
       expect(result).toMatchObject({
@@ -181,13 +385,28 @@ describe("Twilio phone transport runtime", () => {
         twimlUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test",
         statusCallbackUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test/status",
         machineDetection: "Enable",
+        asyncAmd: true,
+        asyncAmdStatusCallbackUrl: "https://voice.example.test/voice/agents/slugger/twilio/outgoing/outbound-test/amd",
       })
-      const saved = JSON.parse(await fs.readFile(path.join(outputDir, "outbound", "outbound-test.json"), "utf8")) as { status?: string; transportCallSid?: string; reason?: string }
+      expect(deps.waitForRuntimeCredentialBootstrap).not.toHaveBeenCalled()
+      expect(deps.refreshRuntimeConfig).not.toHaveBeenCalled()
+      expect(deps.refreshMachineRuntimeConfig).not.toHaveBeenCalled()
+      expect(deps.runVoiceLoopbackTurn).toHaveBeenCalledWith(expect.objectContaining({
+        agentName: "slugger",
+        friendId: "ari",
+        sessionKey: "twilio-phone-ari-via-15557654321",
+      }))
+      const saved = JSON.parse(await fs.readFile(path.join(outputDir, "outbound", "outbound-test.json"), "utf8")) as { status?: string; transportCallSid?: string; reason?: string; initialAudio?: unknown; prewarmedGreeting?: { audioPath?: string; mimeType?: string } }
       expect(saved).toMatchObject({
         status: "queued",
         transportCallSid: "CAOUT",
         reason: "check in about the phone alpha",
+        initialAudio: { source: "tone", label: "hello tone", toneHz: 440, durationMs: 80 },
+        prewarmedGreeting: {
+          mimeType: "audio/x-mulaw;rate=8000",
+        },
       })
+      expect(saved.prewarmedGreeting?.audioPath).toContain("outbound-greetings/outbound-test")
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true })
     }
@@ -554,6 +773,44 @@ describe("Twilio phone transport runtime", () => {
     }))
     expect(deps.startBridgeServer).toHaveBeenCalledWith(expect.objectContaining({
       transportMode: "media-stream",
+    }))
+  })
+
+  it("starts OpenAI Realtime phone transports without cascade clients", async () => {
+    const deps = fakeDeps(
+      {
+        integrations: {
+          openaiApiKey: "openai-secret",
+        },
+      },
+      {
+        voice: {
+          twilioPublicUrl: "https://voice.example.test",
+          twilioTransportMode: "media-stream",
+          twilioConversationEngine: "openai-realtime",
+          openaiRealtimeModel: "gpt-realtime-2",
+          openaiRealtimeVoice: "marin",
+        },
+      },
+    )
+
+    const result = await startConfiguredTwilioPhoneTransport({
+      agentName: "slugger",
+      defaultBasePath: agentScopedTwilioPhoneBasePath("slugger"),
+    }, deps)
+
+    expect(result.status).toBe("started")
+    expect(deps.createTranscriber).not.toHaveBeenCalled()
+    expect(deps.createTts).not.toHaveBeenCalled()
+    expect(deps.startBridgeServer).toHaveBeenCalledWith(expect.objectContaining({
+      transportMode: "media-stream",
+      conversationEngine: "openai-realtime",
+      openaiRealtime: expect.objectContaining({
+        apiKey: "openai-secret",
+        apiKeySource: "integrations.openaiApiKey",
+        model: "gpt-realtime-2",
+        voice: "marin",
+      }),
     }))
   })
 

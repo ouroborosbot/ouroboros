@@ -626,6 +626,10 @@ describe("send_message tool", () => {
       channel: "voice",
       key: "twilio-phone-ari-via-15551234567",
       content: "call Ari and say hello",
+      voiceAudioSource: "tone",
+      voiceAudioLabel: "hello tone",
+      voiceAudioToneHz: "440",
+      voiceAudioDurationMs: "80",
     })
 
     expect(result.toLowerCase()).toContain("delivered now")
@@ -635,6 +639,12 @@ describe("send_message tool", () => {
       friendId: "friend-uuid-1",
       to: "+15551234567",
       reason: "call Ari and say hello",
+      initialAudio: {
+        source: "tone",
+        label: "hello tone",
+        toneHz: 440,
+        durationMs: 80,
+      },
     })
     expect(fs.writeFileSync).not.toHaveBeenCalled()
   })
