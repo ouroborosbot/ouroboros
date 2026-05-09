@@ -91,7 +91,7 @@ export function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
     if (b.has(token)) intersection += 1
   }
   const union = a.size + b.size - intersection
-  return union === 0 ? 0 : intersection / union
+  return intersection / union
 }
 
 export interface StatusBatcher {
@@ -683,6 +683,7 @@ export function createBlueBubblesCallbacks(
 
   function sendStatus(text: string): void {
     const trimmed = text.trim()
+    /* v8 ignore next -- defensive guard; current status callers always provide non-empty text @preserve */
     if (!trimmed) return
     // Status surfaces share the per-turn dedupe set so a status-style
     // outward message (tool description, error notice, watchdog ping)

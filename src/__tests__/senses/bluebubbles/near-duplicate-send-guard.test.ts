@@ -163,6 +163,26 @@ describe("BlueBubbles near-duplicate outward send guard (post-#699 evt-001814/00
 
     await callbacks.finish()
   })
+
+  it("does not compare a later long reply against previous short-token sends", async () => {
+    const { client, sendText } = makeStubClient()
+    const callbacks = createBlueBubblesCallbacks(client as never, CHAT, TOP_LEVEL_REPLY_TARGET, false)
+
+    callbacks.onModelStart()
+
+    callbacks.onTextChunk("ok")
+    await callbacks.flushNow!()
+
+    const LONG_REPLY = "ok — the plan is check coverage fix branch and then rerun verification"
+    callbacks.onTextChunk(LONG_REPLY)
+    await callbacks.flush()
+
+    const sends = sendText.mock.calls.map((call) => call[0]?.text)
+    expect(sends).toContain("ok")
+    expect(sends).toContain(LONG_REPLY)
+
+    await callbacks.finish()
+  })
 })
 
 describe("BlueBubbles status surface dedupe (post-#699 evt-001820/001821/001823)", () => {
@@ -225,6 +245,10 @@ describe("near-duplicate similarity primitives", () => {
     expect(tokens.has("looked")).toBe(true)
     expect(tokens.has("amc's")).toBe(true)
     expect(tokens.has("—")).toBe(false)
+  })
+
+  it("returns an empty token set for punctuation-only text", () => {
+    expect(tokenizeForDedupe("— … !!!").size).toBe(0)
   })
 
   it("reports high similarity for near-duplicate answer rephrasings", () => {
