@@ -686,6 +686,87 @@ describe("Twilio phone voice bridge", () => {
     }
   }, 20_000)
 
+  it("releases outbound SIP greetings on AMD unknown when Realtime heard a short human greeting", async () => {
+    const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-openai-sip-amd-unknown-human-"))
+    const openai = startOpenAISipMock("call_unknown_human")
+    try {
+      await writeTwilioOutboundCallJob(outputDir, {
+        schemaVersion: 1,
+        outboundId: "out-sip-unknown-human",
+        agentName: "slugger",
+        friendId: "ari",
+        to: "+15551234567",
+        from: "+15557654321",
+        reason: "quick voice check",
+        createdAt: "2026-05-08T12:00:00.000Z",
+        status: "requested",
+      })
+      const bridge = createTwilioPhoneBridge({
+        ...baseBridgeOptions(outputDir),
+        conversationEngine: "openai-sip",
+        openaiRealtime: { apiKey: "openai-secret", model: "gpt-realtime-2", voice: "cedar" },
+        openaiSip: {
+          projectId: "proj_test",
+          webhookPath: "/voice/agents/slugger/sip/openai",
+          allowUnsignedWebhooks: true,
+          apiBaseUrl: "https://api.openai.test/v1",
+          websocketBaseUrl: openai.websocketBaseUrl,
+          fetch: openai.openaiFetch,
+        },
+      })
+      await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-sip-unknown-human",
+        headers: {},
+        body: formBody({ CallSid: "CATWILIOUNKNOWN", From: "+15557654321", To: "+15551234567" }),
+      })
+      const sipResponse = await bridge.handle({
+        method: "POST",
+        path: "/voice/agents/slugger/sip/openai",
+        headers: {},
+        body: JSON.stringify({
+          type: "realtime.call.incoming",
+          data: {
+            call_id: "call_unknown_human",
+            sip_headers: [
+              { name: "X-Ouro-Direction", value: "outbound" },
+              { name: "X-Ouro-From", value: "+15551234567" },
+              { name: "X-Ouro-To", value: "+15557654321" },
+              { name: "X-Ouro-Friend-Id", value: "ari" },
+              { name: "X-Ouro-Outbound-Id", value: "out-sip-unknown-human" },
+              { name: "X-Ouro-Reason", value: "quick voice check" },
+            ],
+          },
+        }),
+      })
+      expect(sipResponse.statusCode).toBe(200)
+      await vi.waitFor(() => expect(openai.openaiRequests.some((request) => request.input.endsWith("/realtime/calls/call_unknown_human/accept"))).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(openai.openaiSockets.length).toBe(1), { timeout: 10_000 })
+      await new Promise((resolve) => setTimeout(resolve, 25))
+      expect(openai.openaiMessages.some((event) => event.type === "response.create")).toBe(false)
+
+      openai.openaiSockets[0]?.send(JSON.stringify({
+        type: "conversation.item.input_audio_transcription.completed",
+        transcript: "hello?",
+      }))
+      const amd = await bridge.handle({
+        method: "POST",
+        path: "/voice/twilio/outgoing/out-sip-unknown-human/amd",
+        headers: {},
+        body: formBody({ CallSid: "CATWILIOUNKNOWN", AnsweredBy: "unknown" }),
+      })
+      expect(amd.statusCode).toBe(200)
+      await vi.waitFor(() => expect(openai.openaiMessages.some((event) => event.type === "response.create")).toBe(true), { timeout: 10_000 })
+      expect(openai.openaiRequests.some((request) => request.input.endsWith("/realtime/calls/call_unknown_human/hangup"))).toBe(false)
+      const saved = JSON.parse(await fs.readFile(twilioOutboundCallJobPath(outputDir, "out-sip-unknown-human"), "utf8")) as { status?: string; answeredBy?: string }
+      expect(saved.status).toBe("answered")
+      expect(saved.answeredBy).toBe("unknown")
+    } finally {
+      await openai.close()
+      await fs.rm(outputDir, { recursive: true, force: true })
+    }
+  }, 20_000)
+
   it("hangs up outbound SIP calls silently when async AMD reports voicemail", async () => {
     const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "ouro-openai-sip-amd-machine-"))
     const openai = startOpenAISipMock("call_machine")

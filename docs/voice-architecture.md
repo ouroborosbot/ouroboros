@@ -109,6 +109,11 @@ Current implementation:
   signature, accepts the call, opens the Realtime control WebSocket, sends the
   first voice turn, records transcripts, runs voice tools, and maps
   `voice_end_call` to OpenAI's call hangup endpoint.
+- Outbound SIP holds the first greeting and disables Realtime auto-response
+  while async AMD is pending. Explicit human AMD releases the greeting; machine
+  or fax hangs up silently. If Twilio returns `unknown`, a short human-like
+  Realtime transcript such as "hello" can release the greeting, while silence
+  still times out without leaving voicemail.
 - Direct SIP can render short `voice_play_audio source=tone` cues through the
   Realtime model. Arbitrary URL/file clip bytes still need a real mixer or media
   bridge, most likely a Twilio Conference/SIP mixer using conference

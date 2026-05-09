@@ -1668,6 +1668,16 @@ function transcriptMessageText(messages: OpenAI.ChatCompletionMessageParam[]): s
   ].join("\n")
 }
 
+function looksLikeShortHumanPhoneGreeting(transcript: string): boolean {
+  const normalized = transcript.trim().toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ")
+  if (!normalized) return false
+  const words = normalized.split(/\s+/).filter(Boolean)
+  if (words.length === 0 || words.length > 6) return false
+  const text = words.join(" ")
+  if (/\b(voicemail|mailbox|unavailable|leave|message|reached|record)\b/.test(text)) return false
+  return /^(hi|hello|hey|yo|yes|yeah|yep|ari|slugger)(\b|$)/.test(text)
+}
+
 async function readOptionalText(filePath: string, maxChars: number): Promise<string> {
   try {
     const text = (await fs.readFile(filePath, "utf8")).trim()
@@ -2518,6 +2528,7 @@ class OpenAISipPhoneSession {
   private initialGreetingSent = false
   private outboundAmdState: "not_needed" | "pending" | "human" | "nonhuman" | "timeout" = "not_needed"
   private outboundAmdGreetingTimer: ReturnType<typeof setTimeout> | null = null
+  private outboundAmdHumanGreetingCandidate = false
   private autoResponsesSuppressedForAmd = false
   private openaiWs: WebSocket | null = null
   private toolContext: ToolContext | undefined
@@ -2915,6 +2926,22 @@ class OpenAISipPhoneSession {
     }
   }
 
+  private recordOutboundAmdTranscriptCandidate(transcript: string): void {
+    if (this.outboundAmdState !== "pending") return
+    if (!looksLikeShortHumanPhoneGreeting(transcript)) return
+    this.outboundAmdHumanGreetingCandidate = true
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_openai_sip_amd_human_candidate",
+      message: "OpenAI SIP outbound AMD saw a short human-like greeting while waiting for Twilio classification",
+      meta: {
+        agentName: this.options.agentName,
+        callId: safeSegment(this.metadata.callId),
+        outboundId: safeSegment(this.metadata.outboundId || "unknown"),
+      },
+    })
+  }
+
   handleAsyncAmd(answeredBy: string, nonHumanStatus?: "voicemail" | "fax"): void {
     if (this.metadata.direction !== "outbound" || !this.metadata.outboundId) return
     if (nonHumanStatus) {
@@ -2935,17 +2962,29 @@ class OpenAISipPhoneSession {
       void this.hangup("amd_nonhuman")
       return
     }
-    if (answeredBy.trim().toLowerCase() !== "human") return
+    const normalizedAnsweredBy = answeredBy.trim().toLowerCase()
+    if (normalizedAnsweredBy !== "human") {
+      if (normalizedAnsweredBy === "unknown" && this.outboundAmdHumanGreetingCandidate) {
+        this.releaseOutboundAmdGreeting("amd_unknown_human_candidate")
+      }
+      return
+    }
+    this.releaseOutboundAmdGreeting("amd_human")
+  }
+
+  private releaseOutboundAmdGreeting(trigger: string): void {
+    if (this.outboundAmdState === "nonhuman" || this.outboundAmdState === "timeout") return
     this.outboundAmdState = "human"
     this.clearOutboundAmdGreetingTimeout()
     emitNervesEvent({
       component: "senses",
       event: "senses.voice_openai_sip_amd_human",
-      message: "OpenAI SIP outbound greeting released after async AMD reported a human answer",
+      message: "OpenAI SIP outbound greeting released after human AMD evidence",
       meta: {
         agentName: this.options.agentName,
         callId: safeSegment(this.metadata.callId),
         outboundId: safeSegment(this.metadata.outboundId),
+        trigger,
       },
     })
     this.resumeAfterHumanAmdIfNeeded()
@@ -3060,6 +3099,7 @@ class OpenAISipPhoneSession {
     }
     const type = typeof event.type === "string" ? event.type : ""
     if (type === "conversation.item.input_audio_transcription.completed" && typeof event.transcript === "string") {
+      this.recordOutboundAmdTranscriptCandidate(event.transcript)
       this.appendTranscript("user", event.transcript)
       return
     }
