@@ -4,9 +4,12 @@
     {
       "version": "0.1.0-alpha.576",
       "changes": [
-        "Voice loopback turns now run on a live latency profile that keeps the local transcript/session path intact while skipping pre-model kept-note judging for synchronous audio conversations.",
-        "Live voice turns no longer block audible responses on bundle git pull/push work, so phone TTS can begin as soon as the agent produces `speak` or `settle` text instead of waiting for remote sync.",
-        "Twilio Media Stream VAD now uses a tighter default end-of-speech window, shaving response delay while preserving barge-in and stable voice-session behavior."
+        "Twilio phone voice can now route live phone-number calls through OpenAI SIP, with Ouro owning the Realtime control socket, transcript persistence, voice tools, and hangup policy under the canonical Voice sense.",
+        "Slugger's Realtime phone voice now supports agent-scoped style and speed config so the first audible SIP greeting carries the current spoken identity instead of a generic provider voice.",
+        "Outbound SIP calls now hold Realtime auto-response while Twilio async AMD is pending, release on human evidence, and hang up silently on voicemail/fax or unanswered AMD timeouts.",
+        "Direct SIP voice sessions expose `voice_play_audio` for short model-rendered tone cues while reporting that URL/file clip byte injection needs a later media-bridge transport.",
+        "Voice pending delivery now expires stale live-call residue before model injection so old phone scripts or superseded voice identity notes cannot surprise a fresh call.",
+        "Live voice turns run on a live latency profile, avoid blocking audible responses on bundle sync, and use tighter Media Stream VAD defaults for synchronous conversations."
       ]
     },
     {
@@ -53,17 +56,19 @@
     {
       "version": "0.1.0-alpha.570",
       "changes": [
+        "Twilio phone voice now defaults to a shorter record timeout and can prebuffer the initial streamed greeting so inbound calls keep ringing briefly until first audio is ready.",
         "Twilio phone voice now has an optional `media-stream` transport mode under the same Voice sense, using bidirectional Twilio Media Streams, VAD-framed caller utterances, Whisper.cpp utterance WAVs, stable voice sessions, and ElevenLabs `ulaw_8000` chunks back to the call.",
         "Media Streams playback now sends Twilio `clear` when the caller speaks during agent audio and queues the utterance as an interruption/follow-up instead of losing it.",
-        "Voice prompt/runtime guidance now tells agents to prioritize interrupted or follow-up caller utterances and keep spoken tool-required deliveries short enough for synchronous conversation."
+        "Voice prompt/runtime guidance now tells agents to prioritize interrupted or follow-up caller utterances, answer early with `speak`, and keep spoken tool-required deliveries short enough for synchronous conversation.",
+        "Twilio streaming playback now serves a valid silent MP3 fallback for pre-audio failures and treats client disconnects as clean call-stream endings instead of escalating them into application errors."
       ]
     },
     {
       "version": "0.1.0-alpha.569",
       "changes": [
-        "Twilio phone voice now defaults to a shorter record timeout and can prebuffer the initial streamed greeting so inbound calls keep ringing briefly until first audio is ready.",
-        "Voice prompt and tool-contract guidance now tell agents to behave like live callers are waiting: answer early, keep spoken `speak`/`settle` deliveries short, and use `speak` before slower tool work.",
-        "Twilio streaming playback now serves a valid silent MP3 fallback for pre-audio failures and treats client disconnects as clean call-stream endings instead of escalating them into application errors."
+        "BlueBubbles ordinary chat turns no longer trigger external-state proof retry loops merely because the inbound text populated currentObligation.",
+        "BlueBubbles now suppresses duplicate normalized outward text within a single inbound turn across flush and flushNow delivery paths, preventing retry loops from sending repeated iMessages.",
+        "Regression coverage locks the 2026-05-08 duplicate outward-send incident while preserving distinct same-turn replies and per-turn re-sends."
       ]
     },
     {
