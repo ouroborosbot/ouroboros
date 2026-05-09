@@ -79,6 +79,8 @@ export interface TwilioPhoneTransportRuntimeOverrides {
   openaiRealtimeApiKey?: string
   openaiRealtimeModel?: string
   openaiRealtimeVoice?: string
+  openaiRealtimeVoiceStyle?: string
+  openaiRealtimeVoiceSpeed?: number
   openaiRealtimeWebsocketUrl?: string
   openaiRealtimeReasoningEffort?: OpenAIRealtimeTwilioOptions["reasoningEffort"]
   openaiRealtimeNoiseReduction?: OpenAIRealtimeTwilioOptions["noiseReduction"]
@@ -455,6 +457,12 @@ export function resolveTwilioPhoneTransportRuntime(
       voice: trimOptional(overrides.openaiRealtimeVoice)
         ?? configString(options.runtimeConfig, "voice.openaiRealtimeVoice")
         ?? configString(options.machineConfig, "voice.openaiRealtimeVoice"),
+      voiceStyle: trimOptional(overrides.openaiRealtimeVoiceStyle)
+        ?? configString(options.runtimeConfig, "voice.openaiRealtimeVoiceStyle")
+        ?? configString(options.machineConfig, "voice.openaiRealtimeVoiceStyle"),
+      voiceSpeed: overrides.openaiRealtimeVoiceSpeed
+        ?? configNumber(options.runtimeConfig, "voice.openaiRealtimeVoiceSpeed")
+        ?? configNumber(options.machineConfig, "voice.openaiRealtimeVoiceSpeed"),
       websocketUrl: trimOptional(overrides.openaiRealtimeWebsocketUrl)
         ?? configString(options.machineConfig, "voice.openaiRealtimeWebsocketUrl")
         ?? configString(options.runtimeConfig, "voice.openaiRealtimeWebsocketUrl"),

@@ -51,8 +51,10 @@ See [Voice Architecture](voice-architecture.md) for the fuller transport model.
 - Spoken voice is part of agent identity. Keep one current spoken identity per
   voice transport family instead of presenting multiple provider voices as
   equally canonical. Native Realtime phone should use `voice.openaiRealtimeVoice`
-  as the current phone voice; ElevenLabs remains a legacy cascade compatibility
-  path unless it earns a distinct non-redundant role.
+  as the current phone voice, `voice.openaiRealtimeVoiceStyle` as the spoken
+  identity target, and `voice.openaiRealtimeVoiceSpeed` only for small cadence
+  nudges; ElevenLabs remains a legacy cascade compatibility path unless it earns
+  a distinct non-redundant role.
 - Twilio phone: `record-play` mode keeps the conservative call webhook ->
   record -> Whisper.cpp -> stable voice session -> tool-delivered text ->
   ElevenLabs -> Twilio Play smoke path. `media-stream` mode uses the same

@@ -162,6 +162,8 @@ export interface OpenAIRealtimeTwilioOptions {
   apiKeySource?: string
   model?: string
   voice?: string
+  voiceStyle?: string
+  voiceSpeed?: number
   websocketUrl?: string
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh"
   noiseReduction?: "near_field" | "far_field" | "none"
@@ -1348,6 +1350,8 @@ const OPENAI_REALTIME_DEFAULT_VAD_IDLE_TIMEOUT_MS = 15_000
 const OPENAI_REALTIME_MAX_OUTPUT_TOKENS = 220
 const OPENAI_REALTIME_BARGE_IN_MIN_SPEECH_MS = 160
 const OPENAI_REALTIME_BARGE_IN_RMS_THRESHOLD = 900
+const OPENAI_REALTIME_MIN_VOICE_SPEED = 0.25
+const OPENAI_REALTIME_MAX_VOICE_SPEED = 1.5
 
 interface RealtimePlaybackMark {
   itemId: string
@@ -1515,24 +1519,29 @@ function openAISipCallMetadata(event: OpenAISipWebhookEvent): OpenAISipCallMetad
   }
 }
 
-function openAISipCallConnectedPrompt(metadata: OpenAISipCallMetadata): string {
+function openAISipCallConnectedPrompt(metadata: OpenAISipCallMetadata, voiceStyle?: string): string {
+  const styleLine = voiceStyle?.trim()
+    ? `Phone voice target for this first turn: ${voiceStyle.trim()}`
+    : ""
   if (metadata.direction === "outbound") {
     return [
       "An outbound phone voice call just connected over OpenAI SIP.",
       "This is the first audible turn in a call I chose to place.",
+      styleLine,
       `Call reason/context: ${metadata.reason.trim() || "No additional reason was recorded."}`,
       metadata.from ? `Callee phone: ${metadata.from}.` : "The callee phone number was not provided.",
       metadata.to ? `Ouro phone line: ${metadata.to}.` : "The Ouro phone line was not provided.",
       "Respond through the voice channel as yourself. Briefly greet them and state why you called. Keep this first turn short and conversational.",
-    ].join("\n")
+    ].filter(Boolean).join("\n")
   }
   return [
     "A phone voice call just connected over OpenAI SIP.",
     "This is the first audible turn in the call.",
+    styleLine,
     metadata.from ? `Caller phone: ${metadata.from}.` : "Caller phone was not provided.",
     metadata.to ? `Dialed line: ${metadata.to}.` : "Dialed line was not provided.",
     "Respond through the voice channel as yourself. Greet the caller naturally and briefly, then invite them to speak.",
-  ].join("\n")
+  ].filter(Boolean).join("\n")
 }
 
 function openAISipResponseHeaders(params: Record<string, string>, extra: Record<string, string | undefined> = {}): Record<string, string | undefined> {
@@ -1583,6 +1592,22 @@ function realtimeTurnDetectionConfig(realtime: OpenAIRealtimeTwilioOptions): Rec
     prefix_padding_ms: boundedInteger(turnDetection?.prefixPaddingMs, 0, 2_000) ?? OPENAI_REALTIME_DEFAULT_VAD_PREFIX_PADDING_MS,
     silence_duration_ms: boundedInteger(turnDetection?.silenceDurationMs, 100, 2_000) ?? OPENAI_REALTIME_DEFAULT_VAD_SILENCE_DURATION_MS,
     idle_timeout_ms: boundedInteger(turnDetection?.idleTimeoutMs, 5_000, 30_000) ?? OPENAI_REALTIME_DEFAULT_VAD_IDLE_TIMEOUT_MS,
+  }
+}
+
+function realtimeVoiceSpeed(realtime: OpenAIRealtimeTwilioOptions): number | undefined {
+  return boundedNumber(realtime.voiceSpeed, OPENAI_REALTIME_MIN_VOICE_SPEED, OPENAI_REALTIME_MAX_VOICE_SPEED)
+}
+
+function realtimeOutputAudioConfig(
+  realtime: OpenAIRealtimeTwilioOptions,
+  format?: { type: "audio/pcmu" },
+): Record<string, unknown> {
+  const speed = realtimeVoiceSpeed(realtime)
+  return {
+    ...(format ? { format } : {}),
+    voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
+    ...(speed === undefined ? {} : { speed }),
   }
 }
 
@@ -1648,6 +1673,8 @@ async function buildRealtimeVoiceInstructions(options: {
   agentRoot: string
   priorTranscript: string
   realtimeVoice?: string
+  realtimeVoiceStyle?: string
+  realtimeVoiceSpeed?: number
   realtimeModel?: string
   supportsAudioTools?: boolean
 }): Promise<string> {
@@ -1660,7 +1687,10 @@ async function buildRealtimeVoiceInstructions(options: {
   return [
     `You are ${options.agentName} in the live Voice sense.`,
     "This is the same agent identity as every other Ouro surface. Voice is not a reduced or alternate self.",
-    `Current native Realtime provider config for this call: model=${options.realtimeModel?.trim() || OPENAI_REALTIME_DEFAULT_MODEL}, voice=${options.realtimeVoice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE}.`,
+    `Current native Realtime provider config for this call: model=${options.realtimeModel?.trim() || OPENAI_REALTIME_DEFAULT_MODEL}, voice=${options.realtimeVoice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE}${options.realtimeVoiceSpeed === undefined ? "" : `, speed=${options.realtimeVoiceSpeed}`}.`,
+    options.realtimeVoiceStyle?.trim()
+      ? `Phone voice target: ${options.realtimeVoiceStyle.trim()}`
+      : "",
     "Speak as yourself through live audio. Follow voice/style preferences from identity notes; do not say you lack identity, preferences, or agency because the provider voice is configured by the transport.",
     "Audio is synchronous. Default to one short sentence. Use two short sentences only when needed. Do not use markdown, lists, or long explanations unless the caller explicitly asks.",
     "If the caller interrupts, stop the older path and answer the newest thing first.",
@@ -1677,12 +1707,13 @@ async function buildRealtimeVoiceInstructions(options: {
   ].filter(Boolean).join("\n\n")
 }
 
-function realtimeBootstrapInstructions(agentName: string): string {
+function realtimeBootstrapInstructions(agentName: string, voiceStyle?: string): string {
   return [
     `You are ${agentName} on a live phone call.`,
+    voiceStyle?.trim() ? `Phone voice target: ${voiceStyle.trim()}.` : "",
     "Speak naturally through live audio. Keep turns very short, answer quickly, and accept interruptions immediately.",
     "If the caller is done or asks to end the call, say a brief goodbye and call voice_end_call.",
-  ].join(" ")
+  ].filter(Boolean).join(" ")
 }
 
 function realtimeBootstrapTools(): Array<{ type: "function"; name: string; description?: string; parameters?: unknown }> {
@@ -1935,7 +1966,7 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
     ])
     const usedBootstrap = ready === undefined
     const [instructions, tools] = ready ?? [
-      realtimeBootstrapInstructions(this.options.agentName),
+      realtimeBootstrapInstructions(this.options.agentName, realtime.voiceStyle),
       realtimeBootstrapTools(),
     ]
     this.sendOpenAIRealtimeSessionUpdate(realtime, instructions, tools)
@@ -1977,10 +2008,7 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
             transcription: { model: OPENAI_REALTIME_DEFAULT_TRANSCRIPTION_MODEL },
             turn_detection: realtimeTurnDetectionConfig(realtime),
           },
-          output: {
-            format: { type: "audio/pcmu" },
-            voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
-          },
+          output: realtimeOutputAudioConfig(realtime, { type: "audio/pcmu" }),
         },
         tools,
         tool_choice: "auto",
@@ -2004,6 +2032,8 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
       agentRoot,
       priorTranscript: prior,
       realtimeVoice: this.options.openaiRealtime?.voice,
+      realtimeVoiceStyle: this.options.openaiRealtime?.voiceStyle,
+      realtimeVoiceSpeed: this.options.openaiRealtime ? realtimeVoiceSpeed(this.options.openaiRealtime) : undefined,
       realtimeModel: this.options.openaiRealtime?.model,
     })
     this.sessionMessages = existing?.messages && existing.messages.length > 0
@@ -2526,7 +2556,7 @@ class OpenAISipPhoneSession {
       ])
       const usedBootstrap = ready === undefined
       const [instructions, tools] = ready ?? [
-        realtimeBootstrapInstructions(this.options.agentName),
+        realtimeBootstrapInstructions(this.options.agentName, realtime.voiceStyle),
         realtimeBootstrapTools(),
       ]
 
@@ -2581,9 +2611,7 @@ class OpenAISipPhoneSession {
             transcription: { model: OPENAI_REALTIME_DEFAULT_TRANSCRIPTION_MODEL },
             turn_detection: realtimeTurnDetectionConfig(realtime),
           },
-          output: {
-            voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
-          },
+          output: realtimeOutputAudioConfig(realtime),
         },
         tools,
         tool_choice: "auto",
@@ -2678,6 +2706,8 @@ class OpenAISipPhoneSession {
       agentRoot,
       priorTranscript: prior,
       realtimeVoice: this.options.openaiRealtime?.voice,
+      realtimeVoiceStyle: this.options.openaiRealtime?.voiceStyle,
+      realtimeVoiceSpeed: this.options.openaiRealtime ? realtimeVoiceSpeed(this.options.openaiRealtime) : undefined,
       realtimeModel: this.options.openaiRealtime?.model,
       supportsAudioTools: false,
     })
@@ -2756,7 +2786,7 @@ class OpenAISipPhoneSession {
     this.sendOpenAI({
       type: "response.create",
       response: {
-        instructions: openAISipCallConnectedPrompt(this.metadata),
+        instructions: openAISipCallConnectedPrompt(this.metadata, this.options.openaiRealtime?.voiceStyle),
       },
     })
   }

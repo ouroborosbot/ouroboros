@@ -425,7 +425,13 @@ describe("Twilio phone voice bridge", () => {
         ...baseBridgeOptions(outputDir),
         agentRoot,
         conversationEngine: "openai-sip",
-        openaiRealtime: { apiKey: "openai-secret", model: "gpt-realtime-2", voice: "cedar" },
+        openaiRealtime: {
+          apiKey: "openai-secret",
+          model: "gpt-realtime-2",
+          voice: "cedar",
+          voiceStyle: "scrappy, upbeat, warm, lightly British",
+          voiceSpeed: 1.08,
+        },
         openaiSip: {
           projectId: "proj_test",
           webhookPath: "/voice/agents/slugger/sip/openai",
@@ -475,18 +481,26 @@ describe("Twilio phone voice bridge", () => {
       await vi.waitFor(() => expect(openaiRequests.some((request) => request.input.endsWith("/realtime/calls/call_123/accept"))).toBe(true), { timeout: 10_000 })
       const accept = openaiRequests.find((request) => request.input.endsWith("/realtime/calls/call_123/accept"))!
       expect(accept.auth).toBe("Bearer openai-secret")
-      const acceptBody = JSON.parse(accept.body) as { type?: string; model?: string; audio?: { output?: { voice?: string } }; tools?: Array<{ name: string }> }
+      const acceptBody = JSON.parse(accept.body) as {
+        type?: string
+        model?: string
+        instructions?: string
+        audio?: { output?: { voice?: string; speed?: number } }
+        tools?: Array<{ name: string }>
+      }
       expect(acceptBody).toMatchObject({
         type: "realtime",
         model: "gpt-realtime-2",
-        audio: { output: { voice: "cedar" } },
+        audio: { output: { voice: "cedar", speed: 1.08 } },
       })
+      expect(acceptBody.instructions).toContain("Phone voice target: scrappy, upbeat, warm, lightly British")
       expect(acceptBody.tools?.some((tool) => tool.name === "voice_end_call")).toBe(true)
       expect(acceptBody.tools?.some((tool) => tool.name === "voice_play_audio")).toBe(false)
 
       await vi.waitFor(() => expect(openaiMessages.some((event) => event.type === "response.create")).toBe(true), { timeout: 10_000 })
       const greeting = openaiMessages.find((event) => event.type === "response.create") as { response?: { instructions?: string } }
       expect(greeting.response?.instructions).toContain("A phone voice call just connected over OpenAI SIP.")
+      expect(greeting.response?.instructions).toContain("Phone voice target for this first turn: scrappy, upbeat, warm, lightly British")
 
       openaiSockets[0]?.send(JSON.stringify({
         type: "conversation.item.input_audio_transcription.completed",
@@ -606,6 +620,8 @@ describe("Twilio phone voice bridge", () => {
         websocketUrl: openaiUrl,
         model: "gpt-realtime-2",
         voice: "marin",
+        voiceStyle: "lightly British and interrupt-friendly",
+        voiceSpeed: 1.1,
         reasoningEffort: "low" as const,
       },
     }
@@ -695,9 +711,11 @@ describe("Twilio phone voice bridge", () => {
           output: {
             format: { type: "audio/pcmu" },
             voice: "marin",
+            speed: 1.1,
           },
         },
       })
+      expect(sessionUpdate.session.instructions).toContain("Phone voice target: lightly British and interrupt-friendly")
       const tools = sessionUpdate.session.tools as Array<{ name: string }>
       expect(tools.some((tool) => tool.name === "voice_end_call")).toBe(true)
       expect(tools.some((tool) => tool.name === "voice_play_audio")).toBe(true)

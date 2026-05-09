@@ -149,8 +149,15 @@ Current direction:
 - The current native phone model default is `gpt-realtime-2`, with
   `gpt-realtime-whisper` used for Realtime transcription metadata.
 - `voice.openaiRealtimeVoice` is the current phone voice selector.
-- `marin` and `cedar` are the quality-first OpenAI Realtime voice candidates.
-- Slugger's current configured phone voice is `cedar`.
+- `voice.openaiRealtimeVoiceStyle` is the transport-level spoken identity
+  target, for example "scrappy, upbeat, warm, lightly British".
+- `voice.openaiRealtimeVoiceSpeed` can lightly bias cadence without changing
+  identity; keep it conservative because phone calls need clarity.
+- `marin` and `cedar` are the quality-first OpenAI Realtime voice candidates,
+  but agents may audition another supported voice when identity fit matters.
+- Slugger's current phone direction is a Realtime audition shaped as scrappy,
+  upbeat, warm, lightly British, masculine/neutral-masc, and not posh or
+  announcer-like.
 - ElevenLabs is legacy cascade compatibility unless a future non-redundant use
   earns it a specific role.
 
