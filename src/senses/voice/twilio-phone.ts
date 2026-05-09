@@ -1352,6 +1352,7 @@ const OPENAI_REALTIME_BARGE_IN_MIN_SPEECH_MS = 160
 const OPENAI_REALTIME_BARGE_IN_RMS_THRESHOLD = 900
 const OPENAI_REALTIME_MIN_VOICE_SPEED = 0.25
 const OPENAI_REALTIME_MAX_VOICE_SPEED = 1.5
+const OPENAI_SIP_OUTBOUND_AMD_GREETING_TIMEOUT_MS = 10_000
 
 interface RealtimePlaybackMark {
   itemId: string
@@ -1394,6 +1395,12 @@ interface OpenAISipCallMetadata {
   outboundId: string
   reason: string
   friendId: string
+}
+
+interface OpenAISipPhoneSessionRegistry {
+  register(session: OpenAISipPhoneSession): void
+  unregister(session: OpenAISipPhoneSession): void
+  getByOutboundId(outboundId: string): OpenAISipPhoneSession | undefined
 }
 
 const OPENAI_SIP_UNSUPPORTED_TOOL_NAMES = new Set<string>()
@@ -1572,10 +1579,13 @@ function realtimeNoiseReductionConfig(
   return { type: mode }
 }
 
-function realtimeTurnDetectionConfig(realtime: OpenAIRealtimeTwilioOptions): Record<string, unknown> {
+function realtimeTurnDetectionConfig(
+  realtime: OpenAIRealtimeTwilioOptions,
+  overrides: { createResponse?: boolean; interruptResponse?: boolean } = {},
+): Record<string, unknown> {
   const turnDetection = realtime.turnDetection
-  const createResponse = turnDetection?.createResponse ?? true
-  const interruptResponse = turnDetection?.interruptResponse ?? false
+  const createResponse = overrides.createResponse ?? turnDetection?.createResponse ?? true
+  const interruptResponse = overrides.interruptResponse ?? turnDetection?.interruptResponse ?? false
   if (turnDetection?.mode === "semantic_vad") {
     return {
       type: "semantic_vad",
@@ -2505,6 +2515,10 @@ class OpenAISipPhoneSession {
   private closed = false
   private hangupRequested = false
   private hangupStarted = false
+  private initialGreetingSent = false
+  private outboundAmdState: "not_needed" | "pending" | "human" | "nonhuman" | "timeout" = "not_needed"
+  private outboundAmdGreetingTimer: ReturnType<typeof setTimeout> | null = null
+  private autoResponsesSuppressedForAmd = false
   private openaiWs: WebSocket | null = null
   private toolContext: ToolContext | undefined
   private sessionMessages: OpenAI.ChatCompletionMessageParam[] = []
@@ -2514,7 +2528,16 @@ class OpenAISipPhoneSession {
   constructor(
     private readonly options: TwilioPhoneBridgeOptions,
     private readonly metadata: OpenAISipCallMetadata,
+    private readonly registry?: OpenAISipPhoneSessionRegistry,
   ) {}
+
+  get callId(): string {
+    return this.metadata.callId
+  }
+
+  get outboundId(): string {
+    return this.metadata.outboundId
+  }
 
   async start(): Promise<void> {
     try {
@@ -2532,6 +2555,13 @@ class OpenAISipPhoneSession {
         to: this.metadata.to,
         callSid: this.metadata.callId,
       })
+      const initialGreetingMode = await this.outboundAmdInitialGreetingMode()
+      if (initialGreetingMode === "reject") {
+        await this.rejectOpenAISipCall(realtime, sip, "amd_preclassified_nonhuman")
+        return
+      }
+      this.outboundAmdState = initialGreetingMode === "hold" ? "pending" : "not_needed"
+      this.autoResponsesSuppressedForAmd = initialGreetingMode === "hold"
       await this.updateOutboundJobIfNeeded()
       this.ensureVoiceToolContext()
 
@@ -2546,6 +2576,7 @@ class OpenAISipPhoneSession {
           direction: this.metadata.direction,
         },
       })
+      this.registry?.register(this)
 
       const fullConfigPromise = Promise.all([
         this.buildInstructions(),
@@ -2562,7 +2593,9 @@ class OpenAISipPhoneSession {
         realtimeBootstrapTools(),
       ]
 
-      await this.acceptOpenAISipCall(realtime, sip, instructions, tools)
+      if (this.closed || this.outboundAmdStopped()) return
+      await this.acceptOpenAISipCall(realtime, sip, instructions, tools, this.autoResponsesSuppressedForAmd)
+      if (this.closed || this.outboundAmdStopped()) return
       this.openControlWebSocket(realtime, sip, fullConfigPromise, usedBootstrap)
     } catch (error) {
       emitNervesEvent({
@@ -2572,6 +2605,7 @@ class OpenAISipPhoneSession {
         message: "OpenAI SIP phone call could not be started",
         meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), error: errorMessage(error) },
       })
+      this.close("start_error")
       throw error
     }
   }
@@ -2590,11 +2624,26 @@ class OpenAISipPhoneSession {
     })
   }
 
+  private async outboundAmdInitialGreetingMode(): Promise<"send" | "hold" | "reject"> {
+    if (this.metadata.direction !== "outbound" || !this.metadata.outboundId) return "send"
+    const job = await readTwilioOutboundCallJob(this.options.outputDir, this.metadata.outboundId)
+    if (!job) return "send"
+    const answeredBy = job.answeredBy?.trim()
+    if (nonHumanAnsweredStatus(answeredBy) || job.status === "voicemail" || job.status === "fax") return "reject"
+    if (answeredBy?.toLowerCase() === "human") return "send"
+    return "hold"
+  }
+
+  private outboundAmdStopped(): boolean {
+    return this.outboundAmdState === "nonhuman" || this.outboundAmdState === "timeout"
+  }
+
   private async acceptOpenAISipCall(
     realtime: OpenAIRealtimeTwilioOptions,
     sip: OpenAISipPhoneOptions,
     instructions: string,
     tools: Array<{ type: "function"; name: string; description?: string; parameters?: unknown }>,
+    suppressAutoResponsesForAmd = false,
   ): Promise<void> {
     const fetchImpl = sip.fetch ?? fetch
     const response = await fetchImpl(openAISipCallActionUrl(sip, this.metadata.callId, "accept"), {
@@ -2611,7 +2660,10 @@ class OpenAISipPhoneSession {
           input: {
             noise_reduction: realtimeNoiseReductionConfig(realtime),
             transcription: { model: OPENAI_REALTIME_DEFAULT_TRANSCRIPTION_MODEL },
-            turn_detection: realtimeTurnDetectionConfig(realtime),
+            turn_detection: realtimeTurnDetectionConfig(
+              realtime,
+              suppressAutoResponsesForAmd ? { createResponse: false } : {},
+            ),
           },
           output: realtimeOutputAudioConfig(realtime),
         },
@@ -2635,6 +2687,39 @@ class OpenAISipPhoneSession {
         voice: realtime.voice?.trim() || OPENAI_REALTIME_DEFAULT_VOICE,
       },
     })
+  }
+
+  private async rejectOpenAISipCall(
+    realtime: OpenAIRealtimeTwilioOptions,
+    sip: OpenAISipPhoneOptions,
+    trigger: string,
+  ): Promise<void> {
+    try {
+      const response = await (sip.fetch ?? fetch)(openAISipCallActionUrl(sip, this.metadata.callId, "reject"), {
+        method: "POST",
+        headers: { authorization: `Bearer ${realtime.apiKey.trim()}` },
+      })
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => "")
+        throw new Error(`OpenAI SIP call reject failed: ${response.status} ${responseText}`.trim())
+      }
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_call_rejected",
+        message: "OpenAI SIP outbound call rejected before media start",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), trigger },
+      })
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.voice_openai_sip_call_reject_error",
+        message: "OpenAI SIP outbound call reject request failed",
+        meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), trigger, error: errorMessage(error) },
+      })
+    } finally {
+      this.close(trigger)
+    }
   }
 
   private openControlWebSocket(
@@ -2661,7 +2746,7 @@ class OpenAISipPhoneSession {
         message: "OpenAI SIP Realtime control socket connected",
         meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId) },
       })
-      this.sendInitialGreeting()
+      this.startInitialGreetingFlow()
       if (!usedBootstrap) return
       fullConfigPromise
         .then(([instructions, tools]) => {
@@ -2830,7 +2915,134 @@ class OpenAISipPhoneSession {
     }
   }
 
+  handleAsyncAmd(answeredBy: string, nonHumanStatus?: "voicemail" | "fax"): void {
+    if (this.metadata.direction !== "outbound" || !this.metadata.outboundId) return
+    if (nonHumanStatus) {
+      this.outboundAmdState = "nonhuman"
+      this.clearOutboundAmdGreetingTimeout()
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_amd_nonhuman",
+        message: "OpenAI SIP outbound call is hanging up after async AMD reported a non-human answer",
+        meta: {
+          agentName: this.options.agentName,
+          callId: safeSegment(this.metadata.callId),
+          outboundId: safeSegment(this.metadata.outboundId),
+          answeredBy,
+          status: nonHumanStatus,
+        },
+      })
+      void this.hangup("amd_nonhuman")
+      return
+    }
+    if (answeredBy.trim().toLowerCase() !== "human") return
+    this.outboundAmdState = "human"
+    this.clearOutboundAmdGreetingTimeout()
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_openai_sip_amd_human",
+      message: "OpenAI SIP outbound greeting released after async AMD reported a human answer",
+      meta: {
+        agentName: this.options.agentName,
+        callId: safeSegment(this.metadata.callId),
+        outboundId: safeSegment(this.metadata.outboundId),
+      },
+    })
+    this.resumeAfterHumanAmdIfNeeded()
+  }
+
+  private resumeAfterHumanAmdIfNeeded(): void {
+    if (this.closed) return
+    if (!this.openaiWs || this.openaiWs.readyState !== WebSocket.OPEN) return
+    if (this.autoResponsesSuppressedForAmd) {
+      const realtime = this.options.openaiRealtime
+      if (realtime) {
+        this.sendOpenAI({
+          type: "session.update",
+          session: {
+            type: "realtime",
+            audio: {
+              input: {
+                turn_detection: realtimeTurnDetectionConfig(realtime),
+              },
+            },
+          },
+        })
+      }
+      this.autoResponsesSuppressedForAmd = false
+    }
+    this.sendInitialGreeting()
+  }
+
+  private armOutboundAmdGreetingTimeout(): void {
+    if (this.outboundAmdGreetingTimer || this.outboundAmdState !== "pending") return
+    this.outboundAmdGreetingTimer = setTimeout(() => {
+      this.outboundAmdGreetingTimer = null
+      if (this.closed || this.outboundAmdState !== "pending") return
+      this.outboundAmdState = "timeout"
+      void this.markOutboundAmdTimeout()
+      emitNervesEvent({
+        level: "warn",
+        component: "senses",
+        event: "senses.voice_openai_sip_amd_timeout",
+        message: "OpenAI SIP outbound call hung up because async AMD did not report a human answer",
+        meta: {
+          agentName: this.options.agentName,
+          callId: safeSegment(this.metadata.callId),
+          outboundId: safeSegment(this.metadata.outboundId || "unknown"),
+        },
+      })
+      void this.hangup("amd_timeout")
+    }, OPENAI_SIP_OUTBOUND_AMD_GREETING_TIMEOUT_MS)
+    this.outboundAmdGreetingTimer.unref?.()
+  }
+
+  private clearOutboundAmdGreetingTimeout(): void {
+    if (!this.outboundAmdGreetingTimer) return
+    clearTimeout(this.outboundAmdGreetingTimer)
+    this.outboundAmdGreetingTimer = null
+  }
+
+  private async markOutboundAmdTimeout(): Promise<void> {
+    if (!this.metadata.outboundId) return
+    const job = await readTwilioOutboundCallJob(this.options.outputDir, this.metadata.outboundId)
+    if (!job) return
+    await updateTwilioOutboundCallJob(this.options.outputDir, job.outboundId, {
+      status: "amd-timeout",
+      transportCallSid: this.metadata.callId,
+      events: [
+        ...(job.events ?? []),
+        { at: new Date().toISOString(), status: "amd-timeout", callSid: this.metadata.callId },
+      ],
+    })
+  }
+
+  private startInitialGreetingFlow(): void {
+    if (this.outboundAmdState === "pending") {
+      this.armOutboundAmdGreetingTimeout()
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_openai_sip_amd_greeting_hold",
+        message: "OpenAI SIP outbound greeting is held until async AMD reports a human answer",
+        meta: {
+          agentName: this.options.agentName,
+          callId: safeSegment(this.metadata.callId),
+          outboundId: safeSegment(this.metadata.outboundId || "unknown"),
+        },
+      })
+      return
+    }
+    if (this.outboundAmdState === "nonhuman" || this.outboundAmdState === "timeout") {
+      void this.hangup(`amd_${this.outboundAmdState}`)
+      return
+    }
+    this.resumeAfterHumanAmdIfNeeded()
+  }
+
   private sendInitialGreeting(): void {
+    if (this.initialGreetingSent) return
+    if (!this.openaiWs || this.openaiWs.readyState !== WebSocket.OPEN) return
+    this.initialGreetingSent = true
     this.sendOpenAI({
       type: "response.create",
       response: {
@@ -3028,6 +3240,8 @@ class OpenAISipPhoneSession {
   private close(trigger: string): void {
     if (this.closed) return
     this.closed = true
+    this.clearOutboundAmdGreetingTimeout()
+    this.registry?.unregister(this)
     if (this.openaiWs && (this.openaiWs.readyState === WebSocket.OPEN || this.openaiWs.readyState === WebSocket.CONNECTING)) {
       this.openaiWs.close()
     }
@@ -3037,6 +3251,25 @@ class OpenAISipPhoneSession {
       message: "OpenAI SIP phone call control session stopped",
       meta: { agentName: this.options.agentName, callId: safeSegment(this.metadata.callId), trigger },
     })
+  }
+}
+
+class ActiveOpenAISipSessions implements OpenAISipPhoneSessionRegistry {
+  private readonly byCallId = new Map<string, OpenAISipPhoneSession>()
+  private readonly byOutboundId = new Map<string, OpenAISipPhoneSession>()
+
+  register(session: OpenAISipPhoneSession): void {
+    if (session.callId) this.byCallId.set(session.callId, session)
+    if (session.outboundId) this.byOutboundId.set(session.outboundId, session)
+  }
+
+  unregister(session: OpenAISipPhoneSession): void {
+    if (session.callId && this.byCallId.get(session.callId) === session) this.byCallId.delete(session.callId)
+    if (session.outboundId && this.byOutboundId.get(session.outboundId) === session) this.byOutboundId.delete(session.outboundId)
+  }
+
+  getByOutboundId(outboundId: string): OpenAISipPhoneSession | undefined {
+    return this.byOutboundId.get(outboundId)
   }
 }
 
@@ -3557,6 +3790,7 @@ function verifyRequest(options: TwilioPhoneBridgeOptions, request: TwilioPhoneBr
 async function handleOpenAISipWebhook(
   options: TwilioPhoneBridgeOptions,
   request: TwilioPhoneBridgeRequest,
+  activeSipSessions: OpenAISipPhoneSessionRegistry,
 ): Promise<TwilioPhoneBridgeResponse> {
   const rawBody = bodyText(request.body)
   const sip = options.openaiSip
@@ -3592,7 +3826,7 @@ async function handleOpenAISipWebhook(
   const metadata = openAISipCallMetadata(event)
   if (!metadata) return textResponse(400, "missing OpenAI SIP call metadata")
 
-  const session = new OpenAISipPhoneSession(options, metadata)
+  const session = new OpenAISipPhoneSession(options, metadata, activeSipSessions)
   void session.start().catch(() => undefined)
   return textResponse(200, "ok")
 }
@@ -4033,6 +4267,7 @@ async function handleOutgoingAmdStatus(
   outboundId: string,
   params: Record<string, string>,
   activeMediaStreams: ActiveTwilioMediaStreams,
+  activeSipSessions: OpenAISipPhoneSessionRegistry,
 ): Promise<TwilioPhoneBridgeResponse> {
   const job = await readTwilioOutboundCallJob(options.outputDir, outboundId)
   if (!job) return textResponse(404, "outbound voice call not found")
@@ -4053,6 +4288,7 @@ async function handleOutgoingAmdStatus(
     const session = activeMediaStreams.byOutboundId.get(job.outboundId)
       ?? (callSid ? activeMediaStreams.byCallSid.get(callSid) : undefined)
     session?.end()
+    activeSipSessions.getByOutboundId(job.outboundId)?.handleAsyncAmd(answeredBy, nonHumanStatus)
     emitNervesEvent({
       component: "senses",
       event: "senses.voice_twilio_outgoing_async_amd_nonhuman",
@@ -4067,6 +4303,7 @@ async function handleOutgoingAmdStatus(
     })
     return textResponse(200, "ok")
   }
+  activeSipSessions.getByOutboundId(job.outboundId)?.handleAsyncAmd(answeredBy)
   emitNervesEvent({
     component: "senses",
     event: "senses.voice_twilio_outgoing_async_amd",
@@ -4312,6 +4549,7 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
     byCallSid: new Map(),
     byOutboundId: new Map(),
   }
+  const activeSipSessions = new ActiveOpenAISipSessions()
 
   mediaStreams.on("connection", (ws) => {
     const lifecycle: {
@@ -4357,7 +4595,7 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
       if (method !== "POST") return textResponse(405, "method not allowed")
 
       if (routePath === sipWebhookPath) {
-        return handleOpenAISipWebhook(options, { ...request, path: requestPath })
+        return handleOpenAISipWebhook(options, { ...request, path: requestPath }, activeSipSessions)
       }
 
       const params = formParams(bodyText(request.body))
@@ -4379,7 +4617,7 @@ export function createTwilioPhoneBridge(options: TwilioPhoneBridgeOptions): Twil
         const outboundId = outboundIdPart ? decodeSafeSegment(outboundIdPart) : null
         if (!outboundId) return textResponse(404, "not found")
         if (suffix === "status") return handleOutgoingStatus(options, outboundId, params)
-        if (suffix === "amd") return handleOutgoingAmdStatus(options, outboundId, params, activeMediaStreams)
+        if (suffix === "amd") return handleOutgoingAmdStatus(options, outboundId, params, activeMediaStreams, activeSipSessions)
         if (suffix === undefined) return handleOutgoing(options, basePath, outboundId, params, jobs)
       }
       if (routePath === `${basePath}/listen`) return handleListen(options, basePath)
