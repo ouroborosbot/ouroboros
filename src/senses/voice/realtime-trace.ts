@@ -185,13 +185,18 @@ function parseTraceEvent(value: unknown, index: number, sourceLabel: string): Vo
   if (typeof atMs !== "number" || !Number.isFinite(atMs)) {
     throw new Error(label(eventLabel, "atMs must be a finite number"))
   }
+  let role: "assistant" | "user" | undefined
+  if (raw.role !== undefined) {
+    if (raw.role !== "assistant" && raw.role !== "user") throw new Error(label(eventLabel, "role must be assistant or user"))
+    role = raw.role
+  }
   const parsed: VoiceRealtimeEvalTraceEvent = {
     atMs,
     event,
     source: parseSource(raw.source, eventLabel),
     correlationId: optionalString(raw.correlationId, "correlationId", eventLabel),
     text: optionalString(raw.text, "text", eventLabel),
-    role: raw.role === "assistant" || raw.role === "user" ? raw.role : undefined,
+    role,
     toolName: optionalString(raw.toolName, "toolName", eventLabel),
     friendId: optionalString(raw.friendId, "friendId", eventLabel),
     sessionKey: optionalString(raw.sessionKey, "sessionKey", eventLabel),
@@ -199,7 +204,6 @@ function parseTraceEvent(value: unknown, index: number, sourceLabel: string): Vo
     ignored: ignored || undefined,
     ignoreReason: optionalString(raw.ignoreReason, "ignoreReason", eventLabel),
   }
-  if (parsed.role === undefined && raw.role !== undefined) throw new Error(label(eventLabel, "role must be assistant or user"))
   if (parsed.ignored && !parsed.ignoreReason) throw new Error(label(eventLabel, "ignored events require ignoreReason"))
   return parsed
 }
@@ -240,8 +244,8 @@ export function loadVoiceRealtimeEvalTraceArtifact(filePath: string): VoiceRealt
   let raw: string
   try {
     raw = fs.readFileSync(filePath, "utf8")
-  } catch (error) {
-    throw new Error(`${filePath}: failed to read trace artifact: ${error instanceof Error ? error.message : String(error)}`)
+  } catch {
+    throw new Error(`${filePath}: failed to read trace artifact`)
   }
   try {
     return parseVoiceRealtimeEvalTraceArtifact(JSON.parse(raw), filePath)
@@ -294,8 +298,8 @@ function findFirst(events: VoiceRealtimeEvalTimelineEvent[], type: VoiceRealtime
 function validateCausalTimeline(artifact: VoiceRealtimeEvalTraceArtifact, timeline: VoiceRealtimeEvalTimelineEvent[]): void {
   for (let index = 0; index < artifact.events.length; index += 1) {
     const event = artifact.events[index]
-    if (!event || event.ignored) continue
-    if (!Number.isFinite(event.atMs) || event.atMs < 0) {
+    if (event.ignored) continue
+    if (event.atMs < 0) {
       throw new Error(`${artifact.traceId} event[${index}] atMs must be a nonnegative finite number`)
     }
   }
@@ -412,7 +416,7 @@ export function formatVoiceRealtimeEvalTraceReport(result: VoiceRealtimeEvalTrac
   }
   lines.push(`ignored provider events: ${result.ignoredEvents.length}`)
   for (const event of result.ignoredEvents) {
-    lines.push(`- ${event.atMs}ms ${event.event}${sourceForSummary(event.source)}: ${event.ignoreReason ?? "ignored"}`)
+    lines.push(`- ${event.atMs}ms ${event.event}${sourceForSummary(event.source)}: ${event.ignoreReason}`)
   }
   return lines.join("\n")
 }

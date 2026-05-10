@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest"
+import * as fs from "fs"
+import * as os from "os"
 import * as path from "path"
 import {
   buildVoiceRealtimeEvalDefaultExpectation,
@@ -9,6 +11,7 @@ import {
   gradeVoiceRealtimeEvalTrace,
   loadVoiceRealtimeEvalTraceArtifact,
   parseVoiceRealtimeEvalTraceArtifact,
+  resolveVoiceRealtimeEvalTraceExpectation,
   traceArtifactToVoiceRealtimeEvalTimeline,
   type VoiceRealtimeEvalTraceArtifact,
 } from "../../../senses/voice/realtime-trace"
@@ -140,7 +143,40 @@ describe("voice realtime trace replay", () => {
   })
 
   it("rejects malformed artifacts and unknown unmarked source events with actionable labels", () => {
+    expect(() => parseVoiceRealtimeEvalTraceArtifact([], "")).toThrow("schemaVersion must be 1")
     expect(() => parseVoiceRealtimeEvalTraceArtifact({}, "empty.json")).toThrow("empty.json: schemaVersion must be 1")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "maybe",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-outcome.json")).toThrow("bad-outcome.json: expectedOutcome must be pass, fail, or expected-fail")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectationProfile: "sleepy-phone",
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-profile.json")).toThrow("bad-profile.json: expectationProfile is unsupported")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      expectationProfile: "voice-phone-default",
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-contract-both.json")).toThrow("bad-contract-both.json: provide exactly one of expectation or expectationProfile")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-contract-none.json")).toThrow("bad-contract-none.json: provide exactly one of expectation or expectationProfile")
     expect(() => parseVoiceRealtimeEvalTraceArtifact({
       schemaVersion: 1,
       traceId: "bad",
@@ -155,6 +191,55 @@ describe("voice realtime trace replay", () => {
       scenarioId: "bad",
       expectedOutcome: "pass",
       expectation: minimalExpectation,
+      redacted: "yes",
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-redacted.json")).toThrow("bad-redacted.json: redacted must be boolean")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: { ...minimalExpectation, maxFirstAssistantAudioMs: 0 },
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-budget.json")).toThrow("bad-budget.json: expectation latency budgets must be positive finite numbers")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: null,
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "bad-expectation.json")).toThrow("bad-expectation.json: expectation must be an object")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [null],
+    }, "bad-event-shape.json")).toThrow("bad-event-shape.json event[0]: must be an object")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "" }],
+    }, "bad-event-name.json")).toThrow("bad-event-name.json event[0]: event must be a non-empty string")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: "now", event: "call.connected" }],
+    }, "bad-atms.json")).toThrow("bad-atms.json event[0]: atMs must be a finite number")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
       events: [{ atMs: 0, event: "provider.future.surprise", source: { transport: "voice-eval" } }],
     }, "bad-event.json")).toThrow("bad-event.json event[0]: unknown trace event provider.future.surprise")
     expect(() => parseVoiceRealtimeEvalTraceArtifact({
@@ -163,8 +248,111 @@ describe("voice realtime trace replay", () => {
       scenarioId: "bad",
       expectedOutcome: "pass",
       expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "call.connected", source: null }],
+    }, "bad-source-shape.json")).toThrow("bad-source-shape.json event[0]: source must be an object")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
       events: [{ atMs: 0, event: "call.connected", source: { transport: "fax-machine" } }],
     }, "bad-transport.json")).toThrow("bad-transport.json event[0]: source.transport is unsupported")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "call.connected", source: { transport: "voice-eval", id: 42 } }],
+    }, "bad-source-id.json")).toThrow("bad-source-id.json event[0]: source.id must be a string")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "user.transcript.done", role: "narrator" }],
+    }, "bad-role.json")).toThrow("bad-role.json event[0]: role must be assistant or user")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "user.transcript.done", text: 42 }],
+    }, "bad-text.json")).toThrow("bad-text.json event[0]: text must be a string")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "provider.future.noise", ignored: true }],
+    }, "bad-ignore-reason.json")).toThrow("bad-ignore-reason.json event[0]: ignored events require ignoreReason")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "call.connected", ignored: "yes" }],
+    }, "bad-ignore-flag.json")).toThrow("bad-ignore-flag.json event[0]: ignored must be boolean")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "session.updated", session: null }],
+    }, "bad-session.json")).toThrow("bad-session.json event[0]: session must be an object")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "session.updated", session: { turnDetection: { createResponse: "false" } } }],
+    }, "bad-create-response.json")).toThrow("bad-create-response.json event[0]: session.turnDetection.createResponse must be boolean")
+    expect(() => parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "bad",
+      scenarioId: "bad",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "session.updated", session: { turnDetection: { interruptResponse: "false" } } }],
+    }, "bad-interrupt-response.json")).toThrow("bad-interrupt-response.json event[0]: session.turnDetection.interruptResponse must be boolean")
+    const sessionWithoutTurnDetection = parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "session-without-turn-detection",
+      scenarioId: "session-without-turn-detection",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "session.updated", session: {} }],
+    }, "session-without-turn-detection.json")
+    expect(sessionWithoutTurnDetection.events[0]?.session).toEqual({})
+  })
+
+  it("labels file loading, JSON, and defensive contract failures", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "voice-trace-test-"))
+    const missingPath = path.join(dir, "missing.json")
+    const badJsonPath = path.join(dir, "bad-json.json")
+    const badArtifactPath = path.join(dir, "bad-artifact.json")
+    fs.writeFileSync(badJsonPath, "{")
+    fs.writeFileSync(badArtifactPath, "{}")
+
+    expect(() => loadVoiceRealtimeEvalTraceArtifact(missingPath)).toThrow("failed to read trace artifact")
+    expect(() => loadVoiceRealtimeEvalTraceArtifact(badJsonPath)).toThrow("invalid JSON")
+    expect(() => loadVoiceRealtimeEvalTraceArtifact(badArtifactPath)).toThrow("schemaVersion must be 1")
+    expect(() => resolveVoiceRealtimeEvalTraceExpectation({
+      ...baseTrace(),
+      expectation: undefined,
+      expectationProfile: undefined,
+    })).toThrow("trace artifact has no expectation contract")
+    expect(() => traceArtifactToVoiceRealtimeEvalTimeline({
+      ...baseTrace(),
+      events: [{ atMs: 0, event: "provider.future.surprise" }],
+    })).toThrow("unknown trace event provider.future.surprise")
   })
 
   it("rejects causal timeline violations before grading latency budgets", () => {
@@ -239,6 +427,43 @@ describe("voice realtime trace replay", () => {
     expect(formatVoiceRealtimeEvalTraceReport(report)).toContain("ignored provider events: 1")
   })
 
+  it("formats source-free traces, stable timestamp ties, and expected fail outcomes", () => {
+    const sourceFree = parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "source-free",
+      scenarioId: "source-free",
+      expectedOutcome: "pass",
+      expectation: minimalExpectation,
+      events: [
+        { atMs: 0, event: "call.connected" },
+        { atMs: 100, event: "assistant.audio.started", correlationId: "same-time" },
+        { atMs: 100, event: "assistant.transcript.done", correlationId: "same-time", role: "assistant", text: "hello" },
+      ],
+    }, "source-free.json")
+    const expectedFail = parseVoiceRealtimeEvalTraceArtifact({
+      schemaVersion: 1,
+      traceId: "expected-fail",
+      scenarioId: "expected-fail",
+      expectedOutcome: "fail",
+      expectation: minimalExpectation,
+      events: [{ atMs: 0, event: "call.connected" }],
+    }, "expected-fail.json")
+
+    const sourceFreeResult = gradeVoiceRealtimeEvalTrace(sourceFree)
+    const sourceFreeFormatted = formatVoiceRealtimeEvalTraceReport(sourceFreeResult)
+    const expectedFailResult = gradeVoiceRealtimeEvalTrace(expectedFail)
+
+    expect(sourceFreeResult.report.transportSources).toEqual([])
+    expect(sourceFreeResult.timeline.map((event) => event.type)).toEqual([
+      "call.connected",
+      "assistant.audio.started",
+      "assistant.transcript.done",
+    ])
+    expect(sourceFreeFormatted).toContain("transports: none")
+    expect(sourceFreeFormatted).toContain("\"hello\"")
+    expect(expectedFailResult.outcomeMatched).toBe(true)
+  })
+
   it("redacts transcript-bearing content in reports and cannot satisfy required transcript text from redacted traces", () => {
     const trace = baseTrace({
       redacted: true,
@@ -249,7 +474,7 @@ describe("voice realtime trace replay", () => {
       events: [
         { atMs: 0, event: "call.connected", source: { transport: "voice-eval" } },
         { atMs: 50, event: "assistant.audio.started", source: { transport: "voice-eval" } },
-        { atMs: 90, event: "user.transcript.done", correlationId: "user-1", text: "the secret project is ready", source: { transport: "voice-eval" } },
+        { atMs: 90, event: "user.transcript.done", correlationId: "user-1", role: "user", text: "the secret project is ready", source: { transport: "voice-eval" } },
         { atMs: 130, event: "response.requested", correlationId: "user-1", source: { transport: "voice-eval" } },
       ],
     })
