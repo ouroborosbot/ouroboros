@@ -21,6 +21,7 @@ import {
   type StoredMailMessage,
 } from "./core"
 import { syncMailSearchCacheMetadata, upsertMailSearchCacheDocument, type MailSearchCacheOptions } from "./search-cache"
+import { migrateLocalMailroomToPlaintext } from "./migration"
 
 export interface MailAccessLogEntry {
   id: string
@@ -99,6 +100,12 @@ export interface MailroomStore {
 export interface FileMailroomStoreOptions {
   rootDir: string
   mailSearchCache?: MailSearchCacheOptions
+  /**
+   * When provided, the store runs the plaintext-migration cleanup once at
+   * construction. The migration is idempotent — on a fresh or already-migrated
+   * bundle it is a near-zero-cost no-op.
+   */
+  migrateAgentId?: string
 }
 
 function ensureDir(dir: string): void {
@@ -151,11 +158,20 @@ export class FileMailroomStore implements MailroomStore {
     ensureDir(this.candidatesDir)
     ensureDir(this.decisionsDir)
     ensureDir(this.outboundDir)
+    if (options.migrateAgentId) {
+      const searchCacheRoot = this.mailSearchCache.cacheDirForAgent?.(options.migrateAgentId)
+        ?? path.resolve(this.rootDir, "..", "mail-search")
+      migrateLocalMailroomToPlaintext({
+        agentId: options.migrateAgentId,
+        mailroomRoot: this.rootDir,
+        searchCacheRoot,
+      })
+    }
     emitNervesEvent({
       component: "senses",
       event: "senses.mail_file_store_init",
       message: "file mailroom store initialized",
-      meta: { rootDir: this.rootDir },
+      meta: { rootDir: this.rootDir, migrated: options.migrateAgentId !== undefined },
     })
   }
 
