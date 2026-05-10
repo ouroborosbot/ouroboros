@@ -100,6 +100,7 @@ describe("hosted mail tools", () => {
       rawObject: "raw/mail_merge_shared.json",
       rawSha256: "sha",
       rawSize: 123,
+      bodyForm: "encrypted",
       privateEnvelope: {
         algorithm: "RSA-OAEP-SHA256+A256GCM",
         keyId: "key_1",
@@ -198,6 +199,7 @@ describe("hosted mail tools", () => {
       rawObject: "raw/mail_trip_cached.json",
       rawSha256: "sha",
       rawSize: 123,
+      bodyForm: "encrypted",
       privateEnvelope: {
         algorithm: "RSA-OAEP-SHA256+A256GCM",
         keyId: "key_1",
@@ -289,6 +291,7 @@ describe("hosted mail tools", () => {
       rawObject: "raw/mail_trip_cached_default_reason.json",
       rawSha256: "sha",
       rawSize: 123,
+      bodyForm: "encrypted",
       privateEnvelope: {
         algorithm: "RSA-OAEP-SHA256+A256GCM",
         keyId: "key_1",
@@ -509,6 +512,7 @@ describe("hosted mail tools", () => {
       rawObject: "raw/mail_native_schedule_note.json",
       rawSha256: "sha",
       rawSize: 123,
+      bodyForm: "encrypted",
       privateEnvelope: {
         algorithm: "RSA-OAEP-SHA256+A256GCM",
         keyId: "key_1",
@@ -1231,6 +1235,7 @@ describe("hosted mail tools", () => {
       rawObject: "raw/mail_missing_key_current.json",
       rawSha256: "missing-key",
       rawSize: 0,
+      bodyForm: "encrypted",
       privateEnvelope: {
         algorithm: "RSA-OAEP-SHA256+A256GCM",
         keyId: "missing_key",
@@ -1541,6 +1546,7 @@ describe("hosted mail tools", () => {
       rawObject: "raw/mail_legacy_visible.json",
       rawSha256: "legacy",
       rawSize: 0,
+      bodyForm: "encrypted",
       privateEnvelope: {
         algorithm: "RSA-OAEP-SHA256+A256GCM",
         keyId: "key_1",

@@ -109,7 +109,13 @@ function mailSummary(message: DecryptedMailMessage): MailboxMailMessageSummary {
 }
 
 function missingPrivateMailKeyId(error: unknown): string | null {
-  const match = /^(?:Error: )?Missing private mail key ([^\s]+)$/.exec(String(error))
+  if (error instanceof Error) {
+    const errorWithKeyId = error as Error & { keyId?: unknown }
+    if (typeof errorWithKeyId.keyId === "string" && errorWithKeyId.keyId.length > 0) {
+      return errorWithKeyId.keyId
+    }
+  }
+  const match = /Missing private mail key ([^\s]+)/.exec(String(error))
   return match?.[1] ?? null
 }
 

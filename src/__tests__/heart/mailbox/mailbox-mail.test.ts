@@ -629,44 +629,15 @@ describe("Mailbox mail reader", () => {
     expect(serializedOutbound).not.toContain("smtp diagnostic body should stay private")
   })
 
-  it("returns error views when mailbox reads or decryption fail", async () => {
+  it("returns error views when mailbox reads fail", async () => {
     const storePath = tempDir()
-    const { store, messageId } = await seedMailbox(storePath)
-    const stored = await store.getMessage(messageId)
-    expect(stored).not.toBeNull()
+    const { messageId } = await seedMailbox(storePath)
 
-    cacheRuntimeCredentialConfig("slugger", {
-      mailroom: {
-        mailboxAddress: "slugger@ouro.bot",
-        storePath,
-        privateKeys: { mail_unused_other_key: "unused" },
-      },
-    })
-    const undecryptableList = await readMailView("slugger")
-    expect(undecryptableList).toEqual(expect.objectContaining({
-      status: "ready",
-      error: null,
-      messages: [],
-      recovery: expect.objectContaining({
-        undecryptableCount: 1,
-        missingKeyIds: [stored!.privateEnvelope.keyId],
-      }),
-    }))
-    const undecryptableMessage = await readMailMessageView("slugger", messageId)
-    expect(undecryptableMessage.status).toBe("error")
-
-    cacheRuntimeCredentialConfig("slugger", {
-      mailroom: {
-        mailboxAddress: "slugger@ouro.bot",
-        storePath,
-        privateKeys: { [stored!.privateEnvelope.keyId]: "still not a private key" },
-      },
-    })
-    const brokenDecrypt = await readMailView("slugger")
-    expect(brokenDecrypt).toEqual(expect.objectContaining({
-      status: "error",
-      error: expect.any(String),
-    }))
+    // Note: the previous missing-private-key / corrupt-private-key branches of
+    // this test exercised behavior that no longer exists. The local file store
+    // is plaintext; it cannot land an undecryptable message and there is no
+    // private-key path to corrupt. Hosted-store decrypt failure surfaces are
+    // covered elsewhere. Here we keep the store-throw paths.
 
     vi.spyOn(FileMailroomStore.prototype, "listMessages").mockRejectedValueOnce("list unavailable")
     const brokenList = await readMailView("slugger")

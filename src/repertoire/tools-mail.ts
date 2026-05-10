@@ -33,6 +33,7 @@ import {
   type MailSenderPolicyRecord,
   type MailSenderPolicyScope,
   type StoredMailMessage,
+  type StoredMailMessageBase,
 } from "../mailroom/core"
 import { emitNervesEvent } from "../nerves/runtime"
 import { getCredentialStore } from "./credential-access"
@@ -124,7 +125,13 @@ function mailSearchTerms(query: string): string[] {
 }
 
 function missingPrivateMailKeyId(error: unknown): string | null {
-  const match = /^(?:Error: )?Missing private mail key ([^\s]+)$/.exec(String(error))
+  if (error instanceof Error) {
+    const errorWithKeyId = error as Error & { keyId?: unknown }
+    if (typeof errorWithKeyId.keyId === "string" && errorWithKeyId.keyId.length > 0) {
+      return errorWithKeyId.keyId
+    }
+  }
+  const match = /Missing private mail key ([^\s]+)/.exec(String(error))
   return match?.[1] ?? null
 }
 
@@ -601,7 +608,7 @@ async function refreshMailSearchIndex(input: {
   }
 }
 
-function accessProvenance(message: StoredMailMessage): Pick<MailAccessLogEntry, "mailboxRole" | "compartmentKind" | "ownerEmail" | "source"> {
+function accessProvenance(message: StoredMailMessageBase): Pick<MailAccessLogEntry, "mailboxRole" | "compartmentKind" | "ownerEmail" | "source"> {
   const provenance = describeMailProvenance(message)
   return {
     mailboxRole: provenance.mailboxRole,
