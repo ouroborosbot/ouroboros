@@ -43,6 +43,11 @@ describe("voice floor control", () => {
       floorOwner: "none",
       pendingSpeech: { responseId: "response-1", reason: "answer_turn" },
     })
+    expect(canRequestVoiceResponse(state, { responseId: "response-queued" })).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "response_pending",
+    })
 
     const speechStart = applyVoiceFloorEvent(state, { type: "assistant.speech.started", atMs: 820, responseId: "response-1" })
     expect(speechStart.decision).toMatchObject({
@@ -112,6 +117,11 @@ describe("voice floor control", () => {
     ]).state
 
     expect(state).toMatchObject({ phase: "tool-running", floorOwner: "none", pendingToolCallIds: ["weather-1"] })
+    expect(canSpeakToolResult(state, { toolCallId: "weather-1" })).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "tool_still_running",
+    })
     expect(canSpeakToolHolding(state, { toolCallId: "weather-1", text: "Checking now." })).toMatchObject({
       allowed: true,
       action: "allow",
@@ -163,6 +173,11 @@ describe("voice floor control", () => {
       toolCallId: "research-1",
     })
     expect(canSpeakToolResult(replay.state, { toolCallId: "research-1" })).toMatchObject({
+      allowed: false,
+      action: "suppress",
+      reason: "stale_tool_result",
+    })
+    expect(canSpeakToolHolding(replay.state, { toolCallId: "research-1", text: "Still checking." })).toMatchObject({
       allowed: false,
       action: "suppress",
       reason: "stale_tool_result",
@@ -227,6 +242,178 @@ describe("voice floor control", () => {
       action: "allow",
       reason: "duplicate_tool_completion_ignored",
     })
+
+    const strayCompletion = applyVoiceFloorEvent(createInitialVoiceFloorState(), {
+      type: "tool.call.completed",
+      atMs: 20,
+      toolCallId: "missing-tool",
+    })
+    expect(strayCompletion.decision).toMatchObject({
+      allowed: false,
+      action: "suppress",
+      reason: "missing_tool_call",
+      toolCallId: "missing-tool",
+    })
+    expect(canSpeakToolHolding(createInitialVoiceFloorState(), { toolCallId: "missing-tool", text: "Checking." })).toMatchObject({
+      allowed: false,
+      action: "suppress",
+      reason: "missing_tool_call",
+    })
+    expect(canSpeakToolResult(createInitialVoiceFloorState(), { toolCallId: "missing-tool" })).toMatchObject({
+      allowed: false,
+      action: "suppress",
+      reason: "missing_tool_result",
+    })
+
+    const cancelledWithoutInterruption = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.response.requested", atMs: 100, responseId: "response-1" },
+      { type: "assistant.speech.started", atMs: 120, responseId: "response-1" },
+      { type: "assistant.speech.cancelled", atMs: 150, responseId: "response-1", reason: "local_shutdown" },
+    ])
+    expect(cancelledWithoutInterruption.state).toMatchObject({
+      phase: "listening",
+      floorOwner: "none",
+      activeAssistantSpeechId: undefined,
+    })
+
+    const callerFloor = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "tool.call.started", atMs: 100, toolCallId: "tool-2", toolName: "lookup" },
+      { type: "caller.speech.started", atMs: 140, turnId: "turn-1" },
+    ]).state
+    expect(canSpeakToolResult(callerFloor, { toolCallId: "tool-2" })).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "caller_has_floor",
+    })
+    expect(canSpeakToolHolding(callerFloor, { toolCallId: "tool-2", text: "Checking." })).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "caller_has_floor",
+    })
+    expect(applyVoiceFloorEvent(callerFloor, {
+      type: "assistant.speech.started",
+      atMs: 180,
+      responseId: "too-soon",
+    }).decision).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "caller_has_floor",
+    })
+
+    const pendingSpeech = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.response.requested", atMs: 100, responseId: "response-1" },
+      { type: "assistant.speech.started", atMs: 120, responseId: "response-1" },
+      { type: "tool.call.started", atMs: 130, toolCallId: "tool-3", toolName: "lookup" },
+      { type: "assistant.speech.done", atMs: 180, responseId: "response-1" },
+    ]).state
+    expect(pendingSpeech.phase).toBe("tool-running")
+    expect(summarizeVoiceFloorState(pendingSpeech)).toContain("pendingTools=tool-3")
+    expect(canSpeakToolHolding(pendingSpeech, { toolCallId: "tool-3" })).toMatchObject({
+      allowed: true,
+      action: "allow",
+      reason: "tool_presence_allowed",
+    })
+
+    const readyWhileSpeaking = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.response.requested", atMs: 100, responseId: "response-2" },
+      { type: "assistant.speech.started", atMs: 120, responseId: "response-2" },
+      { type: "tool.call.started", atMs: 130, toolCallId: "tool-4", toolName: "lookup" },
+      { type: "tool.call.completed", atMs: 160, toolCallId: "tool-4" },
+      { type: "assistant.speech.done", atMs: 200, responseId: "response-2" },
+    ]).state
+    expect(readyWhileSpeaking.phase).toBe("tool-result-ready")
+
+    const interruptedBeforeCancel = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.response.requested", atMs: 100, responseId: "response-3" },
+      { type: "assistant.speech.started", atMs: 120, responseId: "response-3" },
+      { type: "caller.speech.started", atMs: 140, turnId: "turn-interrupt" },
+      { type: "caller.speech.ended", atMs: 180, turnId: "turn-interrupt" },
+      { type: "caller.transcript.final", atMs: 220, turnId: "turn-interrupt", text: "hold on" },
+    ]).state
+    expect(interruptedBeforeCancel).toMatchObject({
+      phase: "interrupted",
+      floorOwner: "caller",
+      activeAssistantSpeechId: "response-3",
+    })
+    expect(summarizeVoiceFloorState(interruptedBeforeCancel)).toContain("activeSpeech=response-3")
+    expect(applyVoiceFloorEvent(interruptedBeforeCancel, {
+      type: "assistant.response.requested",
+      atMs: 240,
+      responseId: "too-early",
+    }).decision).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "caller_has_floor",
+    })
+
+    const mismatchedSpeechDone = applyVoiceFloorEvent(createInitialVoiceFloorState(), {
+      type: "assistant.speech.done",
+      atMs: 40,
+      responseId: "missing-speech",
+    })
+    expect(mismatchedSpeechDone.state).toMatchObject({ phase: "listening", floorOwner: "none" })
+    const mismatchedCancel = applyVoiceFloorEvent(createInitialVoiceFloorState(), {
+      type: "assistant.speech.cancelled",
+      atMs: 50,
+      responseId: "missing-speech",
+    })
+    expect(mismatchedCancel.state).toMatchObject({ phase: "listening", floorOwner: "none" })
+
+    const rejectedHolding = applyVoiceFloorEvent(pendingSpeech, {
+      type: "tool.holding.spoken",
+      atMs: 210,
+      toolCallId: "tool-3",
+      text: "This holding phrase is much much too long",
+    })
+    expect(rejectedHolding.decision).toMatchObject({
+      allowed: false,
+      action: "suppress",
+      reason: "tool_holding_too_long",
+    })
+
+    const staleWhileCallerTalks = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "caller.transcript.final", atMs: 100, turnId: "turn-a", text: "research" },
+      { type: "tool.call.started", atMs: 120, toolCallId: "tool-5", turnId: "turn-a" },
+      { type: "caller.speech.started", atMs: 200, turnId: "turn-b" },
+      { type: "tool.call.completed", atMs: 220, toolCallId: "tool-5", turnId: "turn-a" },
+    ]).state
+    expect(staleWhileCallerTalks).toMatchObject({ phase: "caller-speaking", floorOwner: "caller", staleToolCallIds: ["tool-5"] })
+
+    const readyWhileCallerTalks = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "caller.speech.started", atMs: 100, turnId: "turn-c" },
+      { type: "tool.call.started", atMs: 120, toolCallId: "tool-6", turnId: "turn-c" },
+      { type: "tool.call.completed", atMs: 150, toolCallId: "tool-6", turnId: "turn-c" },
+    ]).state
+    expect(readyWhileCallerTalks).toMatchObject({ phase: "caller-speaking", floorOwner: "caller", pendingToolCallIds: ["tool-6"] })
+
+    const runningTool = replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "tool.call.started", atMs: 100, toolCallId: "tool-7" },
+    ]).state
+    expect(applyVoiceFloorEvent(runningTool, {
+      type: "tool.result.spoken",
+      atMs: 130,
+      toolCallId: "tool-7",
+    }).decision).toMatchObject({
+      allowed: false,
+      action: "delay",
+      reason: "tool_still_running",
+    })
+
+    const terminalSummary = summarizeVoiceFloorState(replayVoiceFloorEvents([
+      { type: "call.connected", atMs: 0 },
+      { type: "hangup.requested", atMs: 100 },
+      { type: "call.ended", atMs: 140 },
+    ]).state)
+    expect(terminalSummary).toContain("hangup=requested")
+    expect(terminalSummary).toContain("terminal=true")
 
     expect(() => applyVoiceFloorEvent(createInitialVoiceFloorState(), {
       type: "assistant.started",

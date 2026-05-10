@@ -434,9 +434,9 @@ function applyToolResultSpoken(
 ): VoiceFloorTransition {
   const resultDecision = canSpeakToolResult(state, { toolCallId: event.toolCallId, text: event.text })
   if (!resultDecision.allowed) return { event, state, decision: { ...resultDecision, atMs: event.atMs } }
-  const existing = toolState(state, event.toolCallId)
+  const existing = toolState(state, event.toolCallId)!
   const next = copyState(state)
-  if (existing) setToolState(next, { ...existing, status: "spoken" })
+  setToolState(next, { ...existing, status: "spoken" })
   next.pendingToolCallIds = withoutValue(next.pendingToolCallIds, event.toolCallId)
   next.spokenToolCallIds = withUnique(next.spokenToolCallIds, event.toolCallId)
   next.phase = phaseAfterAssistantSpeech(next)
