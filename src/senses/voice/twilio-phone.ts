@@ -23,6 +23,7 @@ import type { VoiceTranscript, VoiceTranscriber, VoiceTtsService } from "./types
 import { normalizeTwilioE164PhoneNumber } from "./phone"
 import { prepareVoiceCallAudio } from "./audio-playback"
 import type { VoiceCallAudioRequest, VoiceCallAudioResult } from "../../repertoire/tools-base"
+import { VoiceFloorController } from "./floor-controller"
 
 export { normalizeTwilioE164PhoneNumber } from "./phone"
 
@@ -1909,6 +1910,13 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
   private initialAudioPlayed = false
   private callerBargeInSpeechMs = 0
   private lastCallerBargeInSpeechAt = 0
+  private floor: VoiceFloorController = new VoiceFloorController({ transport: "twilio-media-stream" })
+  private floorUnsubscribe: (() => void) | null = null
+  private queuedGatedRealtimeRequest: PendingRealtimeResponseRequest | null = null
+  private activeCallerTurnId: string | undefined
+  private callerTurnSequence = 0
+  private gatedResponseRequestSequence = 0
+  private pendingGatedResponseId: string | null = null
 
   constructor(
     private readonly ws: WebSocket,
@@ -2001,6 +2009,13 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
       callSid: this.callSid,
     })
     this.lifecycle?.onIdentityChange?.(this, { callSid: this.callSid, outboundId: this.outboundId })
+    this.floor = new VoiceFloorController({
+      transport: "twilio-media-stream",
+      agentName: this.options.agentName,
+      callId: this.callSid,
+    })
+    this.floorUnsubscribe = this.floor.onTransition(() => this.flushQueuedGatedRealtimeRequest())
+    this.floor.apply({ type: "call.connected", atMs: Date.now(), callId: this.callSid })
 
     emitNervesEvent({
       component: "senses",
@@ -2171,6 +2186,9 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
   }
 
   private requestHangupFromTool(): void {
+    if (!this.hangupRequested) {
+      this.floor.apply({ type: "hangup.requested", atMs: Date.now(), reason: "voice_end_call" })
+    }
     this.hangupRequested = true
     setTimeout(() => this.completeHangupIfReady("tool_fallback"), 7_500).unref?.()
   }
@@ -2370,6 +2388,9 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
     const content = transcript.trim()
     if (!content) return
     this.appendTranscript("user", content)
+    const turnId = this.activeCallerTurnId ?? `caller-turn-${++this.callerTurnSequence}`
+    this.activeCallerTurnId = undefined
+    this.floor.apply({ type: "caller.transcript.final", atMs: Date.now(), turnId, text: content })
     this.scheduleUserTurnResponse()
   }
 
@@ -2411,7 +2432,6 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
 
   private handleCallerSpeechStarted(): void {
     this.clearPendingUserTurnResponse()
-    const playback = this.playbackState
     if (!this.hasReliableCallerBargeInSpeech()) {
       emitNervesEvent({
         component: "senses",
@@ -2425,6 +2445,10 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
       })
       return
     }
+    const playback = this.playbackState
+    const turnId = `caller-turn-${++this.callerTurnSequence}`
+    this.activeCallerTurnId = turnId
+    this.floor.apply({ type: "caller.speech.started", atMs: Date.now(), turnId })
     this.playbackMarks.clear()
     this.sendTwilioClear()
     if (!playback?.itemId) return
@@ -2525,6 +2549,31 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
     const coordinated = !!toolState
     if (name === "voice_end_call" && toolState) toolState.suppressFollowup = true
     if (toolState && !toolState.suppressFollowup) this.scheduleRealtimeToolPresence(responseId, toolState)
+    // A coordinated tool call (one with a responseId from OpenAI's active
+    // response cycle) is proof that the realtime server has already parsed the
+    // caller's most recent turn into a tool intent. If we still hold a
+    // synthetic caller floor for that turn — because the matching
+    // input_audio_transcription.completed event has not arrived yet, which is
+    // common in unit fixtures and during fast-turn races — dismiss it so the
+    // floor gate is not stuck thinking the caller still owns the floor when
+    // the assistant is mid-response.
+    if (coordinated && this.activeCallerTurnId) {
+      const turnId = this.activeCallerTurnId
+      this.activeCallerTurnId = undefined
+      this.floor.apply({
+        type: "caller.turn.dismissed",
+        atMs: Date.now(),
+        turnId,
+        reason: "coordinated_tool_call",
+      })
+    }
+    this.floor.apply({
+      type: "tool.call.started",
+      atMs: Date.now(),
+      toolCallId: callId,
+      toolName: name,
+      turnId: this.floor.state.latestCallerTurnId,
+    })
     let output: string
     try {
       const args = parseToolArguments(typeof event.arguments === "string" ? event.arguments : "")
@@ -2559,6 +2608,12 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
         output,
       },
     })
+    this.floor.apply({
+      type: "tool.call.completed",
+      atMs: Date.now(),
+      toolCallId: callId,
+      turnId: this.floor.state.latestCallerTurnId,
+    })
     if (!this.completeRealtimeToolCall(responseId, callId) && !coordinated) {
       this.requestRealtimeResponse()
     }
@@ -2581,18 +2636,76 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
       this.responseCreateHoldUntilMs,
       Date.now() + OPENAI_REALTIME_RESPONSE_CREATE_GRACE_MS,
     )
+    const closingResponseId = this.pendingGatedResponseId
+    if (closingResponseId) {
+      // Clear the field BEFORE applying the floor event so that a re-entrant
+      // queued-flush triggered by the onTransition listener can install a new
+      // pendingGatedResponseId for the follow-up request without us racing it
+      // back to null after apply() returns.
+      this.pendingGatedResponseId = null
+      this.floor.apply({ type: "assistant.speech.done", atMs: Date.now(), responseId: closingResponseId })
+    }
     this.schedulePendingRealtimeResponse(OPENAI_REALTIME_RESPONSE_CREATE_GRACE_MS)
   }
 
   private requestRealtimeResponse(response?: Record<string, unknown>): void {
     if (this.closed) return
-    const waitMs = Math.max(0, this.responseCreateHoldUntilMs - Date.now())
-    if (this.realtimeResponseIsBusy() || waitMs > 0) {
-      this.holdRealtimeResponse(response ? { response } : {})
-      if (!this.realtimeResponseIsBusy()) this.schedulePendingRealtimeResponse(waitMs)
+    this.sendGatedRealtimeResponseCreate(response ? { response } : {})
+  }
+
+  private sendGatedRealtimeResponseCreate(request: PendingRealtimeResponseRequest): void {
+    if (this.closed) return
+    const responseId = `gated-${++this.gatedResponseRequestSequence}`
+    const decision = this.floor.canRequestResponse({ responseId })
+    if (decision.action === "allow") {
+      this.queuedGatedRealtimeRequest = null
+      this.pendingGatedResponseId = responseId
+      this.floor.apply({ type: "assistant.response.requested", atMs: Date.now(), responseId })
+      this.sendRealtimeResponseCreate(request)
+      // OpenAI's `response.created` ACK is not guaranteed in every error/race path
+      // (and fixture WebSocket mocks may omit it). Treat the wire send itself as
+      // the moment the assistant has the floor so the gate cannot stay in a
+      // pending state forever. Real `response.created` ids that arrive later are
+      // idempotently re-applied in noteRealtimeResponseCreated().
+      this.floor.apply({ type: "assistant.speech.started", atMs: Date.now(), responseId })
       return
     }
-    this.sendRealtimeResponseCreate(response ? { response } : {})
+    if (decision.action === "delay") {
+      this.queuedGatedRealtimeRequest = request
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_floor_gate_blocked",
+        message: `voice floor gate delayed response.create (${decision.reason})`,
+        meta: this.floorGateMeta({ action: "delay", reason: decision.reason, responseId, queued: true }),
+      })
+      return
+    }
+    this.queuedGatedRealtimeRequest = null
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_floor_gate_blocked",
+      message: `voice floor gate suppressed response.create (${decision.reason})`,
+      meta: this.floorGateMeta({ action: decision.action, reason: decision.reason, responseId, queued: false }),
+    })
+  }
+
+  private flushQueuedGatedRealtimeRequest(): void {
+    if (this.closed || !this.queuedGatedRealtimeRequest) return
+    const queued = this.queuedGatedRealtimeRequest
+    const probeId = `gated-probe-${this.gatedResponseRequestSequence}`
+    const probe = this.floor.canRequestResponse({ responseId: probeId })
+    if (probe.action !== "allow") return
+    this.queuedGatedRealtimeRequest = null
+    this.sendGatedRealtimeResponseCreate(queued)
+  }
+
+  private floorGateMeta(extra: Record<string, unknown>): Record<string, unknown> {
+    return {
+      agentName: this.options.agentName,
+      phase: this.floor.state.phase,
+      floorOwner: this.floor.state.floorOwner,
+      ...extra,
+    }
   }
 
   private realtimeResponseIsBusy(): boolean {
@@ -2786,6 +2899,10 @@ class TwilioOpenAIRealtimeMediaStreamSession implements TwilioMediaStreamLifecyc
     this.clearPendingUserTurnResponse()
     this.clearRealtimeToolPresenceTimers()
     this.clearUntrackedActiveRealtimeResponseTimer()
+    this.queuedGatedRealtimeRequest = null
+    this.floor.apply({ type: "call.ended", atMs: Date.now() })
+    this.floorUnsubscribe?.()
+    this.floorUnsubscribe = null
     this.lifecycle?.onClose?.(this, { callSid: this.callSid, outboundId: this.outboundId })
     emitNervesEvent({
       component: "senses",
@@ -2825,6 +2942,13 @@ class OpenAISipPhoneSession {
   private pendingRealtimeResponseTimer: ReturnType<typeof setTimeout> | null = null
   private pendingUserTurnResponseTimer: ReturnType<typeof setTimeout> | null = null
   private responseCreateHoldUntilMs = 0
+  private floor: VoiceFloorController = new VoiceFloorController({ transport: "openai-sip" })
+  private floorUnsubscribe: (() => void) | null = null
+  private queuedGatedRealtimeRequest: PendingRealtimeResponseRequest | null = null
+  private activeCallerTurnId: string | undefined
+  private callerTurnSequence = 0
+  private gatedResponseRequestSequence = 0
+  private pendingGatedResponseId: string | null = null
 
   constructor(
     private readonly options: TwilioPhoneBridgeOptions,
@@ -2861,6 +2985,13 @@ class OpenAISipPhoneSession {
         to: this.metadata.to,
         callSid: this.metadata.callId,
       })
+      this.floor = new VoiceFloorController({
+        transport: "openai-sip",
+        agentName: this.options.agentName,
+        callId: this.metadata.callId,
+      })
+      this.floorUnsubscribe = this.floor.onTransition(() => this.flushQueuedGatedRealtimeRequest())
+      this.floor.apply({ type: "call.connected", atMs: Date.now(), callId: this.metadata.callId })
       const initialGreetingMode = await this.outboundAmdInitialGreetingMode()
       if (initialGreetingMode === "reject") {
         await this.rejectOpenAISipCall(realtime, sip, "amd_preclassified_nonhuman")
@@ -3447,6 +3578,9 @@ class OpenAISipPhoneSession {
     const content = transcript.trim()
     if (!content) return
     this.appendTranscript("user", content)
+    const turnId = this.activeCallerTurnId ?? `caller-turn-${++this.callerTurnSequence}`
+    this.activeCallerTurnId = undefined
+    this.floor.apply({ type: "caller.transcript.final", atMs: Date.now(), turnId, text: content })
     this.scheduleUserTurnResponse()
   }
 
@@ -3548,6 +3682,31 @@ class OpenAISipPhoneSession {
     const coordinated = !!toolState
     if (name === "voice_end_call" && toolState) toolState.suppressFollowup = true
     if (toolState && !toolState.suppressFollowup) this.scheduleRealtimeToolPresence(responseId, toolState)
+    // A coordinated tool call (one with a responseId from OpenAI's active
+    // response cycle) is proof that the realtime server has already parsed the
+    // caller's most recent turn into a tool intent. If we still hold a
+    // synthetic caller floor for that turn — because the matching
+    // input_audio_transcription.completed event has not arrived yet, which is
+    // common in unit fixtures and during fast-turn races — dismiss it so the
+    // floor gate is not stuck thinking the caller still owns the floor when
+    // the assistant is mid-response.
+    if (coordinated && this.activeCallerTurnId) {
+      const turnId = this.activeCallerTurnId
+      this.activeCallerTurnId = undefined
+      this.floor.apply({
+        type: "caller.turn.dismissed",
+        atMs: Date.now(),
+        turnId,
+        reason: "coordinated_tool_call",
+      })
+    }
+    this.floor.apply({
+      type: "tool.call.started",
+      atMs: Date.now(),
+      toolCallId: callId,
+      toolName: name,
+      turnId: this.floor.state.latestCallerTurnId,
+    })
     let output: string
     try {
       const args = parseToolArguments(typeof event.arguments === "string" ? event.arguments : "")
@@ -3582,6 +3741,12 @@ class OpenAISipPhoneSession {
         output,
       },
     })
+    this.floor.apply({
+      type: "tool.call.completed",
+      atMs: Date.now(),
+      toolCallId: callId,
+      turnId: this.floor.state.latestCallerTurnId,
+    })
     if (!this.completeRealtimeToolCall(responseId, callId) && !coordinated) {
       this.requestRealtimeResponse()
     }
@@ -3604,18 +3769,76 @@ class OpenAISipPhoneSession {
       this.responseCreateHoldUntilMs,
       Date.now() + OPENAI_REALTIME_RESPONSE_CREATE_GRACE_MS,
     )
+    const closingResponseId = this.pendingGatedResponseId
+    if (closingResponseId) {
+      // Clear the field BEFORE applying the floor event so that a re-entrant
+      // queued-flush triggered by the onTransition listener can install a new
+      // pendingGatedResponseId for the follow-up request without us racing it
+      // back to null after apply() returns.
+      this.pendingGatedResponseId = null
+      this.floor.apply({ type: "assistant.speech.done", atMs: Date.now(), responseId: closingResponseId })
+    }
     this.schedulePendingRealtimeResponse(OPENAI_REALTIME_RESPONSE_CREATE_GRACE_MS)
   }
 
   private requestRealtimeResponse(response?: Record<string, unknown>): void {
     if (this.closed) return
-    const waitMs = Math.max(0, this.responseCreateHoldUntilMs - Date.now())
-    if (this.realtimeResponseIsBusy() || waitMs > 0) {
-      this.holdRealtimeResponse(response ? { response } : {})
-      if (!this.realtimeResponseIsBusy()) this.schedulePendingRealtimeResponse(waitMs)
+    this.sendGatedRealtimeResponseCreate(response ? { response } : {})
+  }
+
+  private sendGatedRealtimeResponseCreate(request: PendingRealtimeResponseRequest): void {
+    if (this.closed) return
+    const responseId = `gated-${++this.gatedResponseRequestSequence}`
+    const decision = this.floor.canRequestResponse({ responseId })
+    if (decision.action === "allow") {
+      this.queuedGatedRealtimeRequest = null
+      this.pendingGatedResponseId = responseId
+      this.floor.apply({ type: "assistant.response.requested", atMs: Date.now(), responseId })
+      this.sendRealtimeResponseCreate(request)
+      // OpenAI's `response.created` ACK is not guaranteed in every error/race path
+      // (and fixture WebSocket mocks may omit it). Treat the wire send itself as
+      // the moment the assistant has the floor so the gate cannot stay in a
+      // pending state forever. Real `response.created` ids that arrive later are
+      // idempotently re-applied in noteRealtimeResponseCreated().
+      this.floor.apply({ type: "assistant.speech.started", atMs: Date.now(), responseId })
       return
     }
-    this.sendRealtimeResponseCreate(response ? { response } : {})
+    if (decision.action === "delay") {
+      this.queuedGatedRealtimeRequest = request
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.voice_floor_gate_blocked",
+        message: `voice floor gate delayed response.create (${decision.reason})`,
+        meta: this.floorGateMeta({ action: "delay", reason: decision.reason, responseId, queued: true }),
+      })
+      return
+    }
+    this.queuedGatedRealtimeRequest = null
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.voice_floor_gate_blocked",
+      message: `voice floor gate suppressed response.create (${decision.reason})`,
+      meta: this.floorGateMeta({ action: decision.action, reason: decision.reason, responseId, queued: false }),
+    })
+  }
+
+  private flushQueuedGatedRealtimeRequest(): void {
+    if (this.closed || !this.queuedGatedRealtimeRequest) return
+    const queued = this.queuedGatedRealtimeRequest
+    const probeId = `gated-probe-${this.gatedResponseRequestSequence}`
+    const probe = this.floor.canRequestResponse({ responseId: probeId })
+    if (probe.action !== "allow") return
+    this.queuedGatedRealtimeRequest = null
+    this.sendGatedRealtimeResponseCreate(queued)
+  }
+
+  private floorGateMeta(extra: Record<string, unknown>): Record<string, unknown> {
+    return {
+      agentName: this.options.agentName,
+      phase: this.floor.state.phase,
+      floorOwner: this.floor.state.floorOwner,
+      ...extra,
+    }
   }
 
   private realtimeResponseIsBusy(): boolean {
@@ -3760,6 +3983,10 @@ class OpenAISipPhoneSession {
     this.clearPendingUserTurnResponse()
     this.clearRealtimeToolPresenceTimers()
     this.clearUntrackedActiveRealtimeResponseTimer()
+    this.queuedGatedRealtimeRequest = null
+    this.floor.apply({ type: "call.ended", atMs: Date.now() })
+    this.floorUnsubscribe?.()
+    this.floorUnsubscribe = null
     emitNervesEvent({
       component: "senses",
       event: "senses.voice_openai_sip_call_stop",
