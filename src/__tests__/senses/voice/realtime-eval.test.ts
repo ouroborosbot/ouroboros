@@ -59,7 +59,7 @@ describe("voice realtime eval kernel", () => {
       const firstAudio = events.find((event) => event.type === "assistant.audio.started")
       if (firstAudio) firstAudio.atMs = 1_900
       const firstResponse = events.find((event) => event.type === "response.requested" && event.correlationId === "user-1")
-      if (firstResponse) firstResponse.atMs = 3_000
+      if (firstResponse) firstResponse.atMs = 3_300
       const transcript = events.find((event) => event.type === "assistant.transcript.done")
       if (transcript) transcript.text = "done"
     })
