@@ -2,6 +2,15 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.588",
+      "changes": [
+        "Local mail store (`FileMailroomStore`) now writes messages and raw RFC822 bodies in plaintext on disk. The agent bundle becomes the durable archive surface for mail — a vault key rotation or lost private key can no longer render the local archive unreadable, and `ouro mail import-mbox` remains the canonical recovery mechanism.",
+        "Cloud-blob mail store (`AzureBlobMailroomStore`) continues to encrypt every message on the wire and at rest. The trust boundary it crosses is real; nothing about the hosted path changes.",
+        "`StoredMailMessage` is now a discriminated union on `bodyForm`: plaintext messages carry `private` inline, encrypted messages carry `privateEnvelope`. All reader code paths converge on a single `readPrivateEnvelope` accessor that branches on `bodyForm` so callers no longer reach into decrypt internals.",
+        "One-shot migration helper runs on `FileMailroomStore` init: wipes pre-change encrypted-shape residue in `messages/` and `raw/`, deletes stale `azure-blob` coverage records, and prunes orphan search-cache documents that no longer reference a present local message. Idempotent — subsequent runs are no-ops."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.587",
       "changes": [
         "Voice now has a pure duplex floor-control model with typed transitions, state summaries, and decision reasons for caller floor ownership, assistant speech, tool-running/tool-result states, stale suppression, and hangup terminal behavior.",
