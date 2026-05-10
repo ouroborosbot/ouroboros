@@ -4002,7 +4002,16 @@ describe("Twilio phone voice bridge", () => {
 
       // Send enough media frames with high-amplitude bytes to make the caller barge-in
       // detector accept the next speech_started as a reliable caller turn.
+      const appendBaseline = openaiMessages.filter((e) => e.type === "input_audio_buffer.append").length
       for (let index = 0; index < 14; index += 1) sendMediaFrame(socket, 0x00)
+      // Wait until the runtime has actually forwarded every frame to OpenAI before
+      // sending speech_started so the hasReliableCallerBargeInSpeech window is
+      // populated. Without this wait, CI can deliver speech_started before the
+      // runtime processes the frames, and the floor never enters caller-speaking.
+      await vi.waitFor(() => {
+        const appended = openaiMessages.filter((e) => e.type === "input_audio_buffer.append").length
+        expect(appended).toBeGreaterThanOrEqual(appendBaseline + 14)
+      }, { timeout: 5_000 })
       openaiSockets[0]?.send(JSON.stringify({ type: "input_audio_buffer.speech_started" }))
 
       openaiSockets[0]?.send(JSON.stringify({
