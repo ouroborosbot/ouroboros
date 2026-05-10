@@ -297,6 +297,65 @@ describe("voice realtime eval kernel", () => {
     })
   })
 
+  it("flags speech and tool-result output after terminal floor state", () => {
+    const report = gradeVoiceRealtimeEvalTimeline("terminal-floor", [
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.audio.started", atMs: 40, correlationId: "greeting" },
+      { type: "call.hangup.requested", atMs: 80 },
+      {
+        type: "floor.state.changed",
+        atMs: 90,
+        floorPhase: "listening",
+        floorOwner: "none",
+        pendingToolCallIds: ["weather-1"],
+        decisionReason: "hangup_terminal",
+      },
+      {
+        type: "speech.policy.decision",
+        atMs: 100,
+        speechDecision: "allow",
+        decisionReason: "assistant_speech_allowed",
+        correlationId: "late-speech",
+      },
+      { type: "tool.result.spoken", atMs: 110, correlationId: "weather-1", toolName: "weather_lookup" },
+    ], minimalExpectation)
+
+    expect(report.passed).toBe(false)
+    expect(report.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining([
+      "speech_allowed_after_hangup",
+      "tool_result_spoken_after_hangup",
+    ]))
+
+    const terminalFloorOnly = gradeVoiceRealtimeEvalTimeline("terminal-floor-only", [
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.audio.started", atMs: 40, correlationId: "greeting" },
+      {
+        type: "floor.state.changed",
+        atMs: 80,
+        floorPhase: "hangup",
+        floorOwner: "terminal",
+        decisionReason: "hangup_terminal",
+      },
+      { type: "tool.result.spoken", atMs: 90, correlationId: "weather-1", toolName: "weather_lookup" },
+    ], minimalExpectation)
+    expect(terminalFloorOnly.findings.map((finding) => finding.code)).toContain("tool_result_spoken_after_hangup")
+
+    const safeToolSpeech = gradeVoiceRealtimeEvalTimeline("safe-tool-floor", [
+      { type: "call.connected", atMs: 0 },
+      { type: "assistant.audio.started", atMs: 40, correlationId: "greeting" },
+      {
+        type: "floor.state.changed",
+        atMs: 80,
+        floorPhase: "tool-result-ready",
+        floorOwner: "none",
+        pendingToolCallIds: ["weather-1"],
+        decisionReason: "tool_result_ready",
+      },
+      { type: "tool.result.spoken", atMs: 90, correlationId: "weather-1", toolName: "weather_lookup" },
+    ], minimalExpectation)
+    expect(safeToolSpeech.passed).toBe(true)
+  })
+
   it("rejects empty inputs and invalid latency budgets", () => {
     expect(() => gradeVoiceRealtimeEvalTimeline("", buildVoiceRealtimeEvalHappyPath(), baselineExpectation)).toThrow(
       "voice eval scenario id is empty",

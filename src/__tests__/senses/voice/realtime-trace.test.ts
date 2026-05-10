@@ -536,6 +536,13 @@ describe("voice realtime trace replay", () => {
           role: "assistant",
           source: { transport: "voice-eval", id: "floor" },
         },
+        {
+          atMs: 95,
+          event: "voice.tool.result.ready",
+          correlationId: "search-1",
+          decisionReason: "tool_result_ready",
+          source: { transport: "voice-eval", id: "floor" },
+        },
       ],
     })
 
@@ -553,6 +560,19 @@ describe("voice realtime trace replay", () => {
     })
     expect(result.outcomeMatched).toBe(true)
     expect(formatted).toContain("floor: phase=caller-speaking floor=caller pendingSpeech=followup pendingTools=search-1 interruption=turn-2 reason=assistant_speech_allowed")
+    expect(formatted).toContain("95ms tool.result.ready voice-eval/floor floor(reason=tool_result_ready tool=search-1)")
+    expect(formatVoiceRealtimeEvalTraceReport({
+      ...result,
+      report: {
+        ...result.report,
+        findings: [{
+          code: "empty_floor",
+          severity: "warn",
+          message: "empty floor diagnostic",
+          floor: {},
+        }],
+      },
+    })).toContain("floor: none")
   })
 
   it("redacts transcript-bearing content in reports and cannot satisfy required transcript text from redacted traces", () => {
