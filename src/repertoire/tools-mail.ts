@@ -664,22 +664,20 @@ async function renderEmptyMailResult(input: {
   agentId: string
   config: MailroomRuntimeConfig
   store: MailroomStore
-  storeKind?: string
-  storeLabel?: string
+  storeKind: string
+  storeLabel: string
   scope?: "native" | "delegated"
   source?: string
 }): Promise<string> {
   const anyVisible = await input.store.listMessages({ agentId: input.agentId, limit: 1 })
   if (anyVisible.length === 0) {
     const sourceGrantStatus = await renderSourceGrantStatus(input.config, input.agentId)
-    const divergence = input.storeKind && input.storeLabel
-      ? describeMailSubstrateDivergence({
-          agentId: input.agentId,
-          storeKind: input.storeKind,
-          storeLabel: input.storeLabel,
-          visibleMessageCount: 0,
-        })
-      : null
+    const divergence = describeMailSubstrateDivergence({
+      agentId: input.agentId,
+      storeKind: input.storeKind,
+      storeLabel: input.storeLabel,
+      visibleMessageCount: 0,
+    })
     return [
       "No visible mail yet.",
       `mail onboarding status: Mailroom is provisioned for ${input.config.mailboxAddress}, but this agent's encrypted store has 0 messages.`,
