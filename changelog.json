@@ -2,7 +2,7 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.586",
+      "version": "0.1.0-alpha.587",
       "changes": [
         "Voice now has a pure duplex floor-control model with typed transitions, state summaries, and decision reasons for caller floor ownership, assistant speech, tool-running/tool-result states, stale suppression, and hangup terminal behavior.",
         "Realtime Voice evals and trace replay now understand floor-state, speech-policy, and tool-result events, failing deterministic traces when assistant speech is allowed while the caller owns the floor, stale tool results are spoken, or responses are requested after hangup.",
