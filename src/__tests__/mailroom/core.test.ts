@@ -181,6 +181,8 @@ describe("mailroom core", () => {
     const rawMime = fs.readFileSync(path.join(storePath, onDisk.rawObject)).toString("utf-8")
     expect(rawMime).toContain("launch checklist")
     expect(await store.readRawMime(byId!, keys)).not.toBeNull()
+    // readRawMime returns null when the referenced raw file is absent.
+    expect(await store.readRawMime({ ...byId!, rawObject: "raw/missing.eml" }, keys)).toBeNull()
 
     await store.recordAccess({
       agentId: "slugger",

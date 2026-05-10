@@ -121,6 +121,178 @@ describe("Mailbox mail reader", () => {
     expect(missing.error).toContain("No visible mail message")
   })
 
+  it("surfaces hosted-store encrypted messages that the agent's vault cannot decrypt in the recovery summary", async () => {
+    const { buildEncryptedStoredMailMessage, provisionMailboxRegistry, resolveMailAddress } = await import("../../../mailroom/core")
+    const { registry } = provisionMailboxRegistry({ agentId: "slugger" })
+    const native = resolveMailAddress(registry, "slugger@ouro.bot")
+    if (!native) throw new Error("expected native resolution")
+    const built = await buildEncryptedStoredMailMessage({
+      resolved: { ...native, keyId: "mail_missing_hosted" },
+      envelope: { mailFrom: "remote@example.com", rcptTo: ["slugger@ouro.bot"] },
+      rawMime: Buffer.from("From: Remote <remote@example.com>\r\nTo: slugger@ouro.bot\r\nSubject: Hosted missing\r\n\r\nbody\r\n"),
+      receivedAt: new Date("2026-04-25T18:00:00.000Z"),
+    })
+
+    const readerSpy = vi.spyOn(mailroomReader, "resolveMailroomReaderWithRefresh").mockResolvedValue({
+      ok: true,
+      agentName: "slugger",
+      config: { mailboxAddress: "slugger@ouro.bot", privateKeys: { other_key: "unused" } },
+      store: {
+        listMessages: vi.fn(async () => [built.message]),
+        listScreenerCandidates: vi.fn(async () => []),
+        listMailOutbound: vi.fn(async () => []),
+        recordAccess: vi.fn(async () => ({
+          id: "access_recovery",
+          agentId: "slugger",
+          tool: "mailbox_mail_list",
+          reason: "missing-key recovery proof",
+          accessedAt: "2026-04-25T18:01:00.000Z",
+        })),
+        listAccessLog: vi.fn(async () => []),
+      } as any,
+      storeKind: "azure-blob",
+      storeLabel: "https://mail.blob.core.windows.net/mailroom",
+    })
+
+    const mailbox = await readMailView("slugger")
+    expect(mailbox.status).toBe("ready")
+    if (mailbox.status !== "ready") throw new Error("expected ready view")
+    expect(mailbox.recovery.undecryptableCount).toBe(1)
+    expect(mailbox.recovery.missingKeyIds).toEqual(["mail_missing_hosted"])
+    readerSpy.mockRestore()
+  })
+
+  it("rethrows non-missing-key decrypt failures as error views (covers Error-with-no-keyId rethrow)", async () => {
+    const { buildEncryptedStoredMailMessage, provisionMailboxRegistry, resolveMailAddress } = await import("../../../mailroom/core")
+    const { registry, keys } = provisionMailboxRegistry({ agentId: "slugger" })
+    const native = resolveMailAddress(registry, "slugger@ouro.bot")
+    if (!native) throw new Error("expected native resolution")
+    const built = await buildEncryptedStoredMailMessage({
+      resolved: native,
+      envelope: { mailFrom: "remote@example.com", rcptTo: ["slugger@ouro.bot"] },
+      rawMime: Buffer.from("From: Remote <remote@example.com>\r\nTo: slugger@ouro.bot\r\nSubject: corrupt\r\n\r\nbody\r\n"),
+      receivedAt: new Date("2026-04-25T18:00:00.000Z"),
+    })
+    if (built.message.bodyForm !== "encrypted") throw new Error("expected encrypted")
+    const matchingKeyId = built.message.privateEnvelope.keyId
+    // Supply a non-PEM string for the matching key — crypto.privateDecrypt will throw a plain Error without keyId.
+    const corruptKeys = { [matchingKeyId]: "not a real PEM key" }
+
+    const readerSpy = vi.spyOn(mailroomReader, "resolveMailroomReaderWithRefresh").mockResolvedValue({
+      ok: true,
+      agentName: "slugger",
+      config: { mailboxAddress: "slugger@ouro.bot", privateKeys: corruptKeys },
+      store: {
+        listMessages: vi.fn(async () => [built.message]),
+        listScreenerCandidates: vi.fn(async () => []),
+        listMailOutbound: vi.fn(async () => []),
+        recordAccess: vi.fn(async () => ({
+          id: "access_x",
+          agentId: "slugger",
+          tool: "mailbox_mail_list",
+          reason: "corrupt key proof",
+          accessedAt: "2026-04-25T18:01:00.000Z",
+        })),
+        listAccessLog: vi.fn(async () => []),
+      } as any,
+      storeKind: "azure-blob",
+      storeLabel: "https://mail.blob.core.windows.net/mailroom",
+    })
+
+    const mailbox = await readMailView("slugger")
+    expect(mailbox.status).toBe("error")
+    expect(typeof mailbox.error).toBe("string")
+    readerSpy.mockRestore()
+    expect(keys[matchingKeyId]).toBeTruthy() // sanity: original keys still have it
+  })
+
+  it("normalizes Error-instance list failures to error views", async () => {
+    const readerSpy = vi.spyOn(mailroomReader, "resolveMailroomReaderWithRefresh").mockResolvedValue({
+      ok: true,
+      agentName: "slugger",
+      config: { mailboxAddress: "slugger@ouro.bot", privateKeys: {} },
+      store: {
+        listMessages: vi.fn(async () => { throw new Error("real Error list failure") }),
+        listScreenerCandidates: vi.fn(async () => []),
+        listMailOutbound: vi.fn(async () => []),
+        recordAccess: vi.fn(async () => ({
+          id: "access_x",
+          agentId: "slugger",
+          tool: "mailbox_mail_list",
+          reason: "nope",
+          accessedAt: "2026-04-25T18:01:00.000Z",
+        })),
+        listAccessLog: vi.fn(async () => []),
+      } as any,
+      storeKind: "azure-blob",
+      storeLabel: "https://mail.blob.core.windows.net/mailroom",
+    })
+
+    const mailbox = await readMailView("slugger")
+    expect(mailbox.status).toBe("error")
+    expect(mailbox.error).toBe("real Error list failure")
+    readerSpy.mockRestore()
+  })
+
+  it("normalizes Error-instance getMessage failures to error views", async () => {
+    const readerSpy = vi.spyOn(mailroomReader, "resolveMailroomReaderWithRefresh").mockResolvedValue({
+      ok: true,
+      agentName: "slugger",
+      config: { mailboxAddress: "slugger@ouro.bot", privateKeys: {} },
+      store: {
+        listMessages: vi.fn(async () => []),
+        getMessage: vi.fn(async () => { throw new Error("real Error get failure") }),
+        listScreenerCandidates: vi.fn(async () => []),
+        listMailOutbound: vi.fn(async () => []),
+        recordAccess: vi.fn(async () => ({
+          id: "access_x",
+          agentId: "slugger",
+          tool: "mailbox_mail_body",
+          reason: "nope",
+          accessedAt: "2026-04-25T18:01:00.000Z",
+        })),
+        listAccessLog: vi.fn(async () => []),
+      } as any,
+      storeKind: "azure-blob",
+      storeLabel: "https://mail.blob.core.windows.net/mailroom",
+    })
+
+    const detail = await readMailMessageView("slugger", "mail_x")
+    expect(detail.status).toBe("error")
+    expect(detail.error).toBe("real Error get failure")
+    readerSpy.mockRestore()
+  })
+
+  it("rethrows non-missing-key list failures from the hosted store", async () => {
+    const readerSpy = vi.spyOn(mailroomReader, "resolveMailroomReaderWithRefresh").mockResolvedValue({
+      ok: true,
+      agentName: "slugger",
+      config: { mailboxAddress: "slugger@ouro.bot", privateKeys: {} },
+      store: {
+        listMessages: vi.fn(async () => {
+          // eslint-disable-next-line no-throw-literal -- intentional non-error throw for coverage of error normalization path
+          throw "hosted scan exploded"
+        }),
+        listScreenerCandidates: vi.fn(async () => []),
+        listMailOutbound: vi.fn(async () => []),
+        recordAccess: vi.fn(async () => ({
+          id: "access_x",
+          agentId: "slugger",
+          tool: "mailbox_mail_list",
+          reason: "nope",
+          accessedAt: "2026-04-25T18:01:00.000Z",
+        })),
+        listAccessLog: vi.fn(async () => []),
+      } as any,
+      storeKind: "azure-blob",
+      storeLabel: "https://mail.blob.core.windows.net/mailroom",
+    })
+
+    const mailbox = await readMailView("slugger")
+    expect(mailbox.status).toBe("error")
+    readerSpy.mockRestore()
+  })
+
   it("caps hosted Mailbox summary reads to the visible mailbox slice", async () => {
     const listMessages = vi.fn(async () => [])
     const readerSpy = vi.spyOn(mailroomReader, "resolveMailroomReaderWithRefresh").mockResolvedValue({

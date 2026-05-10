@@ -2,6 +2,7 @@ import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
+import { FileMailroomStore } from "../../mailroom/file-store"
 import { migrateLocalMailroomToPlaintext } from "../../mailroom/migration"
 
 const tempRoots: string[] = []
@@ -172,6 +173,69 @@ describe("migrateLocalMailroomToPlaintext", () => {
     expect(fs.existsSync(path.join(cacheDir, "mail_other_agent.json"))).toBe(true)
     expect(fs.existsSync(path.join(coverageDir, "file.json"))).toBe(true)
     expect(fs.existsSync(path.join(coverageDir, "azure.json"))).toBe(false)
+  })
+
+  it("ignores cross-agent coverage records and malformed search-cache docs", () => {
+    const mailroomRoot = tempDir()
+    const searchCacheRoot = tempDir()
+
+    const coverageDir = path.join(searchCacheRoot, "coverage")
+    fs.mkdirSync(coverageDir, { recursive: true })
+    // Coverage record for a different agent — preserved
+    writeJson(path.join(coverageDir, "other-agent.json"), {
+      schemaVersion: 1,
+      agentId: "other-agent",
+      storeKind: "azure-blob",
+      indexedAt: "2026-04-21T00:00:00.000Z",
+      visibleMessageCount: 0,
+      cachedMessageCount: 0,
+      decryptableMessageCount: 0,
+      skippedMessageCount: 0,
+    })
+    // Malformed search-cache doc — readJson returns null, line skipped
+    fs.writeFileSync(path.join(searchCacheRoot, "broken.json"), "not json")
+    // Search-cache doc with non-string messageId — skipped
+    writeJson(path.join(searchCacheRoot, "weird.json"), {
+      schemaVersion: 1,
+      messageId: 42,
+      agentId: "slugger",
+    })
+
+    const result = migrateLocalMailroomToPlaintext({
+      agentId: "slugger",
+      mailroomRoot,
+      searchCacheRoot,
+    })
+
+    expect(result.wipedCoverageRecords).toBe(0)
+    expect(result.wipedOrphanSearchDocs).toBe(0)
+    expect(fs.existsSync(path.join(coverageDir, "other-agent.json"))).toBe(true)
+    expect(fs.existsSync(path.join(searchCacheRoot, "broken.json"))).toBe(true)
+    expect(fs.existsSync(path.join(searchCacheRoot, "weird.json"))).toBe(true)
+  })
+
+  it("auto-runs migration from FileMailroomStore construction when migrateAgentId is provided", () => {
+    const rootDir = tempDir()
+    fs.mkdirSync(path.join(rootDir, "messages"), { recursive: true })
+    fs.writeFileSync(
+      path.join(rootDir, "messages", "mail_legacy.json"),
+      JSON.stringify({ schemaVersion: 1, id: "mail_legacy", agentId: "slugger", privateEnvelope: {} }) + "\n",
+    )
+    // Default mailSearchCache supplies cacheDirForAgent.
+    new FileMailroomStore({ rootDir, migrateAgentId: "slugger" })
+    expect(fs.existsSync(path.join(rootDir, "messages", "mail_legacy.json"))).toBe(false)
+  })
+
+  it("falls back to the sibling mail-search dir when mailSearchCache has no cacheDirForAgent", () => {
+    const rootDir = tempDir()
+    fs.mkdirSync(path.join(rootDir, "messages"), { recursive: true })
+    fs.writeFileSync(
+      path.join(rootDir, "messages", "mail_legacy.json"),
+      JSON.stringify({ schemaVersion: 1, id: "mail_legacy", agentId: "slugger", privateEnvelope: {} }) + "\n",
+    )
+    // Override mailSearchCache with an empty object so the ?? fallback fires.
+    new FileMailroomStore({ rootDir, migrateAgentId: "slugger", mailSearchCache: {} })
+    expect(fs.existsSync(path.join(rootDir, "messages", "mail_legacy.json"))).toBe(false)
   })
 
   it("is idempotent on the second run", () => {

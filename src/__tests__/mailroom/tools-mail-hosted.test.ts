@@ -3255,4 +3255,273 @@ describe("hosted mail tools", () => {
 
     expect(decision).toContain("sender policy: unavailable (mail registry write failed: write denied as string)")
   })
+
+  // The four tests below exercise the encrypted-store missing-key recovery
+  // surface. After local store went plaintext (PR adopting the new builder
+  // shape), the only path that can still surface a missing private key is the
+  // hosted Azure Blob store. These tests inject encrypted messages directly
+  // into a mocked hosted reader so renderDecryptSkips / renderUndecryptableThread
+  // / decryptVisibleMessages stay covered.
+
+  async function buildEncryptedMessageForKey(keyId: string, subject = "Hosted lost key proof") {
+    const { buildEncryptedStoredMailMessage, provisionMailboxRegistry, resolveMailAddress } = await import("../../mailroom/core")
+    const { registry, keys } = provisionMailboxRegistry({ agentId: "slugger" })
+    const native = resolveMailAddress(registry, "slugger@ouro.bot")
+    if (!native) throw new Error("expected native resolution")
+    const overriddenResolved = {
+      ...native,
+      keyId,
+      publicKeyPem: registry.mailboxes[0]!.publicKeyPem,
+    }
+    const built = await buildEncryptedStoredMailMessage({
+      resolved: overriddenResolved,
+      envelope: { mailFrom: "remote@example.com", rcptTo: ["slugger@ouro.bot"] },
+      rawMime: Buffer.from([
+        "From: Remote <remote@example.com>",
+        "To: slugger@ouro.bot",
+        `Subject: ${subject}`,
+        "",
+        "encrypted hosted body",
+      ].join("\r\n")),
+      receivedAt: new Date("2026-04-25T18:00:00.000Z"),
+    })
+    return { message: built.message, keys, registry }
+  }
+
+  it("renders missing-key skip warnings in hosted mail_recent when the agent's vault lacks the key", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+    const { message } = await buildEncryptedMessageForKey("mail_missing_recent")
+
+    const listMessages = vi.fn(async () => [message])
+    const recordAccess = vi.fn(async () => ({
+      id: "access_recent",
+      agentId: "slugger",
+      tool: "mail_recent",
+      reason: "lost-key proof",
+      accessedAt: "2026-04-25T19:00:00.000Z",
+    }))
+
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: { other_key: "unused" },
+        },
+        store: { listMessages, listMessageIndexRecords: undefined, getMessage: async () => null, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const recent = await mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_recent")!
+      .handler({ scope: "native", reason: "lost-key proof" }, trustedContext())
+    expect(recent).toContain("No decryptable mail to show.")
+    expect(recent).toContain("1 mail message could not be decrypted")
+    expect(recent).toContain("mail_missing_recent")
+  })
+
+  it("renders an undecryptable-thread explanation when hosted mail_body lacks the key", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+    const { message } = await buildEncryptedMessageForKey("mail_missing_body")
+
+    const getMessage = vi.fn(async () => message)
+    const recordAccess = vi.fn(async () => ({
+      id: "access_body",
+      agentId: "slugger",
+      tool: "mail_body",
+      reason: "lost-key body",
+      accessedAt: "2026-04-25T19:00:00.000Z",
+    }))
+
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: {
+          mailboxAddress: "slugger@ouro.bot",
+          privateKeys: { other_key: "unused" },
+        },
+        store: { getMessage, listMessages: async () => [], recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const body = await mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_body")!
+      .handler({ message_id: message.id, reason: "lost-key body" }, trustedContext())
+    expect(body).toContain("could not be decrypted")
+    expect(body).toContain("mail_missing_body")
+    expect(body).toContain("rotation cannot recover")
+  })
+
+  it("rethrows hosted decrypt errors from crypto corruption (Error without keyId)", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+    const { buildEncryptedStoredMailMessage, provisionMailboxRegistry, resolveMailAddress } = await import("../../mailroom/core")
+    const { registry } = provisionMailboxRegistry({ agentId: "slugger" })
+    const native = resolveMailAddress(registry, "slugger@ouro.bot")
+    if (!native) throw new Error("expected resolved")
+    const built = await buildEncryptedStoredMailMessage({
+      resolved: native,
+      envelope: { mailFrom: "remote@example.com", rcptTo: ["slugger@ouro.bot"] },
+      rawMime: Buffer.from("From: r@example.com\r\nTo: slugger@ouro.bot\r\nSubject: x\r\n\r\nbody\r\n"),
+      receivedAt: new Date("2026-04-25T18:00:00.000Z"),
+    })
+    if (built.message.bodyForm !== "encrypted") throw new Error("expected encrypted")
+    const matchingKeyId = built.message.privateEnvelope.keyId
+    const corruptKeys = { [matchingKeyId]: "not a real PEM" }
+
+    const recordAccess = vi.fn(async () => ({
+      id: "access_x", agentId: "slugger", tool: "mail_recent", reason: "corrupt", accessedAt: "2026-04-25T19:00:00.000Z",
+    }))
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: { mailboxAddress: "slugger@ouro.bot", privateKeys: corruptKeys },
+        store: { listMessages: async () => [built.message], getMessage: async () => built.message, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    await expect(mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_recent")!
+      .handler({ scope: "native", reason: "corrupt proof" }, trustedContext())).rejects.toThrow()
+    await expect(mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_body")!
+      .handler({ message_id: built.message.id, reason: "corrupt body" }, trustedContext())).rejects.toThrow()
+  })
+
+  it("renders missing-key skip warnings with plural noun and 'more' overflow when many messages are skipped", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+    const { buildEncryptedStoredMailMessage, provisionMailboxRegistry, resolveMailAddress } = await import("../../mailroom/core")
+    const { registry } = provisionMailboxRegistry({ agentId: "slugger" })
+    const native = resolveMailAddress(registry, "slugger@ouro.bot")
+    if (!native) throw new Error("expected resolved")
+    const built: StoredMailMessage[] = []
+    for (let index = 0; index < 5; index += 1) {
+      const builtOne = await buildEncryptedStoredMailMessage({
+        resolved: { ...native, keyId: `mail_skip_${index}` },
+        envelope: { mailFrom: `r${index}@example.com`, rcptTo: ["slugger@ouro.bot"] },
+        rawMime: Buffer.from(`From: r${index}@example.com\r\nTo: slugger@ouro.bot\r\nSubject: x${index}\r\n\r\nbody\r\n`),
+        receivedAt: new Date(Date.parse("2026-04-25T18:00:00.000Z") + index),
+      })
+      built.push(builtOne.message)
+    }
+
+    const recordAccess = vi.fn(async () => ({
+      id: "access_x", agentId: "slugger", tool: "mail_recent", reason: "skip", accessedAt: "2026-04-25T19:00:00.000Z",
+    }))
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: { mailboxAddress: "slugger@ouro.bot", privateKeys: { unrelated: "unused" } },
+        store: { listMessages: async () => built, getMessage: async () => null, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const recent = await mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_recent")!
+      .handler({ scope: "native", limit: "10", reason: "skip plural proof" }, trustedContext())
+    expect(recent).toContain("5 mail messages could not be decrypted")
+    expect(recent).toContain("; 2 more")
+  })
+
+  it("rethrows hosted non-missing-key decrypt failures from store.listMessages", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+
+    const listMessages = vi.fn(async () => {
+      throw new Error("hosted scan exploded for a non-missing-key reason")
+    })
+    const recordAccess = vi.fn(async () => ({
+      id: "access_recent",
+      agentId: "slugger",
+      tool: "mail_recent",
+      reason: "non-missing-key proof",
+      accessedAt: "2026-04-25T19:00:00.000Z",
+    }))
+
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: { mailboxAddress: "slugger@ouro.bot", privateKeys: { other_key: "unused" } },
+        store: { listMessages, getMessage: async () => null, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    await expect(mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_recent")!
+      .handler({ scope: "native", reason: "non-missing-key proof" }, trustedContext())).rejects.toThrow("hosted scan exploded")
+  })
+
+  it("falls back to envelope mail-from in policy decision when the message body cannot be decrypted", async () => {
+    process.env.HOME = tempDir()
+    setAgentName("slugger")
+    // Use buildEncryptedStoredMailMessage with a key that won't be in privateKeys.
+    const { message } = await buildEncryptedMessageForKey("mail_policy_missing", "Hosted policy proof")
+    const candidate = {
+      schemaVersion: 1 as const,
+      id: `candidate_${message.id}`,
+      agentId: "slugger",
+      mailboxId: message.mailboxId,
+      messageId: message.id,
+      senderEmail: "remote@example.com",
+      senderDisplay: "Remote",
+      recipient: message.recipient,
+      placement: message.placement,
+      status: "pending" as const,
+      trustReason: message.trustReason,
+      firstSeenAt: message.receivedAt,
+      lastSeenAt: message.receivedAt,
+      messageCount: 1,
+    }
+    const getMessage = vi.fn(async () => message)
+    const listScreenerCandidates = vi.fn(async () => [candidate])
+    const updateScreenerCandidate = vi.fn(async (entry: typeof candidate) => entry)
+    const recordMailDecision = vi.fn(async (entry: Record<string, unknown>) => ({ ...entry, schemaVersion: 1, id: "decision_x", createdAt: "now" }))
+    const updateMessagePlacement = vi.fn(async () => message)
+    const recordAccess = vi.fn(async () => ({
+      id: "access_decide",
+      agentId: "slugger",
+      tool: "mail_decide",
+      reason: "test",
+      accessedAt: "2026-04-25T19:00:00.000Z",
+    }))
+
+    const { provisionMailboxRegistry } = await import("../../mailroom/core")
+    const { registry } = provisionMailboxRegistry({ agentId: "slugger" })
+
+    vi.doMock("../../mailroom/reader", () => refreshableReaderMock({
+      resolveMailroomReader: () => ({
+        ok: true,
+        agentName: "slugger",
+        config: { mailboxAddress: "slugger@ouro.bot", privateKeys: { other_key: "unused" } },
+        store: { getMessage, listScreenerCandidates, updateScreenerCandidate, recordMailDecision, updateMessagePlacement, recordAccess },
+        storeKind: "azure-blob",
+        storeLabel: "https://mail.example.invalid/mailroom",
+      }),
+      readMailroomRegistry: async () => registry,
+      writeMailroomRegistry: async () => undefined,
+    }))
+
+    const { mailToolDefinitions } = await import("../../repertoire/tools-mail")
+    const decision = await mailToolDefinitions.find((definition) => definition.tool.function.name === "mail_decide")!
+      .handler({ candidate_id: candidate.id, action: "allow-sender", reason: "policy fallback proof" }, trustedContext())
+    expect(decision).toContain("Mail decision recorded: allow-sender")
+    expect(decision).toContain("sender policy: allow email remote@example.com")
+  })
 })
