@@ -27,6 +27,14 @@ const baselineExpectation: VoiceRealtimeEvalExpectation = {
   ],
 }
 
+const minimalExpectation: VoiceRealtimeEvalExpectation = {
+  maxFirstAssistantAudioMs: 100,
+  maxUserTurnResponseMs: 100,
+  maxToolPresenceMs: 100,
+  maxBargeInClearMs: 100,
+  maxBargeInTruncateMs: 100,
+}
+
 function mutateHappyPath(mutator: (events: VoiceRealtimeEvalTimelineEvent[]) => void): VoiceRealtimeEvalTimelineEvent[] {
   const events = buildVoiceRealtimeEvalHappyPath()
   mutator(events)
@@ -104,6 +112,78 @@ describe("voice realtime eval kernel", () => {
     ]))
   })
 
+  it("covers missing first audio, missing user response, late tool presence, and late barge controls", () => {
+    const flawed = mutateHappyPath((events) => {
+      const firstAudioIndex = events.findIndex((event) => event.type === "assistant.audio.started")
+      if (firstAudioIndex >= 0) events.splice(firstAudioIndex, 1)
+      const userResponseIndex = events.findIndex((event) => event.type === "response.requested" && event.correlationId === "user-1")
+      if (userResponseIndex >= 0) events.splice(userResponseIndex, 1)
+      const holding = events.find((event) => event.type === "tool.holding.started")
+      if (holding) holding.atMs = 3_900
+      const clear = events.find((event) => event.type === "transport.playback_cleared")
+      if (clear) clear.atMs = 4_500
+      const truncate = events.find((event) => event.type === "response.truncated")
+      if (truncate) truncate.atMs = 4_500
+    })
+
+    const report = gradeVoiceRealtimeEvalTimeline("missing-late-path", flawed, baselineExpectation)
+
+    expect(report.passed).toBe(false)
+    expect(report.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining([
+      "first_audio_late",
+      "user_response_missing",
+      "tool_presence_late",
+      "barge_in_clear_late",
+      "barge_in_truncate_late",
+    ]))
+  })
+
+  it("flags a connected call that never starts assistant audio", () => {
+    const silent = mutateHappyPath((events) => {
+      for (let index = events.length - 1; index >= 0; index -= 1) {
+        if (events[index]?.type === "assistant.audio.started") events.splice(index, 1)
+      }
+    })
+
+    const report = gradeVoiceRealtimeEvalTimeline("silent-path", silent, baselineExpectation)
+
+    expect(report.findings.find((finding) => finding.code === "first_audio_missing")).toMatchObject({
+      severity: "fail",
+      source: { transport: "openai-sip", id: "sip-call-1" },
+      atMs: 0,
+    })
+  })
+
+  it("flags malformed timelines with audio but no connect marker or neither connect nor audio", () => {
+    const noConnect = gradeVoiceRealtimeEvalTimeline("no-connect", [
+      { type: "assistant.audio.started", atMs: 50, source: { transport: "openai-sip", id: "sip-call-1" } },
+    ], minimalExpectation)
+    const noConnectOrAudio = gradeVoiceRealtimeEvalTimeline("no-connect-audio", [
+      { type: "user.transcript.done", atMs: 50 },
+    ], minimalExpectation)
+
+    expect(noConnect.findings.find((finding) => finding.code === "first_audio_missing")).toMatchObject({
+      source: { transport: "openai-sip", id: "sip-call-1" },
+      atMs: 50,
+    })
+    expect(noConnectOrAudio.findings.find((finding) => finding.code === "first_audio_missing")).toMatchObject({
+      severity: "fail",
+    })
+  })
+
+  it("treats transcript events without text as missing required content", () => {
+    const missingText = mutateHappyPath((events) => {
+      const assistantTranscript = events.find((event) => event.type === "assistant.transcript.done")
+      if (assistantTranscript) delete assistantTranscript.text
+    })
+
+    const report = gradeVoiceRealtimeEvalTimeline("missing-transcript-text", missingText, baselineExpectation)
+
+    expect(report.findings.find((finding) => finding.code === "transcript_missing")).toMatchObject({
+      message: "Missing assistant transcript containing \"checking the weather\".",
+    })
+  })
+
   it("flags missed barge-in controls, missing friend context, and missing hangup", () => {
     const flawed = mutateHappyPath((events) => {
       const clearIndex = events.findIndex((event) => event.type === "transport.playback_cleared")
@@ -142,6 +222,23 @@ describe("voice realtime eval kernel", () => {
       ...baselineExpectation,
       maxFirstAssistantAudioMs: 0,
     })).toThrow("voice eval latency budgets must be positive")
+    expect(() => gradeVoiceRealtimeEvalTimeline("nan-threshold", buildVoiceRealtimeEvalHappyPath(), {
+      ...baselineExpectation,
+      maxToolPresenceMs: Number.NaN,
+    })).toThrow("voice eval latency budgets must be positive")
+  })
+
+  it("allows minimal timelines when optional voice assertions are disabled", () => {
+    const report = gradeVoiceRealtimeEvalTimeline("minimal", [
+      { type: "call.connected", atMs: 40 },
+      { type: "assistant.audio.started", atMs: 100 },
+    ], minimalExpectation)
+
+    expect(report).toMatchObject({
+      passed: true,
+      metrics: { ttfaMs: 60 },
+      transportSources: [],
+    })
   })
 
   it("runs built-in no-human scenarios and summarizes pass/fail counts", () => {

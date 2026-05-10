@@ -507,12 +507,11 @@ function builtInExpectation(): VoiceRealtimeEvalExpectation {
 }
 
 function buildKnownBadLatencyPath(): VoiceRealtimeEvalTimelineEvent[] {
-  const events = buildVoiceRealtimeEvalHappyPath()
-  const firstAudio = events.find((event) => event.type === "assistant.audio.started")
-  if (firstAudio) firstAudio.atMs = 1_900
-  const userResponse = events.find((event) => event.type === "response.requested" && event.correlationId === "user-1")
-  if (userResponse) userResponse.atMs = 3_500
-  return events
+  return buildVoiceRealtimeEvalHappyPath().map((event) => {
+    if (event.type === "assistant.audio.started" && event.correlationId === "greeting") return { ...event, atMs: 1_900 }
+    if (event.type === "response.requested" && event.correlationId === "user-1") return { ...event, atMs: 3_500 }
+    return event
+  })
 }
 
 export function runBuiltInVoiceRealtimeEvalSuite(): VoiceRealtimeEvalReport[] {
