@@ -102,7 +102,7 @@ function summarizeTraceResults(traces: VoiceRealtimeEvalCommandTraceResult[]): V
 function errorResult(error: unknown): VoiceRealtimeEvalCommandResult {
   return {
     exitCode: 1,
-    payload: { error: error instanceof Error ? error.message : String(error) },
+    payload: { error: String(error).replace(/^Error: /, "") },
   }
 }
 

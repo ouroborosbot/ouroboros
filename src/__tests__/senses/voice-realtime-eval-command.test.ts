@@ -42,13 +42,15 @@ describe("voice realtime eval command", () => {
       fixturePath("clean-call.json"),
       "--trace",
       fixturePath("delayed-audio-transcript-mismatch.json"),
+      "--trace",
+      fixturePath("duplicate-late-provider-event.json"),
     ])
 
     expect(result.exitCode).toBe(0)
     expect(result.payload.traceSummary).toEqual({
-      matched: 2,
+      matched: 3,
       mismatched: 0,
-      total: 2,
+      total: 3,
       mismatchedScenarioIds: [],
     })
     expect(result.payload.traces?.map((trace) => ({
@@ -59,6 +61,12 @@ describe("voice realtime eval command", () => {
     }))).toEqual([
       { scenarioId: "clean-call", expectedOutcome: "pass", outcomeMatched: true, passed: true },
       { scenarioId: "delayed-audio-transcript-mismatch", expectedOutcome: "expected-fail", outcomeMatched: true, passed: false },
+      { scenarioId: "duplicate-late-provider-event", expectedOutcome: "pass", outcomeMatched: true, passed: true },
+    ])
+    expect(result.payload.traces?.[2]?.ignoredEvents.map((event) => event.event)).toEqual([
+      "openai.realtime.output_audio.delta",
+      "openai.realtime.rate_limits.updated",
+      "openai.realtime.response.done",
     ])
   })
 
