@@ -2,10 +2,18 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.585",
+      "version": "0.1.0-alpha.586",
       "changes": [
         "`mail_status`, `mail_recent`, `mail_search`, and `mail_index_refresh` now flag a 'mail substrate divergence' when the encrypted mailroom store reports zero visible messages but the on-disk search cache still holds documents from prior imports — the post-rotation / hosted→local-fallback / wiped-store state that previously rendered as a silent 'no mail' answer indistinguishable from a clean onboarding.",
         "Mail absence answers from a divergent runtime now point at vault inspection (`mailroom.mode`, `mailroom.azureAccountUrl`, `mailroom.storePath`) and re-import recovery, so agents stop treating a broken substrate as evidence that the human inbox is empty."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.585",
+      "changes": [
+        "Voice realtime evals now support replayable trace JSON artifacts that preserve transport/source metadata, normalize SIP/Twilio/Realtime event names into the shared Voice eval timeline, validate causal ordering, and keep ignored provider-noise events visible without grading them.",
+        "`npm run voice:eval -- --trace <file>` grades one or more trace artifacts alongside the built-in happy/known-bad suite, treating expected-fail traces as canaries while failing on unexpected trace failures or unexpected passes.",
+        "Voice trace replay has golden fixtures for clean calls, barge-in, tool holding phrases, mid-turn hangup, delayed audio/transcript behavior, duplicate/late provider events, and redaction-safe summaries so phone regressions can be debugged without a human live call."
       ]
     },
     {
