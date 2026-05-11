@@ -18,8 +18,8 @@ describe("buildAwaitTurnMessage", () => {
       checkpoint: undefined,
       now: () => new Date("2026-05-10T20:00:00.000Z"),
     })
-    expect(result).toContain("await tick: hey_export")
-    expect(result).toContain("condition: HEY export download visible")
+    expect(result).toContain("await tick: hey_export — HEY export download visible")
+    expect(result).not.toContain("\ncondition: HEY export download visible")
     expect(result).toContain("history: never checked")
     expect(result).toContain("call resolve_await")
   })

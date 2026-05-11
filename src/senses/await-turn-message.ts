@@ -37,9 +37,7 @@ export function buildAwaitTurnMessage(options: AwaitTurnMessageOptions): string 
   })
 
   const lines: string[] = []
-  lines.push(`await tick: ${options.awaitName}`)
-  lines.push("")
-  lines.push(`condition: ${options.condition}`)
+  lines.push(`await tick: ${options.awaitName} — ${options.condition}`)
 
   if (options.body && options.body.trim().length > 0) {
     lines.push("")
