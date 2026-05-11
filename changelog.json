@@ -2,6 +2,12 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.602",
+      "changes": [
+        "Inner tab in mailbox UI now surfaces the return-obligation queue: count of queued/running held items and the oldest item's age. Previously the tab said 'No pending inner work' even when dozens of held items were sitting in arc/obligations/inner/ — only the pending-messages dir (inbox-style) was consulted. Adds MailboxReturnObligationQueueSummary to the public mailbox contract."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.601",
       "changes": [
         "Mailbox tab loading hang: listMailOutbound now downloads blobs in parallel (MESSAGE_LIST_SCAN_CONCURRENCY=32) instead of sequentially, and accepts an optional limit. The Mailbox tab passes limit=50 so the UI no longer blocks on a full-history scan for agents with many outbound records."
