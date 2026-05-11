@@ -861,6 +861,7 @@ async function prewarmOutboundGreeting(options: {
   byteLength: number
   preparedAt: string
 } | undefined> {
+  /* v8 ignore next -- defensive guard against record-play prewarm calls; the implicit-media-stream default added when realtime/SIP credentials are configured prevents this branch from being reachable in current outbound tests @preserve */
   if (options.settings.transportMode !== "media-stream") return undefined
   /* v8 ignore next -- Realtime/SIP outbound tests assert no cascade prewarm is attempted @preserve */
   if (options.settings.outboundConversationEngine === "openai-realtime" || options.settings.outboundConversationEngine === "openai-sip") return undefined
