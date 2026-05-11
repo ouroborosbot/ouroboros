@@ -43,6 +43,7 @@ function makeDeps(overrides: Partial<AwaitSchedulerDeps> = {}): AwaitSchedulerDe
     readdir: vi.fn(() => []),
     readFile: vi.fn(() => ""),
     existsSync: vi.fn(() => true),
+    mkdir: vi.fn(),
     now: vi.fn(() => 1_000_000),
     ouroPath: "/usr/local/bin/ouro",
     ...overrides,
@@ -106,6 +107,29 @@ describe("AwaitScheduler", () => {
   })
 
   describe("start()", () => {
+    it("ensures the awaits dir exists before scanning (cold-start: dir not yet created)", () => {
+      const mkdir = vi.fn()
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ mkdir, readdir })
+
+      const scheduler = new AwaitScheduler({
+        agent: "slugger",
+        awaitsDir: "/bundles/slugger.ouro/awaiting",
+        osCronManager: cronManager,
+        onAwaitFire,
+        onAwaitExpire,
+        deps,
+      })
+
+      scheduler.start()
+
+      expect(mkdir).toHaveBeenCalledWith("/bundles/slugger.ouro/awaiting")
+      // mkdir must precede readdir so the watcher (which attaches after start()) sees a real dir.
+      const mkdirOrder = mkdir.mock.invocationCallOrder[0]
+      const readdirOrder = readdir.mock.invocationCallOrder[0]
+      expect(mkdirOrder).toBeLessThan(readdirOrder)
+    })
+
     it("scans awaitsDir and registers cron entries for pending awaits", () => {
       const readdir = vi.fn(() => ["hey_export.md"])
       const readFile = vi.fn(() => "content")

@@ -443,6 +443,7 @@ void daemon.start().then(() => {
           readdir: (dir) => fs.readdirSync(dir),
           readFile: (p, enc) => fs.readFileSync(p, enc as BufferEncoding),
           existsSync: (p) => fs.existsSync(p),
+          mkdir: (dir) => { fs.mkdirSync(dir, { recursive: true }) },
           now: () => Date.now(),
           ouroPath,
           watch: (dir, cb) => fs.watch(dir, cb),

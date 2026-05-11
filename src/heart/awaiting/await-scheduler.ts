@@ -14,6 +14,8 @@ export interface AwaitSchedulerDeps {
   readdir: (dir: string) => string[]
   readFile: (filePath: string, encoding: string) => string
   existsSync: (target: string) => boolean
+  /** Ensure a directory exists (recursive). Called at scheduler start so the file watcher can attach. */
+  mkdir: (dir: string) => void
   now: () => number
   ouroPath: string
   watch?: (dir: string, callback: (event: string, filename: string | null) => void) => FsWatcher
@@ -81,6 +83,11 @@ export class AwaitScheduler {
       message: "await scheduler starting",
       meta: { agent: this.agent, awaitsDir: this.awaitsDir },
     })
+
+    // Ensure the awaits dir exists before scanning + attaching the file watcher.
+    // Without this, fs.watch ENOENTs on cold start and the watcher is never installed,
+    // so a freshly-filed first-ever await has to wait for the next periodic reconcile.
+    this.deps.mkdir(this.awaitsDir)
 
     const awaits = this.scanAwaits()
     this.expireOverdueByMaxAge(awaits)
