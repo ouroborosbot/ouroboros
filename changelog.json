@@ -2,9 +2,15 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.607",
+      "version": "0.1.0-alpha.609",
       "changes": [
         "Fix the inner-dialog rest loop incident: skip empty rest-only assistant turns when deriving checkpoints, surface meaningful tool-only actions in thoughts/status output, compact idle heartbeat rest triplets, and avoid stale session repair churn during active-session scans."
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.608",
+      "changes": [
+        "Carry agent context through MCP CLI commands."
       ]
     },
     {
