@@ -4,7 +4,7 @@
     {
       "version": "0.1.0-alpha.607",
       "changes": [
-        "Fix inner-dialog rest-only heartbeat compaction and surface tool-only checkpoints."
+        "Fix the inner-dialog rest loop incident: skip empty rest-only assistant turns when deriving checkpoints, surface meaningful tool-only actions in thoughts/status output, compact idle heartbeat rest triplets, and avoid stale session repair churn during active-session scans."
       ]
     },
     {

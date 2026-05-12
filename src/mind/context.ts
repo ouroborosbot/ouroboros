@@ -101,7 +101,6 @@ function messageContentToText(content: unknown): string {
   if (!Array.isArray(content)) return ""
   return content
     .map((part) => {
-      if (typeof part === "string") return part
       if (part && typeof part === "object" && "text" in part && typeof part.text === "string") {
         return part.text
       }
@@ -110,17 +109,12 @@ function messageContentToText(content: unknown): string {
     .join("\n")
 }
 
-function toolCallName(toolCall: unknown): string | undefined {
-  if (!toolCall || typeof toolCall !== "object" || !("function" in toolCall)) return undefined
-  const fn = (toolCall as { function?: unknown }).function
-  if (!fn || typeof fn !== "object" || !("name" in fn) || typeof fn.name !== "string") return undefined
-  return fn.name
+function toolCallName(toolCall: unknown): string {
+  return (toolCall as { function: { name: string } }).function.name
 }
 
-function toolCallId(toolCall: unknown): string | undefined {
-  if (!toolCall || typeof toolCall !== "object" || !("id" in toolCall)) return undefined
-  const id = (toolCall as { id?: unknown }).id
-  return typeof id === "string" ? id : undefined
+function toolCallId(toolCall: unknown): string {
+  return (toolCall as { id: string }).id
 }
 
 function isIdleHeartbeatRestUserMessage(message: OpenAI.ChatCompletionMessageParam): boolean {
@@ -137,12 +131,11 @@ function isEmptyRestOnlyAssistantMessage(message: OpenAI.ChatCompletionMessagePa
   if (!Array.isArray(message.tool_calls) || message.tool_calls.length !== 1) return null
   const onlyToolCall = message.tool_calls[0]
   if (toolCallName(onlyToolCall) !== "rest") return null
-  return toolCallId(onlyToolCall) ?? null
+  return toolCallId(onlyToolCall)
 }
 
 function isMatchingToolResult(message: OpenAI.ChatCompletionMessageParam, toolId: string): boolean {
-  if (message.role !== "tool") return false
-  return message.tool_call_id === toolId
+  return (message as { tool_call_id?: string }).tool_call_id === toolId
 }
 
 function compactIdleRestOnlyTurns(
