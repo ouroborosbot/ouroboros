@@ -213,6 +213,75 @@ describe("trimMessages", () => {
   })
 })
 
+describe("postTurnTrim idle rest compaction", () => {
+  beforeEach(() => { vi.resetModules() })
+
+  it("keeps only recent idle rest-only heartbeat turns while preserving meaningful tool turns", async () => {
+    const { postTurnTrim } = await import("../../mind/context")
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+    ]
+
+    for (let i = 0; i < 25; i++) {
+      msgs.push(
+        { role: "user", content: `...time passing. anything stirring?\n\nlast checkpoint: idle ${i}` },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: `call_rest_${i}`,
+              type: "function",
+              function: { name: "rest", arguments: "{}" },
+            },
+          ],
+        } as any,
+        { role: "tool", tool_call_id: `call_rest_${i}`, content: "(resting)" } as any,
+      )
+    }
+
+    msgs.push(
+      { role: "user", content: "...time passing. anything stirring?\n\nlast checkpoint: important" },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_surface",
+            type: "function",
+            function: { name: "surface", arguments: JSON.stringify({ message: "important surfaced message" }) },
+          },
+        ],
+      } as any,
+      { role: "tool", tool_call_id: "call_surface", content: "delivered" } as any,
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_rest_final",
+            type: "function",
+            function: { name: "rest", arguments: "{}" },
+          },
+        ],
+      } as any,
+      { role: "tool", tool_call_id: "call_rest_final", content: "(resting)" } as any,
+    )
+
+    const prepared = postTurnTrim(msgs)
+    const restCalls = msgs.flatMap((message) => {
+      if (message.role !== "assistant") return []
+      return ((message as any).tool_calls ?? []).filter((toolCall: any) => toolCall.function?.name === "rest")
+    })
+
+    expect(restCalls).toHaveLength(21)
+    expect(JSON.stringify(msgs)).toContain("call_surface")
+    expect(JSON.stringify(msgs)).not.toContain("call_rest_0")
+    expect(JSON.stringify(msgs)).toContain("call_rest_24")
+    expect(prepared.trimmedMessages).toHaveLength(msgs.length)
+  })
+})
+
 describe("saveSession", () => {
   beforeEach(() => {
     vi.resetModules()

@@ -490,6 +490,46 @@ describe("inner dialog runtime", () => {
     expect(checkpoint).toBe("no prior checkpoint recorded")
   })
 
+  it("uses the latest meaningful tool-only assistant action when empty rest follows it", () => {
+    const checkpoint = deriveResumeCheckpoint([
+      {
+        role: "assistant",
+        content: "older visible checkpoint",
+      },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_surface",
+            type: "function",
+            function: {
+              name: "surface",
+              arguments: JSON.stringify({
+                message: "HEY — something is WRONG. I just called rest hundreds of times.",
+              }),
+            },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "call_surface", content: "delivered — via iMessage" },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_rest",
+            type: "function",
+            function: { name: "rest", arguments: "{}" },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "call_rest", content: "(resting)" },
+    ] as OpenAI.ChatCompletionMessageParam[])
+
+    expect(checkpoint).toBe("surfaced: HEY — something is WRONG. I just called rest hundreds of times.")
+  })
+
   // ── Pipeline integration tests ──────────────────────────────────
 
   it("calls handleInboundTurn instead of inline lifecycle", async () => {

@@ -447,6 +447,46 @@ describe("thoughts", () => {
       expect(turns[0].tools).toEqual(["real_tool"])
     })
 
+    it("shows meaningful tool-only turns instead of a blank response", () => {
+      const sessionPath = tmpSessionFile([
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "...time passing. anything stirring?\n\nlast checkpoint: older visible checkpoint" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call_surface",
+              type: "function",
+              function: {
+                name: "surface",
+                arguments: JSON.stringify({ message: "HEY — something is WRONG." }),
+              },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_surface", content: "delivered — via iMessage" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call_rest",
+              type: "function",
+              function: { name: "rest", arguments: "{}" },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_rest", content: "(resting)" },
+      ])
+
+      const turns = parseInnerDialogSession(sessionPath)
+
+      expect(turns).toHaveLength(1)
+      expect(turns[0].tools).toEqual(["surface", "rest"])
+      expect(turns[0].response).toBe("surfaced: HEY — something is WRONG.")
+    })
+
     it("handles turn with no assistant response", () => {
       const sessionPath = tmpSessionFile([
         { role: "system", content: "system prompt" },
