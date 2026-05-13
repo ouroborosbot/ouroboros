@@ -2,6 +2,12 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.612",
+      "changes": [
+        "Add autopilot skill — long-running agent loop discipline. Operating doctrine for multi-track, multi-PR mandates: scan-and-spawn loop, 12 durable rules (R1–R12), and a 10-pattern recognition table. Sanitized from internal long-session dogfooding; usable by any long-running coding agent."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.611",
       "changes": [
         "BlueBubbles recovery: stale captured inbound sidecars are now marked superseded when the chat session has already advanced, preventing old iMessage recovery entries from keeping runtime health in warn or replaying obsolete chat turns."
